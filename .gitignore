@@ -122,3 +122,6 @@ app.*.symbols
 backend/node_modules/
 backend/.env
 backend/npm-debug.log*
+
+# --- VSCode ---
+.vscode/
