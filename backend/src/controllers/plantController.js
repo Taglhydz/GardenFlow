@@ -48,7 +48,7 @@ exports.updatePlant = async (req, res) => {
     const { name, type, description, sow_start_month, sow_end_month, harvest_start_month, harvest_end_month, sunlight_need, water_need, preferred_soil, spacing_cm } = req.body;
     const result = await Plant.update(id, { name, type, description, sow_start_month, sow_end_month, harvest_start_month, harvest_end_month, sunlight_need, water_need, preferred_soil, spacing_cm });
     
-	// check plant updated or found
+	// check plant deleted or not found
 	if (result.affectedRows === 0) { return res.status(404).json({ message: 'Plant not found or not updated' }); }
 
     res.json({ message: 'Plant updated' });
@@ -63,11 +63,11 @@ exports.deletePlant = async (req, res) => {
     const { id } = req.params;
     const result = await Plant.softDelete(id);
 
-	// check plant deleted or found
+	// check plant deleted or not found
     if (result.affectedRows === 0) { return res.status(404).json({ message: 'Plant not found or already deleted' }); }
 
     res.json({ message: 'Plant deleted (soft)' });
-	
+
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

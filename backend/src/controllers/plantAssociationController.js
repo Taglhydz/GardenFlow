@@ -53,7 +53,7 @@ exports.updatePlantAssociation = async (req, res) => {
   try {
     const result = await PlantAssociation.update(id, updatedAssociation);
 
-	// check association updated
+	// check association deleted or not found
     if (result.affectedRows === 0) { return res.status(404).json({ error: 'Association non trouvée ou déjà supprimée' }); }
 
     res.status(200).json({ message: 'Association mise à jour avec succès' });
@@ -69,7 +69,7 @@ exports.deletePlantAssociation = async (req, res) => {
   try {
     const result = await PlantAssociation.softDelete(id);
 
-	// check association deleted
+	// check association deleted or not found
     if (result.affectedRows === 0) { return res.status(404).json({ error: 'Association non trouvée ou déjà supprimée' }); }
 
     res.status(200).json({ message: 'Association supprimée (soft delete) avec succès' });

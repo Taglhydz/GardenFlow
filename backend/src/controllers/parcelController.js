@@ -48,7 +48,7 @@ exports.updateParcel = async (req, res) => {
     const { name, area_m2, pos_x, pos_y, width, length, soil_type, sunlight, moisture } = req.body;
     const result = await Parcel.update(id, { name, area_m2, pos_x, pos_y, width, length, soil_type, sunlight, moisture });
 
-	// check parcel updated or found
+	// check parcel deleted or not found
     if (result.affectedRows === 0) { return res.status(404).json({ message: 'Parcel not found or not updated' }); }
 
     res.json({ message: 'Parcel updated' });
@@ -63,7 +63,7 @@ exports.deleteParcel = async (req, res) => {
     const { id } = req.params;
     const result = await Parcel.softDelete(id);
 
-	// check parcel deleted or found
+	// check parcel deleted or not found
     if (result.affectedRows === 0) { return res.status(404).json({ message: 'Parcel not found or already deleted' }); }
 
     res.json({ message: 'Parcel deleted (soft)' });
@@ -79,7 +79,7 @@ exports.getParcelsByGardenId = async (req, res) => {
     const parcels = await Parcel.getByGardenId(garden_id);
 
     res.json(parcels);
-	
+
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

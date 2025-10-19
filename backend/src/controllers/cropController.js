@@ -52,7 +52,7 @@ exports.updateCrop = async (req, res) => {
   try {
     const result = await Crop.update(id, updatedCrop);
 
-	// check crop updated
+	// check crop deleted or not found
     if (result.affectedRows === 0) { return res.status(404).json({ error: 'Culture non trouvée ou déjà supprimée' }); }
 
     res.status(200).json({ message: 'Culture mise à jour avec succès' });
@@ -64,11 +64,11 @@ exports.updateCrop = async (req, res) => {
 
 exports.deleteCrop = async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     const result = await Crop.softDelete(id);
 
-	// check crop deleted
+	// check crop deleted or not found
     if (result.affectedRows === 0) { return res.status(404).json({ error: 'Culture non trouvée ou déjà supprimée' }); }
 
     res.status(200).json({ message: 'Culture supprimée (soft delete) avec succès' });

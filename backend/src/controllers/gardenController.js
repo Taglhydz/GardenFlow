@@ -48,7 +48,7 @@ exports.updateGarden = async (req, res) => {
     const { name, location, description } = req.body;
     const result = await Garden.update(id, { name, location, description });
 
-	// check garden updated or found
+	// check garden deleted or not found
     if (result.affectedRows === 0) { return res.status(404).json({ message: 'Garden not found or not updated' }); }
 
     res.json({ message: 'Garden updated' });
@@ -63,7 +63,7 @@ exports.deleteGarden = async (req, res) => {
     const { id } = req.params;
     const result = await Garden.softDelete(id);
 
-	// check garden deleted or found
+	// check garden deleted or not found
     if (result.affectedRows === 0) { return res.status(404).json({ message: 'Garden not found or already deleted' }); }
 
     res.json({ message: 'Garden deleted (soft)' });
