@@ -10,27 +10,24 @@ class ApiService {
 
   String? _token;
 
-  // Récupérer le token stocké
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(AppConstants.tokenKey);
   }
 
-  // Sauvegarder le token
   Future<void> saveToken(String token) async {
     _token = token;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.tokenKey, token);
   }
 
-  // Supprimer le token
   Future<void> removeToken() async {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.tokenKey);
   }
 
-  // Headers avec authentification
+  // Headers auth
   Map<String, String> _getHeaders() {
     final headers = {
       'Content-Type': 'application/json',

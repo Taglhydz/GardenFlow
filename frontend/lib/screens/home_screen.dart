@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../config/constants.dart';
 import 'gardens_screen.dart';
 import 'login_screen.dart';
 
@@ -46,8 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('GardenFlow'),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -67,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               icon: Icons.yard,
               title: 'Mes Jardins',
-              color: Colors.green,
+              color: AppColors.gardens,
               onTap: () {
                 Navigator.push(
                   context,
@@ -79,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               icon: Icons.grid_on,
               title: 'Parcelles',
-              color: Colors.brown,
+              color: AppColors.parcels,
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Parcelles à venir...')),
@@ -90,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               icon: Icons.local_florist,
               title: 'Plantes',
-              color: Colors.pink,
+              color: AppColors.plants,
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Plantes à venir...')),
@@ -101,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               icon: Icons.agriculture,
               title: 'Cultures',
-              color: Colors.orange,
+              color: AppColors.crops,
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Cultures à venir...')),

@@ -5,7 +5,6 @@ import 'api_service.dart';
 class PlantService {
   final ApiService _apiService = ApiService();
 
-  // Récupérer toutes les plantes
   Future<List<Plant>> getAllPlants() async {
     try {
       await _apiService.loadToken();
@@ -20,7 +19,6 @@ class PlantService {
     }
   }
 
-  // Récupérer une plante par ID
   Future<Plant> getPlantById(int id) async {
     try {
       await _apiService.loadToken();
@@ -31,7 +29,6 @@ class PlantService {
     }
   }
 
-  // Créer une plante
   Future<Plant> createPlant(Plant plant) async {
     try {
       await _apiService.loadToken();
@@ -45,7 +42,6 @@ class PlantService {
     }
   }
 
-  // Mettre à jour une plante
   Future<Plant> updatePlant(int id, Plant plant) async {
     try {
       await _apiService.loadToken();
@@ -59,7 +55,6 @@ class PlantService {
     }
   }
 
-  // Supprimer une plante
   Future<void> deletePlant(int id) async {
     try {
       await _apiService.loadToken();

@@ -5,7 +5,6 @@ import 'api_service.dart';
 class ParcelService {
   final ApiService _apiService = ApiService();
 
-  // Récupérer toutes les parcelles
   Future<List<Parcel>> getAllParcels() async {
     try {
       await _apiService.loadToken();
@@ -20,7 +19,6 @@ class ParcelService {
     }
   }
 
-  // Récupérer une parcelle par ID
   Future<Parcel> getParcelById(int id) async {
     try {
       await _apiService.loadToken();
@@ -31,7 +29,6 @@ class ParcelService {
     }
   }
 
-  // Récupérer les parcelles d'un jardin
   Future<List<Parcel>> getParcelsByGardenId(int gardenId) async {
     try {
       await _apiService.loadToken();
@@ -46,7 +43,6 @@ class ParcelService {
     }
   }
 
-  // Créer une parcelle
   Future<Parcel> createParcel(Parcel parcel) async {
     try {
       await _apiService.loadToken();
@@ -60,7 +56,6 @@ class ParcelService {
     }
   }
 
-  // Mettre à jour une parcelle
   Future<Parcel> updateParcel(int id, Parcel parcel) async {
     try {
       await _apiService.loadToken();
@@ -74,7 +69,6 @@ class ParcelService {
     }
   }
 
-  // Supprimer une parcelle
   Future<void> deleteParcel(int id) async {
     try {
       await _apiService.loadToken();

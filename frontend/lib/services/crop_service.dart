@@ -5,7 +5,6 @@ import 'api_service.dart';
 class CropService {
   final ApiService _apiService = ApiService();
 
-  // Récupérer toutes les cultures
   Future<List<Crop>> getAllCrops() async {
     try {
       await _apiService.loadToken();
@@ -20,7 +19,6 @@ class CropService {
     }
   }
 
-  // Récupérer une culture par ID
   Future<Crop> getCropById(int id) async {
     try {
       await _apiService.loadToken();
@@ -31,7 +29,6 @@ class CropService {
     }
   }
 
-  // Créer une culture
   Future<Crop> createCrop(Crop crop) async {
     try {
       await _apiService.loadToken();
@@ -45,7 +42,6 @@ class CropService {
     }
   }
 
-  // Mettre à jour une culture
   Future<Crop> updateCrop(int id, Crop crop) async {
     try {
       await _apiService.loadToken();
@@ -59,7 +55,6 @@ class CropService {
     }
   }
 
-  // Supprimer une culture
   Future<void> deleteCrop(int id) async {
     try {
       await _apiService.loadToken();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../config/constants.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -11,24 +12,24 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _formKey                   = GlobalKey<FormState>();
+  final _usernameController        = TextEditingController();
+  final _emailController           = TextEditingController();
+  final _passwordController        = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _authService = AuthService();
-  bool _isLoading = false;
-  bool _isPasswordVisible = false;
+  final _authService               = AuthService();
+  bool _isLoading                = false;
+  bool _isPasswordVisible        = false;
   bool _isConfirmPasswordVisible = false;
   DateTime? _selectedBirthdate;
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
+    _usernameController       .dispose();
+    _emailController          .dispose();
+    _passwordController       .dispose();
     _confirmPasswordController.dispose();
-    super.dispose();
+    super                     .dispose();
   }
 
   Future<void> _selectBirthdate() async {
@@ -71,7 +72,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Inscription réussie ! Bienvenue 🌱'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
 
@@ -86,7 +87,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -110,11 +111,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo ou titre
+                  // Logo ou "GardenFlow"
                   const Icon(
                     Icons.eco,
                     size: 80,
-                    color: Colors.green,
+                    color: AppColors.primary,
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -123,7 +124,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                      color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -132,12 +133,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey,
+                      color: AppColors.grey,
                     ),
                   ),
                   const SizedBox(height: 48),
 
-                  // Nom d'utilisateur
+                  // username
                   TextFormField(
                     controller: _usernameController,
                     decoration: const InputDecoration(
@@ -157,7 +158,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Email
+                  // email
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -178,7 +179,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Date de naissance (optionnel)
+                  // birthdate
                   InkWell(
                     onTap: _selectBirthdate,
                     child: InputDecorator(
@@ -193,15 +194,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             : _formatDate(_selectedBirthdate!),
                         style: TextStyle(
                           color: _selectedBirthdate == null
-                              ? Colors.grey
-                              : Colors.black,
+                              ? AppColors.grey
+                              : AppColors.black,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Mot de passe
+                  // password
                   TextFormField(
                     controller: _passwordController,
                     obscureText: !_isPasswordVisible,
@@ -234,7 +235,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Confirmation mot de passe
+                  // password confirmation
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: !_isConfirmPasswordVisible,
@@ -268,12 +269,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Bouton Inscription
+                  // submit button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _register,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -285,7 +286,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: AppColors.white,
                             ),
                           )
                         : const Text(
@@ -295,7 +296,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Lien vers connexion
+                  // link to login
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -312,7 +313,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: const Text(
                           'Se connecter',
                           style: TextStyle(
-                            color: Colors.green,
+                            color: AppColors.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

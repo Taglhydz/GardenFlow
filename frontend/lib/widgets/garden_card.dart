@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/garden.dart';
+import '../config/constants.dart';
 
 class GardenCard extends StatelessWidget {
   final Garden garden;
@@ -37,12 +38,12 @@ class GardenCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade100,
+                      color: AppColors.primaryLight,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       Icons.yard,
-                      color: Colors.green.shade700,
+                      color: AppColors.primaryDark,
                       size: 32,
                     ),
                   ),
@@ -64,14 +65,14 @@ class GardenCard extends StatelessWidget {
                               const Icon(
                                 Icons.location_on,
                                 size: 16,
-                                color: Colors.grey,
+                                color: AppColors.grey,
                               ),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   garden.location!,
                                   style: const TextStyle(
-                                    color: Colors.grey,
+                                    color: AppColors.grey,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -84,7 +85,7 @@ class GardenCard extends StatelessWidget {
                   const Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
-                    color: Colors.grey,
+                    color: AppColors.grey,
                   ),
                 ],
               ),
@@ -94,7 +95,7 @@ class GardenCard extends StatelessWidget {
                   child: Text(
                     garden.description!,
                     style: const TextStyle(
-                      color: Colors.grey,
+                      color: AppColors.grey,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/garden.dart';
 import '../services/garden_service.dart';
+import '../config/constants.dart';
 import '../widgets/garden_card.dart';
 
 class GardensScreen extends StatefulWidget {
@@ -47,8 +48,8 @@ class _GardensScreenState extends State<GardensScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mes Jardins'),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -60,13 +61,13 @@ class _GardensScreenState extends State<GardensScreen> {
                       const Icon(
                         Icons.error_outline,
                         size: 64,
-                        color: Colors.red,
+                        color: AppColors.error,
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'Erreur: $_error',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.red),
+                        style: const TextStyle(color: AppColors.error),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
@@ -84,14 +85,14 @@ class _GardensScreenState extends State<GardensScreen> {
                           const Icon(
                             Icons.yard,
                             size: 64,
-                            color: Colors.grey,
+                            color: AppColors.grey,
                           ),
                           const SizedBox(height: 16),
                           const Text(
                             'Aucun jardin pour le moment',
                             style: TextStyle(
                               fontSize: 18,
-                              color: Colors.grey,
+                              color: AppColors.grey,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -107,8 +108,8 @@ class _GardensScreenState extends State<GardensScreen> {
                             icon: const Icon(Icons.add),
                             label: const Text('Créer mon premier jardin'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: AppColors.white,
                             ),
                           ),
                         ],
@@ -134,7 +135,7 @@ class _GardensScreenState extends State<GardensScreen> {
                   ),
                 );
               },
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.primary,
               child: const Icon(Icons.add),
             )
           : null,

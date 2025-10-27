@@ -5,7 +5,6 @@ import 'api_service.dart';
 class AuthService {
   final ApiService _apiService = ApiService();
 
-  // Inscription
   Future<User> register({
     required String username,
     required String email,
@@ -23,7 +22,7 @@ class AuthService {
         },
       );
 
-      // Sauvegarder le token si présent
+      // save token
       if (response['token'] != null) {
         await _apiService.saveToken(response['token']);
       }
@@ -34,7 +33,6 @@ class AuthService {
     }
   }
 
-  // Connexion
   Future<User> login({
     required String email,
     required String password,
@@ -48,7 +46,7 @@ class AuthService {
         },
       );
 
-      // Sauvegarder le token
+      // save token
       if (response['token'] != null) {
         await _apiService.saveToken(response['token']);
       }
@@ -59,7 +57,6 @@ class AuthService {
     }
   }
 
-  // Récupérer le profil
   Future<User> getProfile() async {
     try {
       await _apiService.loadToken();
@@ -70,15 +67,13 @@ class AuthService {
     }
   }
 
-  // Déconnexion
   Future<void> logout() async {
     await _apiService.removeToken();
   }
 
-  // Vérifier si l'utilisateur est connecté
   Future<bool> isLoggedIn() async {
     await _apiService.loadToken();
-    // On vérifie si le token existe en essayant de récupérer le profil
+    // try to verify if the token exists by trying to get the profile
     try {
       await getProfile();
       return true;
