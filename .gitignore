@@ -125,3 +125,4 @@ backend/npm-debug.log*
 
 # --- VSCode ---
 .vscode/
+I18N_GUIDE.md
