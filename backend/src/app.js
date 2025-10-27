@@ -1,10 +1,13 @@
 require('dotenv').config();
 const express = require('express');
+const multer = require('multer');
 const app = express();
 const routes = require('./routes');
 const { logRequest } = require('./utils/logger');
 
+// Support JSON et form-data
 app.use(express.json());
+app.use(multer().none());
 
 // logger
 app.use(logRequest);
