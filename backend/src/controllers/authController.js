@@ -23,7 +23,23 @@ exports.register = async (req, res) => {
       role: role || 'user',
     });
 
-    res.status(201).json({ id: newUser.id, username, email, birthdate, role: role || 'user' });
+    // Générer un token JWT pour connecter l'utilisateur automatiquement
+    const token = jwt.sign(
+      { id: newUser.id, email: newUser.email, role: role || 'user' },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    res.status(201).json({ 
+      token, 
+      user: { 
+        id: newUser.id, 
+        username, 
+        email, 
+        birthdate, 
+        role: role || 'user' 
+      } 
+    });
 
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
