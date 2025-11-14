@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Charger les variables d'environnement
+  await dotenv.load(fileName: ".env");
+  
   await EasyLocalization.ensureInitialized();
 
   runApp(
