@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppConstants {
-  // API Configuration
-  static const String baseUrl = 'http://localhost:3000/api';
+  // API Configuration - Chargée depuis .env
+  static String get baseUrl => dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000/api';
+  static bool get debugMode => dotenv.env['DEBUG_MODE'] == 'true';
   
   // API Endpoints
   static const String authEndpoint              = '/auth'              ;
