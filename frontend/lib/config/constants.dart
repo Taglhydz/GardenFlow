@@ -3,8 +3,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppConstants {
   // API Configuration - Chargée depuis .env
-  static String get baseUrl => dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000/api';
-  static bool get debugMode => dotenv.env['DEBUG_MODE'] == 'true';
+  static String get baseUrl   => dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000/api';
+  static bool   get debugMode => dotenv.env['DEBUG_MODE'  ] == 'true';
   
   // API Endpoints
   static const String authEndpoint              = '/auth'              ;

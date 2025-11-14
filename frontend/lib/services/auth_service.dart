@@ -1,6 +1,7 @@
 import '../config/constants.dart';
 import '../models/user.dart';
 import 'api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   final ApiService _apiService = ApiService();
@@ -27,7 +28,15 @@ class AuthService {
         await _apiService.saveToken(response['token']);
       }
 
-      return User.fromJson(response['user']);
+      final user = User.fromJson(response['user']);
+      
+      // save user id
+      if (user.id != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('user_id', user.id!);
+      }
+
+      return user;
     } catch (e) {
       throw Exception('Erreur lors de l\'inscription: $e');
     }
@@ -51,7 +60,15 @@ class AuthService {
         await _apiService.saveToken(response['token']);
       }
 
-      return User.fromJson(response['user']);
+      final user = User.fromJson(response['user']);
+      
+      // save user id
+      if (user.id != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('user_id', user.id!);
+      }
+
+      return user;
     } catch (e) {
       throw Exception('Erreur lors de la connexion: $e');
     }
@@ -61,7 +78,7 @@ class AuthService {
     try {
       await _apiService.loadToken();
       final response = await _apiService.get('${AppConstants.authEndpoint}/profile');
-      return User.fromJson(response['user']);
+      return User.fromJson(response);
     } catch (e) {
       throw Exception('Erreur lors de la récupération du profil: $e');
     }
