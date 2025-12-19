@@ -308,7 +308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 value: _user!.birthdate!.toString().split(' ')[0],
               ),
             ],
-            if (_user?.role?.toLowerCase() == 'admin') ...[
+            if (_user?.role.toLowerCase() == 'admin') ...[
               const Divider(height: 24),
               _buildInfoRow(
                 icon: Icons.shield,
