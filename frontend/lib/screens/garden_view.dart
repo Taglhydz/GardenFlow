@@ -10,11 +10,14 @@ import '../models/plant.dart';
 import '../models/zone.dart';
 import '../providers/garden_providers.dart';
 import '../providers/plant_providers.dart';
+import '../providers/snap_provider.dart';
 import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
+import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
 import '../widgets/parcel_form_sheet.dart';
 import '../widgets/shape_canvas.dart';
+import '../widgets/snap_button.dart';
 import 'parcel_screen.dart';
 
 enum _GardenAction { rename, delete }
@@ -127,6 +130,14 @@ class _GardenViewState extends ConsumerState<GardenView> {
       await ref
           .read(parcelsProvider(_gardenId).notifier)
           .reshape(parcel, Geometry.translate(absolutePoints, -parcel.position));
+    } catch (e) {
+      _showError(e);
+    }
+  }
+
+  Future<void> _editDimensions(Parcel parcel) async {
+    try {
+      await editParcelDimensions(context, ref, parcel);
     } catch (e) {
       _showError(e);
     }
@@ -282,25 +293,38 @@ class _GardenViewState extends ConsumerState<GardenView> {
                       : 'garden_view.hint'.tr(),
                 ),
                 Expanded(
-                  child: ShapeCanvas(
-                    world: PlanGeometry.gardenWorld([
-                      for (final p in parcels) p.absoluteShape,
-                      if (_draft != null) _draft!,
-                    ]),
-                    nonNegative: true,
-                    shapes: [
-                      for (final p in parcels)
-                        CanvasShape(id: p.id, points: p.absoluteShape, fill: soilColor(p.soilType), labels: [p.name]),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: ShapeCanvas(
+                          snapCm: ref.watch(snapProvider).effectiveCm,
+                          world: PlanGeometry.gardenWorld([
+                            for (final p in parcels) p.absoluteShape,
+                            if (_draft != null) _draft!,
+                          ]),
+                          nonNegative: true,
+                          shapes: [
+                            for (final p in parcels)
+                              CanvasShape(
+                                id: p.id,
+                                points: p.absoluteShape,
+                                fill: soilColor(p.soilType),
+                                labels: [p.name],
+                              ),
+                          ],
+                          overlay: _zoneShapes(parcels, zones, crops, plantsById),
+                          selectedId: selected?.id,
+                          draft: _draft,
+                          onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
+                          onDraftClose: _finishDrawing,
+                          onSelect: (id) => setState(() => _selectedParcelId = id),
+                          onOpen: _openParcel,
+                          onMoved: _onMoved,
+                          onReshaped: _onReshaped,
+                        ),
+                      ),
+                      const Positioned(top: 8, right: 8, child: SnapButton()),
                     ],
-                    overlay: _zoneShapes(parcels, zones, crops, plantsById),
-                    selectedId: selected?.id,
-                    draft: _draft,
-                    onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
-                    onDraftClose: _finishDrawing,
-                    onSelect: (id) => setState(() => _selectedParcelId = id),
-                    onOpen: _openParcel,
-                    onMoved: _onMoved,
-                    onReshaped: _onReshaped,
                   ),
                 ),
               ],
@@ -363,6 +387,11 @@ class _GardenViewState extends ConsumerState<GardenView> {
                 ),
               ),
               IconButton(
+                icon: const Icon(Icons.straighten),
+                tooltip: 'dimensions.title'.tr(),
+                onPressed: () => _editDimensions(parcel),
+              ),
+              IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'edit_parcel'.tr(),
                 onPressed: () => ParcelFormSheet.show(context, gardenId: _gardenId, parcel: parcel),
@@ -397,6 +426,37 @@ class _GardenViewState extends ConsumerState<GardenView> {
       ),
     );
   }
+}
+
+/// Dimensions sheet of a parcel (sides in meters, position in the garden), then saves it.
+/// Throws if the server refuses the new shape.
+Future<void> editParcelDimensions(BuildContext context, WidgetRef ref, Parcel parcel) async {
+  final zones = (ref.read(zonesProvider(parcel.gardenId)).value ?? const <Zone>[]).where(
+    (z) => z.parcelId == parcel.id,
+  );
+
+  final result = await DimensionsSheet.show(
+    context,
+    title: 'dimensions.title_of'.tr(args: [parcel.name]),
+    shape: parcel.absoluteShape,
+    positionLabel: 'dimensions.position_in_garden'.tr(),
+    validate: (result) {
+      if (result.finalShape.any((p) => p.dx < 0 || p.dy < 0)) return 'dimensions.outside_garden'.tr();
+      // the zones stay where they are in the parcel : they must still be inside its new shape
+      final relative = Geometry.translate(result.shape, -parcel.position);
+      if (zones.any((z) => !Geometry.isInside(z.shape, relative))) return 'errors.ZONES_OUTSIDE_PARCEL'.tr();
+      return null;
+    },
+  );
+  if (result == null) return;
+
+  await ref
+      .read(parcelsProvider(parcel.gardenId).notifier)
+      .setGeometry(
+        parcel,
+        position: PlanGeometry.roundCm(parcel.position + result.move),
+        shape: [for (final p in result.shape) PlanGeometry.roundCm(p - parcel.position)],
+      );
 }
 
 /// Color of a parcel according to its soil.

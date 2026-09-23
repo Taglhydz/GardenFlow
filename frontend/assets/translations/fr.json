@@ -220,7 +220,7 @@
     "draw_hint": "Touchez le plan pour poser chaque coin de la parcelle, puis touchez le premier point ou « Terminer ».",
     "empty_hint": "Touchez « Dessiner une parcelle » pour tracer votre première parcelle.",
     "hint": "Touchez une parcelle pour la sélectionner. Pincez pour zoomer.",
-    "hint_selected": "Glissez la parcelle ou ses coins, touchez un + pour ajouter un coin, appui long sur un coin pour le supprimer. Touchez-la à nouveau pour entrer dedans.",
+    "hint_selected": "Glissez la parcelle ou ses coins, touchez un + pour ajouter un coin, appui long sur un coin pour le supprimer. La règle permet de saisir les mesures. Touchez-la à nouveau pour entrer dedans.",
     "invalid_shape": "Forme invalide : les côtés ne doivent pas se croiser.",
     "open_parcel": "Ouvrir",
     "rename_garden": "Renommer le jardin",
@@ -271,7 +271,7 @@
     "draw_hint": "Touchez la parcelle pour poser chaque coin de la zone, puis touchez le premier point ou « Terminer ».",
     "empty_hint": "Délimitez des zones (rangs, planches, coins) pour y placer vos plantes.",
     "hint": "Touchez une zone pour la sélectionner.",
-    "hint_selected": "Glissez la zone ou ses coins, touchez un + pour ajouter un coin, appui long sur un coin pour le supprimer. Touchez-la à nouveau pour l'ouvrir.",
+    "hint_selected": "Glissez la zone ou ses coins, touchez un + pour ajouter un coin, appui long sur un coin pour le supprimer. La règle permet de saisir les mesures. Touchez-la à nouveau pour l'ouvrir.",
     "zone_name": "Nom de la zone",
     "rename_zone": "Renommer la zone",
     "delete_zone": "Supprimer la zone",
@@ -282,6 +282,25 @@
   "drawing": {
     "undo": "Annuler le point",
     "finish": "Terminer"
+  },
+  "snap": {
+    "title": "Aimantage à la grille",
+    "step_cm": "{} cm",
+    "step_m": "{} m",
+    "off": "Désactivé (au cm près)",
+    "free": "Libre"
+  },
+  "dimensions": {
+    "title": "Mesures",
+    "title_of": "Mesures de « {} »",
+    "of_parcel": "Mesures de la parcelle",
+    "hint": "Modifier un côté étire la forme dans sa direction.",
+    "sides": "Côtés",
+    "position_in_garden": "Position dans le jardin (coin en haut à gauche)",
+    "position_in_parcel": "Position dans la parcelle (coin en haut à gauche)",
+    "invalid_number": "Nombre invalide",
+    "too_short": "1 cm minimum",
+    "outside_garden": "La parcelle doit rester dans le jardin : X et Y ne peuvent pas être négatifs."
   },
   "zone_screen": {
     "whole_parcel": "Toute la parcelle",

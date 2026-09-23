@@ -220,7 +220,7 @@
     "draw_hint": "Tap the plan to place each corner of the parcel, then tap the first point or \"Finish\".",
     "empty_hint": "Tap \"Draw a parcel\" to draw your first parcel.",
     "hint": "Tap a parcel to select it. Pinch to zoom.",
-    "hint_selected": "Drag the parcel or its corners, tap a + to add a corner, long press a corner to remove it. Tap it again to go inside.",
+    "hint_selected": "Drag the parcel or its corners, tap a + to add a corner, long press a corner to remove it. The ruler lets you type the dimensions. Tap it again to go inside.",
     "invalid_shape": "Invalid shape: the sides must not cross each other.",
     "open_parcel": "Open",
     "rename_garden": "Rename the garden",
@@ -271,7 +271,7 @@
     "draw_hint": "Tap the parcel to place each corner of the zone, then tap the first point or \"Finish\".",
     "empty_hint": "Draw zones (rows, beds, corners) to place your plants.",
     "hint": "Tap a zone to select it.",
-    "hint_selected": "Drag the zone or its corners, tap a + to add a corner, long press a corner to remove it. Tap it again to open it.",
+    "hint_selected": "Drag the zone or its corners, tap a + to add a corner, long press a corner to remove it. The ruler lets you type the dimensions. Tap it again to open it.",
     "zone_name": "Zone name",
     "rename_zone": "Rename the zone",
     "delete_zone": "Delete the zone",
@@ -282,6 +282,25 @@
   "drawing": {
     "undo": "Undo point",
     "finish": "Finish"
+  },
+  "snap": {
+    "title": "Snap to grid",
+    "step_cm": "{} cm",
+    "step_m": "{} m",
+    "off": "Off (to the cm)",
+    "free": "Free"
+  },
+  "dimensions": {
+    "title": "Dimensions",
+    "title_of": "Dimensions of \"{}\"",
+    "of_parcel": "Dimensions of the parcel",
+    "hint": "Changing a side stretches the shape in its direction.",
+    "sides": "Sides",
+    "position_in_garden": "Position in the garden (top-left corner)",
+    "position_in_parcel": "Position in the parcel (top-left corner)",
+    "invalid_number": "Invalid number",
+    "too_short": "1 cm minimum",
+    "outside_garden": "The parcel must stay in the garden: X and Y can't be negative."
   },
   "zone_screen": {
     "whole_parcel": "Whole parcel",

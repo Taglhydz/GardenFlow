@@ -8,12 +8,15 @@ import '../models/parcel.dart';
 import '../models/zone.dart';
 import '../providers/garden_providers.dart';
 import '../providers/plant_providers.dart';
+import '../providers/snap_provider.dart';
 import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
+import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
 import '../widgets/parcel_form_sheet.dart';
 import '../widgets/shape_canvas.dart';
-import 'garden_view.dart' show soilColor;
+import '../widgets/snap_button.dart';
+import 'garden_view.dart' show editParcelDimensions, soilColor;
 import 'zone_screen.dart';
 
 enum _ParcelAction { wholeParcel, delete }
@@ -122,6 +125,26 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
     }
     try {
       await ref.read(zonesProvider(_gardenId).notifier).reshape(zone, shape);
+    } catch (e) {
+      _showError(e);
+    }
+  }
+
+  Future<void> _editZoneDimensions(Zone zone) async {
+    final result = await DimensionsSheet.show(
+      context,
+      title: 'dimensions.title_of'.tr(args: [zone.name]),
+      shape: zone.shape,
+      positionLabel: 'dimensions.position_in_parcel'.tr(),
+      validate: (result) => _zoneShapeError(result.finalShape, zoneId: zone.id),
+    );
+    if (result == null) return;
+    await _reshapeZone(zone.id, [for (final p in result.finalShape) PlanGeometry.roundCm(p)]);
+  }
+
+  Future<void> _editParcelDimensions(Parcel parcel) async {
+    try {
+      await editParcelDimensions(context, ref, parcel);
     } catch (e) {
       _showError(e);
     }
@@ -265,6 +288,11 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.straighten),
+            tooltip: 'dimensions.of_parcel'.tr(),
+            onPressed: () => _editParcelDimensions(current),
+          ),
+          IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'edit_parcel'.tr(),
             onPressed: () => ParcelFormSheet.show(context, gardenId: _gardenId, parcel: current),
@@ -308,37 +336,45 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
             ),
           ),
           Expanded(
-            child: ShapeCanvas(
-              world: PlanGeometry.parcelWorld(current.shape),
-              background: [
-                CanvasShape(
-                  id: -1,
-                  points: current.shape,
-                  fill: soilColor(current.soilType),
-                  border: AppColors.parcels,
-                ),
-              ],
-              shapes: [
-                for (final zone in zones)
-                  CanvasShape(
-                    id: zone.id,
-                    points: zone.shape,
-                    fill: AppColors.primaryLight.withValues(alpha: 0.75),
-                    border: AppColors.primaryDark,
-                    labels: [zone.name, ...plantsIn(zone)],
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ShapeCanvas(
+                    snapCm: ref.watch(snapProvider).effectiveCm,
+                    world: PlanGeometry.parcelWorld(current.shape),
+                    background: [
+                      CanvasShape(
+                        id: -1,
+                        points: current.shape,
+                        fill: soilColor(current.soilType),
+                        border: AppColors.parcels,
+                      ),
+                    ],
+                    shapes: [
+                      for (final zone in zones)
+                        CanvasShape(
+                          id: zone.id,
+                          points: zone.shape,
+                          fill: AppColors.primaryLight.withValues(alpha: 0.75),
+                          border: AppColors.primaryDark,
+                          labels: [zone.name, ...plantsIn(zone)],
+                        ),
+                    ],
+                    selectedId: selected?.id,
+                    draft: _draft,
+                    onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
+                    onDraftClose: _finishDrawing,
+                    onSelect: (id) => setState(() => _selectedZoneId = id),
+                    onOpen: _openZone,
+                    onMoved: (id, delta) {
+                      final zone = zones.firstWhere((z) => z.id == id);
+                      _reshapeZone(id, Geometry.translate(zone.shape, delta));
+                    },
+                    onReshaped: _reshapeZone,
                   ),
+                ),
+                const Positioned(top: 8, right: 8, child: SnapButton()),
               ],
-              selectedId: selected?.id,
-              draft: _draft,
-              onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
-              onDraftClose: _finishDrawing,
-              onSelect: (id) => setState(() => _selectedZoneId = id),
-              onOpen: _openZone,
-              onMoved: (id, delta) {
-                final zone = zones.firstWhere((z) => z.id == id);
-                _reshapeZone(id, Geometry.translate(zone.shape, delta));
-              },
-              onReshaped: _reshapeZone,
             ),
           ),
         ],
@@ -381,6 +417,11 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.straighten),
+                tooltip: 'dimensions.title'.tr(),
+                onPressed: () => _editZoneDimensions(zone),
               ),
               IconButton(
                 icon: const Icon(Icons.edit_outlined),

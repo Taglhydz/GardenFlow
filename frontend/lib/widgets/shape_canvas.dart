@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../config/app_localizations.dart';
 import '../config/constants.dart';
 import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
@@ -41,12 +42,15 @@ class _Drag {
 
 /// Plan in meters where free shapes (polygons) are drawn and edited with the finger.
 ///
-/// - drawing mode ([draft] not null) : each tap adds a point (snapped to 10 cm),
+/// - drawing mode ([draft] not null) : each tap adds a point (snapped to the magnet grid [snapCm]),
 ///   tapping the first point closes the shape ([onDraftClose])
 /// - no shape selected : tap a shape to select it, pan and pinch to move / zoom the plan
 /// - a shape selected : drag it to move it, drag a corner to move the corner, drag a "+" (middle
 ///   of a side) to add a corner, long press a corner to remove it. Tap it again to open it,
 ///   tap outside to deselect.
+///
+/// The length of the sides is written along the shape being drawn and the selected shape,
+/// whose corners are named A, B, C… (same names as in the dimensions sheet).
 ///
 /// The canvas only shows its inputs : the parent saves the changes ([onMoved], [onReshaped])
 /// and passes the new shapes back.
@@ -66,6 +70,7 @@ class ShapeCanvas extends StatefulWidget {
     required this.onMoved,
     required this.onReshaped,
     this.nonNegative = false,
+    this.snapCm = PlanGeometry.defaultSnapCm,
   });
 
   /// Part of the plan to show (meters)
@@ -98,6 +103,9 @@ class ShapeCanvas extends StatefulWidget {
 
   /// Points can't go below 0 (the garden plan starts at its top-left corner)
   final bool nonNegative;
+
+  /// Magnet grid (cm) of the points drawn or dragged, 1 = no magnet
+  final int snapCm;
 
   @override
   State<ShapeCanvas> createState() => _ShapeCanvasState();
@@ -144,7 +152,7 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
       if (draft.length >= 3 && first != null && (first - local).distance <= _closeTouch) {
         widget.onDraftClose?.call();
       } else {
-        widget.onDraftPoint?.call(_clamp(PlanGeometry.snapPoint(point)));
+        widget.onDraftPoint?.call(_clamp(PlanGeometry.snapPoint(point, widget.snapCm)));
       }
       return;
     }
@@ -196,7 +204,7 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
       for (var i = 0; i < points.length && drag == null; i++) {
         final middle = (points[i] + points[(i + 1) % points.length]) / 2;
         if (((middle - world.topLeft) * ppm - local).distance <= _midpointTouch) {
-          final withCorner = [...points]..insert(i + 1, PlanGeometry.snapPoint(middle));
+          final withCorner = [...points]..insert(i + 1, PlanGeometry.snapPoint(middle, widget.snapCm));
           drag = _Drag(mode: _DragMode.vertex, shapeId: selected.id, startPoint: point, original: withCorner, vertex: i + 1);
         }
       }
@@ -219,10 +227,10 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
     final delta = world.topLeft + local / ppm - drag.startPoint;
     setState(() {
       if (drag.mode == _DragMode.vertex) {
-        final moved = _clamp(PlanGeometry.snapPoint(drag.original[drag.vertex] + delta));
+        final moved = _clamp(PlanGeometry.snapPoint(drag.original[drag.vertex] + delta, widget.snapCm));
         drag.current = [...drag.original]..[drag.vertex] = moved;
       } else {
-        var snapped = PlanGeometry.snapPoint(delta);
+        var snapped = PlanGeometry.snapPoint(delta, widget.snapCm);
         if (widget.nonNegative) {
           // the shape stops at the top and left borders of the plan
           final bounds = Geometry.bounds(drag.original);
@@ -285,6 +293,7 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
               painter: _PlanPainter(
                 world: world,
                 ppm: ppm,
+                snapCm: widget.snapCm,
                 background: widget.background,
                 shapes: [
                   for (final s in widget.shapes)
@@ -323,6 +332,7 @@ class _PlanPainter extends CustomPainter {
   _PlanPainter({
     required this.world,
     required this.ppm,
+    required this.snapCm,
     required this.background,
     required this.shapes,
     required this.overlay,
@@ -333,6 +343,7 @@ class _PlanPainter extends CustomPainter {
 
   final Rect world;
   final double ppm;
+  final int snapCm;
   final List<CanvasShape> background;
   final List<CanvasShape> shapes;
   final List<CanvasShape> overlay;
@@ -365,12 +376,35 @@ class _PlanPainter extends CustomPainter {
       _paintLabels(canvas, s);
     }
 
-    if (selectedPoints != null) _paintHandles(canvas, selectedPoints!);
-    if (draft != null) _paintDraft(canvas, draft!);
+    if (selectedPoints != null) {
+      _paintHandles(canvas, selectedPoints!);
+      _paintLengths(canvas, selectedPoints!, closed: true);
+    }
+    if (draft != null) {
+      _paintDraft(canvas, draft!);
+      _paintLengths(canvas, draft!, closed: false);
+    }
   }
 
   void _paintGrid(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFF1F8E9));
+
+    // magnet grid, only when its lines are far enough apart to be seen
+    final step = snapCm / 100;
+    if (snapCm > 1 && snapCm < 100 && step * ppm >= 8) {
+      final minor = Paint()
+        ..color = const Color(0x1A66BB6A)
+        ..strokeWidth = 1;
+      for (var i = (world.left / step).ceil(); i * step <= world.right; i++) {
+        final px = _px(Offset(i * step, 0)).dx;
+        canvas.drawLine(Offset(px, 0), Offset(px, size.height), minor);
+      }
+      for (var i = (world.top / step).ceil(); i * step <= world.bottom; i++) {
+        final py = _px(Offset(0, i * step)).dy;
+        canvas.drawLine(Offset(0, py), Offset(size.width, py), minor);
+      }
+    }
+
     final line = Paint()
       ..color = const Color(0x3366BB6A)
       ..strokeWidth = 1;
@@ -443,11 +477,54 @@ class _PlanPainter extends CustomPainter {
       canvas.drawLine(middle.translate(-3.5, 0), middle.translate(3.5, 0), border);
       canvas.drawLine(middle.translate(0, -3.5), middle.translate(0, 3.5), border);
     }
-    // corners
-    for (final p in points) {
-      canvas.drawCircle(_px(p), 9, Paint()..color = AppColors.primary);
-      canvas.drawCircle(_px(p), 9, fill..style = PaintingStyle.stroke..strokeWidth = 2);
+    // corners, with their name
+    for (var i = 0; i < points.length; i++) {
+      final center = _px(points[i]);
+      canvas.drawCircle(center, 9, Paint()..color = AppColors.primary);
+      canvas.drawCircle(center, 9, fill..style = PaintingStyle.stroke..strokeWidth = 2);
       fill.style = PaintingStyle.fill;
+      final name = TextPainter(
+        text: TextSpan(
+          text: PlanGeometry.cornerName(i),
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.white),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      name.paint(canvas, center - Offset(name.width / 2, name.height / 2));
+    }
+  }
+
+  /// Length of each side, written outside the shape next to the middle of the side.
+  void _paintLengths(Canvas canvas, List<Offset> points, {required bool closed}) {
+    if (points.length < 2) return;
+    // orientation of the corners : the outside of a side is on its left or on its right
+    var signedArea = 0.0;
+    for (var i = 0; i < points.length; i++) {
+      final a = points[i];
+      final b = points[(i + 1) % points.length];
+      signedArea += a.dx * b.dy - b.dx * a.dy;
+    }
+    final outside = signedArea >= 0 ? 1.0 : -1.0;
+
+    final sides = closed ? points.length : points.length - 1;
+    for (var i = 0; i < sides; i++) {
+      final a = _px(points[i]);
+      final b = _px(points[(i + 1) % points.length]);
+      final pixels = (b - a).distance;
+      if (pixels < 40) continue; // no room for the text
+
+      final normal = Offset(b.dy - a.dy, a.dx - b.dx) / pixels * outside;
+      final label = TextPainter(
+        text: TextSpan(
+          text: AppLocalizations.meters(PlanGeometry.sideLength(points, i)),
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final center = (a + b) / 2 + normal * 18;
+      final box = Rect.fromCenter(center: center, width: label.width + 8, height: label.height + 2);
+      canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(4)), Paint()..color = const Color(0xE6FFFFFF));
+      label.paint(canvas, box.topLeft + const Offset(4, 1));
     }
   }
 

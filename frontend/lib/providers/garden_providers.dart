@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/constants.dart';
 import '../models/crop.dart';
@@ -148,6 +149,17 @@ class ParcelsNotifier extends AsyncNotifier<List<Parcel>> {
         parcel.copyWith(shape: shape),
         {'shape': shapeToJson(shape)},
       );
+
+  /// New position and shape (dimensions sheet) in one request, only what changed is sent.
+  Future<void> setGeometry(Parcel parcel, {required Offset position, required List<Offset> shape}) {
+    final moved = position != parcel.position;
+    final reshaped = !listEquals(shape, parcel.shape);
+    if (!moved && !reshaped) return Future.value();
+    return _optimistic(parcel, parcel.copyWith(position: position, shape: shape), {
+      if (moved) ...{'pos_x': position.dx, 'pos_y': position.dy},
+      if (reshaped) 'shape': shapeToJson(shape),
+    });
+  }
 
   /// Shown immediately, saved in the background, the previous parcel comes back if the server refuses.
   Future<void> _optimistic(Parcel previous, Parcel updated, Map<String, dynamic> changes) async {

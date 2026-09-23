@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:GardenFlow/models/crop.dart';
 import 'package:GardenFlow/models/garden.dart';
 import 'package:GardenFlow/models/parcel.dart';
@@ -8,6 +9,7 @@ import 'package:GardenFlow/models/suggestion.dart';
 import 'package:GardenFlow/models/zone.dart';
 import 'package:GardenFlow/utils/plan_geometry.dart';
 import 'package:GardenFlow/widgets/shape_canvas.dart';
+import 'package:GardenFlow/widgets/snap_button.dart';
 import 'app_harness.dart';
 import 'fakes.dart';
 
@@ -238,6 +240,121 @@ void main() {
       expect(find.text('Basilic'), findsOneWidget);
       expect(find.textContaining('Rang 1'), findsOneWidget);
       expect(find.textContaining('Sans zone'), findsOneWidget);
+    });
+  });
+
+  group('magnet and dimensions', () {
+    Future<void> chooseSnap(WidgetTester tester, String label) async {
+      await tester.tap(find.byType(SnapButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(CheckedPopupMenuItem<int>, label));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> drawRectangle(WidgetTester tester, List<Offset> corners) async {
+      await tester.tap(find.text('Dessiner une parcelle'));
+      await tester.pumpAndSettle();
+      for (final corner in corners) {
+        await tapAt(tester, corner);
+      }
+      await tester.tap(find.text('Terminer'));
+      await tester.pumpAndSettle();
+    }
+
+    /// Types [value] in the field of the dimensions sheet with the key [key] (side_0, position_x…).
+    Future<void> type(WidgetTester tester, String key, String value) async {
+      final field = find.descendant(of: find.byKey(ValueKey(key)), matching: find.byType(TextField));
+      await tester.ensureVisible(field);
+      await tester.enterText(field, value);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> save(WidgetTester tester) async {
+      await tester.ensureVisible(find.text('Enregistrer'));
+      await tester.tap(find.text('Enregistrer'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('magnet off : the corners go where the finger is (to the cm), the choice is remembered', (tester) async {
+      await pumpApp(tester, services);
+      expect(find.text('10 cm'), findsOneWidget); // default grid
+
+      await chooseSnap(tester, 'Désactivé (au cm près)');
+      expect(find.text('Libre'), findsOneWidget);
+      await drawRectangle(tester, const [Offset(1.03, 1.07), Offset(3.02, 1.07), Offset(3.02, 2.04), Offset(1.03, 2.04)]);
+
+      final fields = services.parcels.created.single;
+      expect(fields['pos_x'], 1.03);
+      expect(fields['pos_y'], 1.07);
+      expect(shapeFromJson(fields['shape']), rect(1.99, 0.97));
+      expect((await SharedPreferences.getInstance()).getInt('snap_cm'), -10); // off, the 10 cm step is kept
+    });
+
+    testWidgets('50 cm grid : the corners go to the nearest 50 cm', (tester) async {
+      await pumpApp(tester, services);
+
+      await chooseSnap(tester, '50 cm');
+      await drawRectangle(tester, const [Offset(1.2, 1.3), Offset(2.9, 1.3), Offset(2.9, 2.2), Offset(1.2, 2.2)]);
+
+      final fields = services.parcels.created.single;
+      expect(fields['pos_x'], 1);
+      expect(fields['pos_y'], 1.5);
+      expect(shapeFromJson(fields['shape']), rect(2, 0.5));
+    });
+
+    testWidgets('dimensions of a parcel : typed sides and position saved in one request', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+
+      await tapAt(tester, const Offset(2, 2)); // select
+      await tester.tap(find.byTooltip('Mesures'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mesures de « Carré A »'), findsOneWidget);
+
+      await type(tester, 'side_0', '3'); // A -> B : 2 m -> 3 m
+      await type(tester, 'position_x', '0,5');
+      await save(tester);
+
+      final (id, changes) = services.parcels.updates.single;
+      expect(id, 1);
+      expect(changes['pos_x'], 0.5);
+      expect(changes['pos_y'], 1);
+      expect(shapeFromJson(changes['shape']), rect(3, 2));
+    });
+
+    testWidgets('dimensions of a parcel : a size that leaves a zone outside is refused in the sheet', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      services.zones.zones = [Zone(id: 70, parcelId: 1, name: 'Rang 2', shape: rect(1, 2, 1, 0))];
+      await pumpApp(tester, services);
+
+      await tapAt(tester, const Offset(1.5, 1.5));
+      await tester.tap(find.byTooltip('Mesures'));
+      await tester.pumpAndSettle();
+      await type(tester, 'side_0', '1,5');
+      await save(tester);
+
+      expect(find.text('Cette forme laisserait des zones en dehors de la parcelle.'), findsOneWidget);
+      expect(services.parcels.updates, isEmpty);
+    });
+
+    testWidgets('dimensions of a zone : checked against the parcel, then saved', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      services.zones.zones = [Zone(id: 70, parcelId: 1, name: 'Rang 1', shape: rect(1, 2))];
+      await pumpApp(tester, services);
+      await tapAt(tester, const Offset(2, 2));
+      await tapAt(tester, const Offset(2, 2)); // inside the parcel
+
+      await tapAt(tester, const Offset(0.5, 1)); // select the zone
+      await tester.tap(find.byTooltip('Mesures'));
+      await tester.pumpAndSettle();
+
+      await type(tester, 'side_0', '3');
+      await save(tester);
+      expect(find.text("La zone doit être à l'intérieur de la parcelle."), findsOneWidget);
+
+      await type(tester, 'side_0', '1,5');
+      await save(tester);
+      expect(services.zones.zones.single.shape, rect(1.5, 2));
     });
   });
 
