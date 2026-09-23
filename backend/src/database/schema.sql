@@ -15,6 +15,7 @@ DROP TABLE IF EXISTS suggestion;
 DROP TABLE IF EXISTS plant_association;
 DROP TABLE IF EXISTS plant_period;
 DROP TABLE IF EXISTS crop;
+DROP TABLE IF EXISTS zone;
 DROP TABLE IF EXISTS parcel;
 DROP TABLE IF EXISTS garden;
 DROP TABLE IF EXISTS plant;
@@ -52,25 +53,44 @@ CREATE TABLE garden (
 -- =======
 -- Parcels
 -- =======
--- Dimensions and positions are in meters, relative to the garden's top-left corner.
+-- Free shape (polygon) drawn on the garden plan, in meters.
+--   pos_x / pos_y : position of the parcel on the garden plan (moving the parcel only changes them)
+--   shape         : points of the polygon RELATIVE to (pos_x, pos_y), JSON [{"x": 0, "y": 0}, ...]
+--   area_m2       : computed from the shape by the API
 CREATE TABLE parcel (
     id        INT AUTO_INCREMENT PRIMARY KEY,
     garden_id INT NOT NULL,
     name      VARCHAR(100) NOT NULL,
-    area_m2   DECIMAL(10,2) NULL,
     pos_x     DECIMAL(10,2) NOT NULL DEFAULT 0,
     pos_y     DECIMAL(10,2) NOT NULL DEFAULT 0,
-    width     DECIMAL(10,2) NOT NULL DEFAULT 0,
-    length    DECIMAL(10,2) NOT NULL DEFAULT 0,
+    shape     JSON NOT NULL,
+    area_m2   DECIMAL(10,2) NOT NULL DEFAULT 0,
     soil_type ENUM('standard', 'clay', 'sandy', 'loamy', 'humus', 'chalky') NOT NULL DEFAULT 'standard',
     sunlight  ENUM('low', 'medium', 'high')                                 NOT NULL DEFAULT 'medium',
     moisture  ENUM('low', 'medium', 'high')                                 NOT NULL DEFAULT 'medium',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CHECK (area_m2 IS NULL OR area_m2 >= 0),
-    CHECK (width  >= 0),
-    CHECK (length >= 0),
+    CHECK (area_m2 >= 0),
     FOREIGN KEY (garden_id) REFERENCES garden(id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+-- =====
+-- Zones
+-- =====
+-- Permanent delimitation drawn inside a parcel (a row, a bed, a corner...), where crops are planted
+-- season after season : it keeps the history of its crops (crop rotation per zone).
+--   shape : points RELATIVE to the parcel position (pos_x, pos_y), so the zones follow the parcel when it moves.
+-- The API checks that a zone is inside its parcel and doesn't overlap another zone.
+CREATE TABLE zone (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    parcel_id  INT NOT NULL,
+    name       VARCHAR(100) NOT NULL,
+    shape      JSON NOT NULL,
+    area_m2    DECIMAL(10,2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CHECK (area_m2 >= 0),
+    FOREIGN KEY (parcel_id) REFERENCES parcel(id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 -- ======
@@ -123,9 +143,12 @@ CREATE TABLE plant_period (
 -- =====
 -- A plant can't be deleted while it is used by a crop (ON DELETE RESTRICT) :
 -- deleting a plant from the catalog must never delete users' crops.
+-- zone_id : where the crop is in the parcel (NULL = the whole parcel). Deleting a zone keeps
+-- its crops in the parcel (ON DELETE SET NULL).
 CREATE TABLE crop (
     id                    INT AUTO_INCREMENT PRIMARY KEY,
     parcel_id             INT NOT NULL,
+    zone_id               INT NULL,
     plant_id              INT NOT NULL,
     sow_date              DATE NULL,
     expected_harvest_date DATE NULL,
@@ -134,6 +157,7 @@ CREATE TABLE crop (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (parcel_id) REFERENCES parcel(id) ON DELETE CASCADE,
+    FOREIGN KEY (zone_id)   REFERENCES zone(id)   ON DELETE SET NULL,
     FOREIGN KEY (plant_id)  REFERENCES plant(id)  ON DELETE RESTRICT
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 

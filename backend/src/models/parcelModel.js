@@ -1,7 +1,10 @@
 const db = require('../database/db');
 const { buildUpdateSet } = require('../utils/sql');
 
-const UPDATABLE = ['name', 'area_m2', 'pos_x', 'pos_y', 'width', 'length', 'soil_type', 'sunlight', 'moisture'];
+const UPDATABLE = ['name', 'pos_x', 'pos_y', 'shape', 'area_m2', 'soil_type', 'sunlight', 'moisture'];
+
+/** The shape is stored as JSON (mysql2 parses it back automatically when reading). */
+const serialize = (data) => (data.shape === undefined ? data : { ...data, shape: JSON.stringify(data.shape) });
 
 // Ownership goes through the garden : parcel -> garden.user_id
 const Parcel = {
@@ -23,13 +26,13 @@ const Parcel = {
 
   /** The caller must have checked that the garden belongs to the user. */
   create: async (gardenId, data) => {
-    const fields  = UPDATABLE.filter((key) => data[key] !== undefined);
+    const values  = serialize(data);
+    const fields  = UPDATABLE.filter((key) => values[key] !== undefined);
     const columns = ['garden_id', ...fields];
-    const values  = [gardenId, ...fields.map((key) => data[key])];
 
     const [result] = await db.query(
       `INSERT INTO parcel (${columns.map((c) => `\`${c}\``).join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
-      values
+      [gardenId, ...fields.map((key) => values[key])]
     );
     const [rows] = await db.query('SELECT * FROM parcel WHERE id = ?', [result.insertId]);
     return rows[0];
@@ -37,7 +40,7 @@ const Parcel = {
 
   /** The caller must have checked ownership with findOwned. */
   update: async (id, data) => {
-    const { clause, values } = buildUpdateSet(data, UPDATABLE);
+    const { clause, values } = buildUpdateSet(serialize(data), UPDATABLE);
     if (clause) {
       await db.query(`UPDATE parcel SET ${clause} WHERE id = ?`, [...values, id]);
     }
@@ -45,7 +48,7 @@ const Parcel = {
     return rows[0] || null;
   },
 
-  /** Hard delete : crops are removed by ON DELETE CASCADE. */
+  /** Hard delete : zones and crops are removed by ON DELETE CASCADE. */
   deleteOwned: async (id, userId) => {
     const [result] = await db.query(
       `DELETE p FROM parcel p

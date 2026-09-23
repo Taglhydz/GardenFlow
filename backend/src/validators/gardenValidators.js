@@ -1,6 +1,6 @@
 const { z } = require('zod');
 const {
-  SOIL_TYPES, LEVELS, id, requiredText, optionalText, optionalDate, positiveDecimal, month, nonEmpty,
+  SOIL_TYPES, LEVELS, id, requiredText, optionalText, optionalDate, positiveDecimal, month, shape, nonEmpty,
 } = require('./common');
 
 // ======
@@ -18,14 +18,14 @@ const updateGardenSchema = nonEmpty(z.object(gardenFields).partial());
 // ======
 // Parcel
 // ======
-// garden_id is taken from the URL (POST /gardens/:gardenId/parcels) and can't be changed
+// garden_id is taken from the URL (POST /gardens/:gardenId/parcels) and can't be changed.
+// The shape points are relative to (pos_x, pos_y) : moving a parcel = changing pos_x / pos_y only.
+// The area is computed from the shape.
 const parcelFields = {
   name     : requiredText(100),
-  area_m2  : positiveDecimal.nullable().optional(),
   pos_x    : positiveDecimal.optional(),
   pos_y    : positiveDecimal.optional(),
-  width    : positiveDecimal.optional(),
-  length   : positiveDecimal.optional(),
+  shape,
   soil_type: z.enum(SOIL_TYPES).optional(),
   sunlight : z.enum(LEVELS).optional(),
   moisture : z.enum(LEVELS).optional(),
@@ -35,11 +35,26 @@ const createParcelSchema = z.object(parcelFields);
 const updateParcelSchema = nonEmpty(z.object(parcelFields).partial());
 
 // ====
+// Zone
+// ====
+// parcel_id is taken from the URL (POST /parcels/:parcelId/zones) and can't be changed.
+// The shape points are relative to the parcel position, like the parcel shape.
+const zoneFields = {
+  name : requiredText(100),
+  shape,
+};
+
+const createZoneSchema = z.object(zoneFields);
+const updateZoneSchema = nonEmpty(z.object(zoneFields).partial());
+
+// ====
 // Crop
 // ====
 // parcel_id is taken from the URL (POST /parcels/:parcelId/crops) and can't be changed
 const cropFields = {
   plant_id             : id,
+  // where the crop is in the parcel (null = the whole parcel), the zone must belong to the parcel
+  zone_id              : id.nullable().optional(),
   sow_date             : optionalDate,
   expected_harvest_date: optionalDate,
   actual_harvest_date  : optionalDate,
@@ -74,6 +89,8 @@ module.exports = {
   updateGardenSchema,
   createParcelSchema,
   updateParcelSchema,
+  createZoneSchema,
+  updateZoneSchema,
   createCropSchema,
   updateCropSchema,
   cropDatesIssues,

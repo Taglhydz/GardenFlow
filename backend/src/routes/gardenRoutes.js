@@ -3,6 +3,7 @@ const router  = express.Router();
 const gardenController = require('../controllers/gardenController');
 const parcelController = require('../controllers/parcelController');
 const cropController   = require('../controllers/cropController');
+const zoneController   = require('../controllers/zoneController');
 const validate         = require('../middlewares/validate');
 const { authenticate } = require('../middlewares/authMiddleware');
 const { idParam } = require('../validators/common');
@@ -22,5 +23,8 @@ router.post('/:gardenId/parcels', validate({ params: idParam('gardenId'), body: 
 
 // crops of all the parcels of a garden
 router.get('/:gardenId/crops', validate({ params: idParam('gardenId') }), cropController.getCropsByGarden);
+
+// zones of all the parcels of a garden
+router.get('/:gardenId/zones', validate({ params: idParam('gardenId') }), zoneController.getZonesByGarden);
 
 module.exports = router;

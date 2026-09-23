@@ -1,20 +1,15 @@
 const Garden   = require('../models/gardenModel');
 const Parcel   = require('../models/parcelModel');
+const Zone     = require('../models/zoneModel');
 const AppError = require('../utils/AppError');
+const { polygonArea, isInside } = require('../utils/geometry');
 
 // Ownership : a parcel belongs to the user who owns its garden.
 
-/**
- * The area is computed from the dimensions (width x length) unless it is explicitly sent.
- * `current` is the stored parcel for an update.
- */
-const withArea = (data, current = {}) => {
-  if (data.area_m2 !== undefined || (data.width === undefined && data.length === undefined)) return data;
-
-  const width  = data.width  ?? current.width  ?? 0;
-  const length = data.length ?? current.length ?? 0;
-  return { ...data, area_m2: width > 0 && length > 0 ? Math.round(width * length * 100) / 100 : null };
-};
+/** The area is always computed from the shape. */
+const withArea = (data) => (data.shape === undefined
+  ? data
+  : { ...data, area_m2: Math.round(polygonArea(data.shape) * 100) / 100 });
 
 /** GET /gardens/:gardenId/parcels */
 exports.getParcelsByGarden = async (req, res) => {
@@ -46,19 +41,29 @@ exports.getParcelById = async (req, res) => {
   res.json(parcel);
 };
 
-/** PATCH /parcels/:id */
+/**
+ * PATCH /parcels/:id
+ * Moving the parcel (pos_x / pos_y) moves its zones with it (their shape is relative to the parcel).
+ * A new shape is refused if a zone would no longer be inside the parcel.
+ */
 exports.updateParcel = async (req, res) => {
   const { id } = req.valid.params;
-
-  const parcel = await Parcel.findOwned(id, req.user.id);
+  const body = req.valid.body;
 
   // check parcel found
-  if (!parcel) { throw AppError.notFound('Parcel'); }
+  if (!(await Parcel.findOwned(id, req.user.id))) { throw AppError.notFound('Parcel'); }
 
-  res.json(await Parcel.update(id, withArea(req.valid.body, parcel)));
+  if (body.shape) {
+    const outside = (await Zone.findAllByParcel(id)).filter((zone) => !isInside(zone.shape, body.shape));
+    if (outside.length) {
+      throw AppError.conflict('ZONES_OUTSIDE_PARCEL', `Zones would be outside the parcel: ${outside.map((z) => z.name).join(', ')}`);
+    }
+  }
+
+  res.json(await Parcel.update(id, withArea(body)));
 };
 
-/** DELETE /parcels/:id - also deletes its crops */
+/** DELETE /parcels/:id - also deletes its zones and crops */
 exports.deleteParcel = async (req, res) => {
   // check parcel deleted
   if (!(await Parcel.deleteOwned(req.valid.params.id, req.user.id))) { throw AppError.notFound('Parcel'); }

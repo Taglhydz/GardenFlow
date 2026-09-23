@@ -17,12 +17,15 @@ const plant = (id, code, extra = {}) => ({
   ...extra,
 });
 
-const parcel = (id, extra = {}) => ({
+const rect = (w, h, x = 0, y = 0) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }];
+
+/** Rectangular parcel : width / length build its shape (relative to pos_x / pos_y). */
+const parcel = (id, { width = 1, length = 1, ...extra } = {}) => ({
   id,
   pos_x    : 0,
   pos_y    : 0,
-  width    : 1,
-  length   : 1,
+  shape    : rect(width, length),
+  area_m2  : width * length,
   soil_type: 'standard',
   sunlight : 'medium',
   moisture : 'medium',
@@ -193,7 +196,7 @@ describe('associations', () => {
 
   test('a plant already in the parcel is slightly penalized', () => {
     const result = run({ plants, associations, crops: [crop(1, 10)] });
-    expect(codes(find(result, 'tomato'))).toContain('already_in_parcel');
+    expect(codes(find(result, 'tomato'))).toContain('already_here');
   });
 });
 
@@ -225,6 +228,54 @@ describe('crop rotation', () => {
       crops  : [crop(1, 40, { actual_harvest_date: '2025-08-01' }), crop(2, 30, { actual_harvest_date: '2025-08-01' })],
     });
     expect(codes(find(result, 'tomato'))).not.toContain('rotation_same_family');
+  });
+});
+
+describe('zones', () => {
+  // parcel 2 x 1 m split in two zones of 1 m²
+  const zone1 = { id: 100, parcel_id: 1, shape: rect(1, 1), area_m2: 1 };
+  const zone2 = { id: 101, parcel_id: 1, shape: rect(1, 1, 1, 0), area_m2: 1 };
+  const plants = [plant(10, 'tomato', { family: 'solanaceae' }), plant(20, 'basil'), plant(30, 'eggplant', { family: 'solanaceae' })];
+  const associations = [{ plant_id_1: 10, plant_id_2: 20, relation_type: 'positive' }];
+  const runZone = (zone, crops) => run({ parcel: parcel(1, { width: 2 }), parcels: [parcel(1, { width: 2 })], zone, plants, associations, crops });
+
+  test('a companion in the same zone counts more than in another zone of the parcel', () => {
+    const crops = [crop(1, 10, { zone_id: 100 })];
+    const sameZone  = find(runZone(zone1, crops), 'basil');
+    const otherZone = find(runZone(zone2, crops), 'basil');
+
+    expect(codes(sameZone)).toContain('good_companion');
+    expect(codes(otherZone)).toContain('good_in_parcel');
+    expect(sameZone.score - otherZone.score).toBe(WEIGHTS.goodCompanion - WEIGHTS.goodInParcel);
+  });
+
+  test('a crop planted in the whole parcel (no zone) counts for every zone, in the parcel tier', () => {
+    const basil = find(runZone(zone2, [crop(1, 10, { zone_id: null })]), 'basil');
+    expect(codes(basil)).toContain('good_in_parcel');
+  });
+
+  test('crop rotation uses the history of the zone (and of the whole parcel)', () => {
+    const harvested = { actual_harvest_date: '2025-08-01' };
+
+    expect(codes(find(runZone(zone1, [crop(1, 10, { zone_id: 100, ...harvested })]), 'eggplant'))).toContain('rotation_same_family');
+    expect(codes(find(runZone(zone2, [crop(1, 10, { zone_id: 100, ...harvested })]), 'eggplant'))).not.toContain('rotation_same_family');
+    // harvested in the whole parcel : concerns every zone
+    expect(codes(find(runZone(zone2, [crop(1, 10, { zone_id: null, ...harvested })]), 'eggplant'))).toContain('rotation_same_family');
+  });
+});
+
+describe('capacity', () => {
+  test('number of plants that fit with the spacing of the plant', () => {
+    const tomato = plant(10, 'tomato', { spacing_cm: 50 });
+    const result = run({ plants: [tomato], parcel: parcel(1, { width: 2, length: 1.5 }) })[0];
+    expect(result.reasons.find((r) => r.code === 'capacity').params).toEqual({ count: 12 });
+  });
+
+  test('a place too small for even one plant is penalized', () => {
+    const squash = plant(10, 'squash', { spacing_cm: 150 });
+    const result = run({ plants: [squash], parcel: parcel(1, { width: 1, length: 1 }) })[0];
+    expect(codes(result)).toContain('too_small');
+    expect(result.score).toBe(BASE_SCORE + WEIGHTS.inSeason + WEIGHTS.sunMatch + WEIGHTS.waterMatch + WEIGHTS.tooSmall);
   });
 });
 

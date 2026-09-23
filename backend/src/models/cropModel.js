@@ -1,7 +1,7 @@
 const db = require('../database/db');
 const { buildUpdateSet } = require('../utils/sql');
 
-const UPDATABLE = ['plant_id', 'sow_date', 'expected_harvest_date', 'actual_harvest_date', 'comment'];
+const UPDATABLE = ['plant_id', 'zone_id', 'sow_date', 'expected_harvest_date', 'actual_harvest_date', 'comment'];
 
 // Ownership goes through the parcel and the garden : crop -> parcel -> garden.user_id
 const Crop = {
@@ -37,9 +37,9 @@ const Crop = {
   /** The caller must have checked that the parcel belongs to the user. */
   create: async (parcelId, crop) => {
     const [result] = await db.query(
-      `INSERT INTO crop (parcel_id, plant_id, sow_date, expected_harvest_date, actual_harvest_date, comment)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [parcelId, crop.plant_id, crop.sow_date ?? null, crop.expected_harvest_date ?? null, crop.actual_harvest_date ?? null, crop.comment ?? null]
+      `INSERT INTO crop (parcel_id, zone_id, plant_id, sow_date, expected_harvest_date, actual_harvest_date, comment)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [parcelId, crop.zone_id ?? null, crop.plant_id, crop.sow_date ?? null, crop.expected_harvest_date ?? null, crop.actual_harvest_date ?? null, crop.comment ?? null]
     );
     const [rows] = await db.query('SELECT * FROM crop WHERE id = ?', [result.insertId]);
     return rows[0];

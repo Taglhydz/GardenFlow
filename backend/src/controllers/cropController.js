@@ -1,6 +1,7 @@
 const Garden   = require('../models/gardenModel');
 const Parcel   = require('../models/parcelModel');
 const Crop     = require('../models/cropModel');
+const Zone     = require('../models/zoneModel');
 const AppError = require('../utils/AppError');
 const { cropDatesIssues } = require('../validators/gardenValidators');
 
@@ -10,6 +11,15 @@ const { cropDatesIssues } = require('../validators/gardenValidators');
 const checkDates = (crop) => {
   const issues = cropDatesIssues(crop);
   if (issues.length) { throw AppError.badRequest('VALIDATION_ERROR', 'Invalid crop dates', issues); }
+};
+
+/** The zone of a crop must belong to the crop's parcel (null = the whole parcel). */
+const checkZone = async (zoneId, parcelId, userId) => {
+  if (zoneId == null) return;
+  const zone = await Zone.findOwned(zoneId, userId);
+  if (!zone || zone.parcel_id !== parcelId) {
+    throw AppError.badRequest('INVALID_ZONE', 'The zone does not belong to the parcel of the crop');
+  }
 };
 
 /** GET /gardens/:gardenId/crops - crops of all the parcels of the garden (one request for the garden plan) */
@@ -40,6 +50,7 @@ exports.createCrop = async (req, res) => {
   if (!(await Parcel.findOwned(parcelId, req.user.id))) { throw AppError.notFound('Parcel'); }
 
   checkDates(req.valid.body);
+  await checkZone(req.valid.body.zone_id, parcelId, req.user.id);
 
   res.status(201).json(await Crop.create(parcelId, req.valid.body));
 };
@@ -64,6 +75,7 @@ exports.updateCrop = async (req, res) => {
 
   // the dates are checked on the final state : stored values + modified values
   checkDates({ ...crop, ...req.valid.body });
+  await checkZone(req.valid.body.zone_id, crop.parcel_id, req.user.id);
 
   res.json(await Crop.update(id, req.valid.body));
 };

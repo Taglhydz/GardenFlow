@@ -17,6 +17,9 @@ const register = async (email, extra = {}) => {
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
 
+/** Rectangle shape (points relative to the parcel position) */
+const rect = (w, h, x = 0, y = 0) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }];
+
 let alice; // owner of the test data
 let bob;   // another user, must never see alice's data
 let admin;
@@ -184,21 +187,22 @@ describe('parcels and crops', () => {
     tomatoId = tomato.id;
   });
 
-  test('create a parcel : decimals are returned as numbers and defaults are applied', async () => {
+  test('create a parcel : shape stored as JSON, area computed, defaults applied', async () => {
     const res = await api.post(`/api/gardens/${gardenId}/parcels`).set(auth(alice.token))
-      .send({ name: 'Carré 1', width: 1.2, length: '2.5', soil_type: 'clay' });
+      .send({ name: 'Carré 1', pos_x: '1.5', shape: rect(1.2, 2.5), soil_type: 'clay' });
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ garden_id: gardenId, width: 1.2, length: 2.5, soil_type: 'clay', sunlight: 'medium', pos_x: 0 });
+    expect(res.body).toMatchObject({ garden_id: gardenId, pos_x: 1.5, pos_y: 0, area_m2: 3, soil_type: 'clay', sunlight: 'medium' });
+    expect(res.body.shape).toEqual(rect(1.2, 2.5));
     parcelId = res.body.id;
   });
 
   test('invalid enum -> 400', async () => {
-    const res = await api.post(`/api/gardens/${gardenId}/parcels`).set(auth(alice.token)).send({ name: 'X', soil_type: 'mud' });
+    const res = await api.post(`/api/gardens/${gardenId}/parcels`).set(auth(alice.token)).send({ name: 'X', shape: rect(1, 1), soil_type: 'mud' });
     expect(res.status).toBe(400);
   });
 
   test("can't create a parcel in another user's garden", async () => {
-    const res = await api.post(`/api/gardens/${gardenId}/parcels`).set(auth(bob.token)).send({ name: 'Intrus' });
+    const res = await api.post(`/api/gardens/${gardenId}/parcels`).set(auth(bob.token)).send({ name: 'Intrus', shape: rect(1, 1) });
     expect(res.status).toBe(404);
   });
 
@@ -404,20 +408,20 @@ describe('garden plan and suggestions', () => {
     gardenId = garden.body.id;
 
     const create = (body) => api.post(`/api/gardens/${gardenId}/parcels`).set(auth(alice.token)).send(body);
-    parcelA = (await create({ name: 'A', pos_x: 0, pos_y: 0, width: 2, length: 1.5, soil_type: 'humus', sunlight: 'high' })).body;
-    parcelB = (await create({ name: 'B', pos_x: 2, pos_y: 0, width: 1, length: 1.5, soil_type: 'humus', sunlight: 'high' })).body;
-    parcelC = (await create({ name: 'C', pos_x: 6, pos_y: 4, width: 1, length: 1 })).body;
+    parcelA = (await create({ name: 'A', pos_x: 0, pos_y: 0, shape: rect(2, 1.5), soil_type: 'humus', sunlight: 'high' })).body;
+    parcelB = (await create({ name: 'B', pos_x: 2, pos_y: 0, shape: rect(1, 1.5), soil_type: 'humus', sunlight: 'high' })).body;
+    parcelC = (await create({ name: 'C', pos_x: 6, pos_y: 4, shape: rect(1, 1) })).body;
 
     await api.post(`/api/parcels/${parcelA.id}/crops`).set(auth(alice.token)).send({ plant_id: ids.tomato, sow_date: '2026-05-01' });
   });
 
-  test('the area is computed from the dimensions, and recomputed when they change', async () => {
+  test('the area is computed from the shape, and recomputed when it changes', async () => {
     expect(parcelA.area_m2).toBe(3);
 
-    const res = await api.patch(`/api/parcels/${parcelA.id}`).set(auth(alice.token)).send({ width: 3 });
+    const res = await api.patch(`/api/parcels/${parcelA.id}`).set(auth(alice.token)).send({ shape: rect(3, 1.5) });
     expect(res.body.area_m2).toBe(4.5);
 
-    const back = await api.patch(`/api/parcels/${parcelA.id}`).set(auth(alice.token)).send({ width: 2 });
+    const back = await api.patch(`/api/parcels/${parcelA.id}`).set(auth(alice.token)).send({ shape: rect(2, 1.5) });
     expect(back.body.area_m2).toBe(3);
   });
 
@@ -483,6 +487,145 @@ describe('garden plan and suggestions', () => {
   test('invalid month -> 400, other user -> 404', async () => {
     expect((await api.get(`/api/parcels/${parcelA.id}/suggestions?month=13`).set(auth(alice.token))).status).toBe(400);
     expect((await api.get(`/api/parcels/${parcelA.id}/suggestions`).set(auth(bob.token))).status).toBe(404);
+  });
+});
+
+describe('free shapes and zones', () => {
+  let gardenId;
+  let parcel; // L shape : 3 x 3 m without its top-right 2 x 2 m corner
+  let zoneA;  // bottom band of the L
+  let zoneB;  // left band of the L, touching zone A
+  let ids;
+
+  const lShape = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 3 }, { x: 0, y: 3 }];
+  const createZone = (body, token = alice.token) => api.post(`/api/parcels/${parcel.id}/zones`).set(auth(token)).send(body);
+  const suggestionsOf = async (zoneId, code) => {
+    const res = await api.get(`/api/zones/${zoneId}/suggestions?month=5`).set(auth(alice.token));
+    return res.body.suggestions.find((s) => s.plant_code === code);
+  };
+  const reasonCodes = (suggestion) => suggestion.reasons.map((r) => r.code);
+
+  beforeAll(async () => {
+    const [rows] = await db.query("SELECT id, code FROM plant WHERE code IN ('tomato', 'basil', 'potato', 'eggplant', 'squash')");
+    ids = Object.fromEntries(rows.map((r) => [r.code, r.id]));
+
+    gardenId = (await api.post('/api/gardens').set(auth(alice.token)).send({ name: 'Formes' })).body.id;
+    parcel = (await api.post(`/api/gardens/${gardenId}/parcels`).set(auth(alice.token))
+      .send({ name: 'En L', pos_x: 4, pos_y: 1, shape: lShape, soil_type: 'humus', sunlight: 'high' })).body;
+  });
+
+  test('a free shape parcel : area computed with the real shape', () => {
+    expect(parcel.area_m2).toBe(5);
+    expect(parcel.shape).toEqual(lShape);
+  });
+
+  test('a self-crossing shape is refused', async () => {
+    const res = await api.post(`/api/gardens/${gardenId}/parcels`).set(auth(alice.token))
+      .send({ name: 'Noeud', shape: [{ x: 0, y: 0 }, { x: 2, y: 2 }, { x: 2, y: 0 }, { x: 0, y: 2 }] });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  test('zones inside the parcel, touching each other', async () => {
+    const a = await createZone({ name: 'Bande du bas', shape: rect(3, 1, 0, 2) });
+    expect(a.status).toBe(201);
+    expect(a.body).toMatchObject({ parcel_id: parcel.id, area_m2: 3 });
+    zoneA = a.body;
+
+    const b = await createZone({ name: 'Bande de gauche', shape: rect(1, 2) });
+    expect(b.status).toBe(201);
+    zoneB = b.body;
+  });
+
+  test('a zone outside the parcel (in the missing corner of the L) is refused', async () => {
+    const res = await createZone({ name: 'Dehors', shape: rect(1, 1, 1.5, 0.5) });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('ZONE_OUTSIDE_PARCEL');
+  });
+
+  test('overlapping zones are refused, also when a zone is modified', async () => {
+    const res = await createZone({ name: 'Chevauche', shape: rect(1, 1, 0.5, 2) });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('ZONES_OVERLAP');
+
+    const update = await api.patch(`/api/zones/${zoneB.id}`).set(auth(alice.token)).send({ shape: rect(1, 2.5) });
+    expect(update.status).toBe(400);
+    expect(update.body.code).toBe('ZONES_OVERLAP');
+  });
+
+  test('a parcel shape that would leave a zone outside is refused, moving the parcel is fine', async () => {
+    const shrink = await api.patch(`/api/parcels/${parcel.id}`).set(auth(alice.token)).send({ shape: rect(3, 2) });
+    expect(shrink.status).toBe(409);
+    expect(shrink.body.code).toBe('ZONES_OUTSIDE_PARCEL');
+
+    const move = await api.patch(`/api/parcels/${parcel.id}`).set(auth(alice.token)).send({ pos_x: 5 });
+    expect(move.status).toBe(200);
+    // the zones are relative to the parcel : they moved with it, nothing to change
+    const zones = await api.get(`/api/parcels/${parcel.id}/zones`).set(auth(alice.token));
+    expect(zones.body.find((z) => z.id === zoneA.id).shape).toEqual(zoneA.shape);
+  });
+
+  test('GET /gardens/:id/zones, and another user cannot touch the zones', async () => {
+    const res = await api.get(`/api/gardens/${gardenId}/zones`).set(auth(alice.token));
+    expect(res.body.map((z) => z.id).sort()).toEqual([zoneA.id, zoneB.id].sort());
+
+    expect((await api.get(`/api/gardens/${gardenId}/zones`).set(auth(bob.token))).status).toBe(404);
+    expect((await api.get(`/api/zones/${zoneA.id}`).set(auth(bob.token))).status).toBe(404);
+    expect((await api.patch(`/api/zones/${zoneA.id}`).set(auth(bob.token)).send({ name: 'x' })).status).toBe(404);
+    expect((await api.delete(`/api/zones/${zoneA.id}`).set(auth(bob.token))).status).toBe(404);
+    expect((await createZone({ name: 'x', shape: rect(0.5, 0.5, 0, 0) }, bob.token)).status).toBe(404);
+    expect((await api.get(`/api/zones/${zoneA.id}/suggestions`).set(auth(bob.token))).status).toBe(404);
+  });
+
+  test('a crop can only use a zone of its own parcel', async () => {
+    const other = (await api.post(`/api/gardens/${gardenId}/parcels`).set(auth(alice.token))
+      .send({ name: 'Autre', pos_x: 20, shape: rect(1, 1) })).body;
+
+    const wrong = await api.post(`/api/parcels/${other.id}/crops`).set(auth(alice.token)).send({ plant_id: ids.tomato, zone_id: zoneA.id });
+    expect(wrong.status).toBe(400);
+    expect(wrong.body.code).toBe('INVALID_ZONE');
+
+    const ok = await api.post(`/api/parcels/${parcel.id}/crops`).set(auth(alice.token)).send({ plant_id: ids.tomato, zone_id: zoneA.id });
+    expect(ok.status).toBe(201);
+    expect(ok.body.zone_id).toBe(zoneA.id);
+  });
+
+  test('zone suggestions : companions in the zone count more than in the rest of the parcel', async () => {
+    // tomato is in zone A
+    const basilA = await suggestionsOf(zoneA.id, 'basil');
+    const basilB = await suggestionsOf(zoneB.id, 'basil');
+
+    expect(reasonCodes(basilA)).toContain('good_companion');
+    expect(reasonCodes(basilB)).toContain('good_in_parcel');
+    expect(basilA.score).toBeGreaterThan(basilB.score);
+  });
+
+  test('zone suggestions : crop rotation uses the history of the zone', async () => {
+    const lastYear = new Date(Date.now() - 200 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    await api.post(`/api/parcels/${parcel.id}/crops`).set(auth(alice.token))
+      .send({ plant_id: ids.potato, zone_id: zoneB.id, sow_date: lastYear, actual_harvest_date: lastYear });
+
+    expect(reasonCodes(await suggestionsOf(zoneB.id, 'eggplant'))).toContain('rotation_same_family');
+    expect(reasonCodes(await suggestionsOf(zoneA.id, 'eggplant'))).not.toContain('rotation_same_family');
+  });
+
+  test('zone suggestions : how many plants fit, and zones too small for a plant', async () => {
+    const tomato = await suggestionsOf(zoneA.id, 'tomato'); // 3 m², 50 cm spacing
+    expect(tomato.reasons.find((r) => r.code === 'capacity').params).toEqual({ count: 12 });
+
+    const mini = (await api.post(`/api/gardens/${gardenId}/parcels`).set(auth(alice.token))
+      .send({ name: 'Mini', pos_x: 30, shape: rect(0.3, 0.3) })).body;
+    const tiny = (await api.post(`/api/parcels/${mini.id}/zones`).set(auth(alice.token))
+      .send({ name: 'Petit coin', shape: rect(0.3, 0.3) })).body;
+
+    const squash = await suggestionsOf(tiny.id, 'squash'); // 1.5 m spacing
+    expect(reasonCodes(squash)).toContain('too_small');
+  });
+
+  test('deleting a zone keeps its crops in the parcel', async () => {
+    expect((await api.delete(`/api/zones/${zoneA.id}`).set(auth(alice.token))).status).toBe(204);
+    const [crops] = await db.query('SELECT zone_id FROM crop WHERE parcel_id = ? AND plant_id = ?', [parcel.id, ids.tomato]);
+    expect(crops).toEqual([{ zone_id: null }]);
   });
 });
 

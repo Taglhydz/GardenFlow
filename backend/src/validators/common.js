@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { isSimplePolygon, polygonArea } = require('../utils/geometry');
 
 // Must stay in sync with the ENUMs of schema.sql
 const SOIL_TYPES     = ['standard', 'clay', 'sandy', 'loamy', 'humus', 'chalky'];
@@ -32,6 +33,22 @@ const nonEmpty = (schema) => schema.refine((data) => Object.values(data).some((v
   message: 'At least one field must be provided',
 });
 
+/** Smallest shape accepted (m²) */
+const MIN_SHAPE_AREA = 0.01;
+
+/**
+ * Free shape drawn by the user : 3 to 50 points { x, y } in meters, rounded to the cm,
+ * forming a simple polygon (no crossing edges).
+ */
+const shape = z.array(z.object({
+  x: z.coerce.number().min(-10000).max(10000),
+  y: z.coerce.number().min(-10000).max(10000),
+}))
+  .min(3).max(50)
+  .transform((points) => points.map((p) => ({ x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100 })))
+  .refine(isSimplePolygon, { message: 'The shape must be a simple polygon (no crossing edges, no duplicated point)' })
+  .refine((points) => polygonArea(points) >= MIN_SHAPE_AREA, { message: 'The shape is too small' });
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 module.exports = {
@@ -48,6 +65,7 @@ module.exports = {
   optionalDate,
   month,
   positiveDecimal,
+  shape,
   nonEmpty,
   today,
 };

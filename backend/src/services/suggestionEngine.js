@@ -1,10 +1,11 @@
 /**
- * Suggestion engine : ranks the plants of the catalog for a parcel and a month.
+ * Suggestion engine : ranks the plants of the catalog for a parcel (or a zone of a parcel) and a month.
  *
  * Pure functions (no database access) so the rules are easy to test and to tune.
  * Every score change comes with a reason { code, impact, params } that the app translates
  * (suggestion_reasons.<code> in the translation files).
  */
+const { translate, polygonDistance } = require('../utils/geometry');
 
 // ==========
 // Parameters
@@ -12,21 +13,25 @@
 const BASE_SCORE = 50;
 
 const WEIGHTS = {
-  inSeason         : 15,  // can go in the ground this month
-  soilMatch        : 10,
-  soilMismatch     : -5,
-  sunMatch         : 10,
-  sunEnough        : 5,   // more sun than needed
-  sunTooLow        : [-10, -25], // 1 or 2 levels below the need
-  waterMatch       : 5,
-  tooDry           : [-5, -15],
-  tooWet           : -10, // 2 levels above the need
-  goodCompanion    : 12,
-  badCompanion     : -20,
-  goodNeighbour    : 6,   // association with a crop of an adjacent parcel
-  badNeighbour     : -10,
-  alreadyInParcel  : -5,
-  rotation         : [-25, -15, -8], // same family harvested < 1, < 2, < 3 years ago
+  inSeason       : 15,  // can go in the ground this month
+  soilMatch      : 10,
+  soilMismatch   : -5,
+  sunMatch       : 10,
+  sunEnough      : 5,   // more sun than needed
+  sunTooLow      : [-10, -25], // 1 or 2 levels below the need
+  waterMatch     : 5,
+  tooDry         : [-5, -15],
+  tooWet         : -10, // 2 levels above the need
+  // associations, from the closest crops to the farthest
+  goodCompanion  : 12,  // same zone (or same parcel when there is no zone)
+  badCompanion   : -20,
+  goodInParcel   : 8,   // another place of the same parcel
+  badInParcel    : -14,
+  goodNeighbour  : 6,   // an adjacent parcel
+  badNeighbour   : -10,
+  alreadyHere    : -5,
+  rotation       : [-25, -15, -8], // same family harvested here < 1, < 2, < 3 years ago
+  tooSmall       : -30, // not even one plant fits (spacing)
 };
 
 /** Parcels closer than this (meters) are neighbours. */
@@ -46,12 +51,12 @@ const periodsNow = (plant, month) => new Set(
   (plant.periods || []).filter((p) => isMonthInRange(month, p.start_month, p.end_month)).map((p) => p.type)
 );
 
-/** Two rectangles are neighbours when the gap between them is at most `distance` on both axes (overlap included). */
-const areNeighbours = (a, b, distance = NEIGHBOUR_DISTANCE_M) => {
-  const gapX = Math.max(a.pos_x, b.pos_x) - Math.min(a.pos_x + a.width, b.pos_x + b.width);
-  const gapY = Math.max(a.pos_y, b.pos_y) - Math.min(a.pos_y + a.length, b.pos_y + b.length);
-  return gapX <= distance && gapY <= distance;
-};
+/** Shape of a parcel on the garden plan (its shape is relative to its position). */
+const absoluteShape = (parcel) => translate(parcel.shape, parcel.pos_x, parcel.pos_y);
+
+/** Two parcels are neighbours when the gap between their borders is at most `distance`. */
+const areNeighbours = (a, b, distance = NEIGHBOUR_DISTANCE_M) =>
+  polygonDistance(absoluteShape(a), absoluteShape(b)) <= distance;
 
 /** Full months between two 'YYYY-MM-DD' dates (or Date objects). */
 const monthsBetween = (from, to) => {
@@ -99,44 +104,43 @@ const scoreWater = (plant, parcel, add) => {
   else if (diff === 2) add(WEIGHTS.tooWet, 'too_wet', 'negative', { need: plant.water_need });
 };
 
-/**
- * Associations with the crops still in the ground, in the parcel and in the neighbour parcels.
- * Each other plant counts once, the parcel wins over the neighbours.
- */
-const scoreAssociations = (plant, context, add) => {
-  const { parcelPlantIds, neighbourPlantIds, associationIndex, plantsById } = context;
+/** From the closest crops to the farthest : each other plant counts once, in its closest tier. */
+const ASSOCIATION_TIERS = [
+  { key: 'here',      good: [WEIGHTS.goodCompanion, 'good_companion'], bad: [WEIGHTS.badCompanion, 'bad_companion'] },
+  { key: 'inParcel',  good: [WEIGHTS.goodInParcel, 'good_in_parcel'],  bad: [WEIGHTS.badInParcel, 'bad_in_parcel'] },
+  { key: 'neighbour', good: [WEIGHTS.goodNeighbour, 'good_neighbour'], bad: [WEIGHTS.badNeighbour, 'bad_neighbour'] },
+];
 
-  if (parcelPlantIds.has(plant.id)) {
-    add(WEIGHTS.alreadyInParcel, 'already_in_parcel', 'info');
+const scoreAssociations = (plant, context, add) => {
+  const { plantIds, associationIndex, plantsById } = context;
+
+  if (plantIds.here.has(plant.id)) {
+    add(WEIGHTS.alreadyHere, 'already_here', 'info');
   }
 
-  for (const [otherIds, isNeighbour] of [[parcelPlantIds, false], [neighbourPlantIds, true]]) {
-    for (const otherId of otherIds) {
-      if (otherId === plant.id || (isNeighbour && parcelPlantIds.has(otherId))) continue;
+  const counted = new Set([plant.id]);
+  for (const tier of ASSOCIATION_TIERS) {
+    for (const otherId of plantIds[tier.key]) {
+      if (counted.has(otherId)) continue;
+      counted.add(otherId);
 
       const relation = relationBetween(associationIndex, plant.id, otherId);
       if (!relation) continue;
 
-      const params = { plant_code: plantsById.get(otherId)?.code };
-      if (relation === 'positive') {
-        add(isNeighbour ? WEIGHTS.goodNeighbour : WEIGHTS.goodCompanion,
-          isNeighbour ? 'good_neighbour' : 'good_companion', 'positive', params);
-      } else {
-        add(isNeighbour ? WEIGHTS.badNeighbour : WEIGHTS.badCompanion,
-          isNeighbour ? 'bad_neighbour' : 'bad_companion', 'negative', params);
-      }
+      const [points, code] = relation === 'positive' ? tier.good : tier.bad;
+      add(points, code, relation === 'positive' ? 'positive' : 'negative', { plant_code: plantsById.get(otherId)?.code });
     }
   }
 };
 
-/** Crop rotation : penalty when the same family was harvested in this parcel recently (most recent only). */
+/** Crop rotation : penalty when the same family was harvested here recently (most recent only). */
 const scoreRotation = (plant, context, add) => {
   if (!plant.family) return;
 
-  const { harvestedCrops, plantsById, today } = context;
+  const { harvestedHere, plantsById, today } = context;
   let mostRecent = null;
 
-  for (const crop of harvestedCrops) {
+  for (const crop of harvestedHere) {
     const other = plantsById.get(crop.plant_id);
     if (other?.family !== plant.family) continue;
 
@@ -155,44 +159,66 @@ const scoreRotation = (plant, context, add) => {
   }
 };
 
+/** How many plants fit in the area, with the spacing of the plant (square grid). */
+const scoreCapacity = (plant, area, add) => {
+  if (!area || !plant.spacing_cm) return;
+
+  const spacing = plant.spacing_cm / 100;
+  const count = Math.floor(area / (spacing * spacing));
+
+  if (count < 1) add(WEIGHTS.tooSmall, 'too_small', 'negative', { spacing_cm: plant.spacing_cm });
+  else add(0, 'capacity', 'info', { count });
+};
+
 // ======
 // Engine
 // ======
 
 /**
  * @param {object}   input
- * @param {object}   input.parcel        the parcel to plant (pos_x, pos_y, width, length, soil_type, sunlight, moisture)
+ * @param {object}   input.parcel        the parcel (pos_x, pos_y, shape, area_m2, soil_type, sunlight, moisture)
+ * @param {object}   [input.zone]        a zone of this parcel (shape, area_m2) : suggestions for this zone only
  * @param {object[]} input.parcels       all the parcels of the garden (to find the neighbours)
- * @param {object[]} input.crops         all the crops of the garden
+ * @param {object[]} input.crops         all the crops of the garden (with parcel_id and zone_id)
  * @param {object[]} input.plants        catalog, with `periods`
  * @param {object[]} input.associations  plant associations
  * @param {number}   input.month         1-12
  * @param {string}   input.today         'YYYY-MM-DD'
  * @returns {object[]} suggestions sorted by score : { plant_id, plant_code, score, actions, reasons }
  */
-const suggestPlants = ({ parcel, parcels, crops, plants, associations, month, today }) => {
+const suggestPlants = ({ parcel, zone = null, parcels, crops, plants, associations, month, today }) => {
   const plantsById = new Map(plants.map((p) => [p.id, p]));
   const neighbourIds = new Set(
     parcels.filter((p) => p.id !== parcel.id && areNeighbours(parcel, p)).map((p) => p.id)
   );
 
+  const parcelCrops = crops.filter((c) => c.parcel_id === parcel.id);
+  // "here" = the zone, or the whole parcel when no zone is given
+  const isHere = (crop) => !zone || crop.zone_id === zone.id;
+
   // crops still in the ground (planned ones included) vs harvested crops
   const inGround = crops.filter((c) => !c.actual_harvest_date);
+  const plantIdsOf = (list) => new Set(list.map((c) => c.plant_id));
 
   const context = {
     plantsById,
     today,
-    associationIndex : buildAssociationIndex(associations),
-    parcelPlantIds   : new Set(inGround.filter((c) => c.parcel_id === parcel.id).map((c) => c.plant_id)),
-    neighbourPlantIds: new Set(inGround.filter((c) => neighbourIds.has(c.parcel_id)).map((c) => c.plant_id)),
-    harvestedCrops   : crops.filter((c) => c.parcel_id === parcel.id && c.actual_harvest_date),
+    associationIndex: buildAssociationIndex(associations),
+    plantIds: {
+      here     : plantIdsOf(inGround.filter((c) => c.parcel_id === parcel.id && isHere(c))),
+      inParcel : plantIdsOf(inGround.filter((c) => c.parcel_id === parcel.id && !isHere(c))),
+      neighbour: plantIdsOf(inGround.filter((c) => neighbourIds.has(c.parcel_id))),
+    },
+    // rotation : the history of the zone, plus the crops planted in the whole parcel (without zone)
+    harvestedHere: parcelCrops.filter((c) => c.actual_harvest_date && (isHere(c) || c.zone_id == null)),
   };
 
+  const area = zone ? zone.area_m2 : parcel.area_m2;
   const suggestions = [];
 
   for (const plant of plants) {
     const now = periodsNow(plant, month);
-    // what can be done this month : put it in the parcel, or sow it under cover to plant it later
+    // what can be done this month : put it in the ground, or sow it under cover to plant it later
     const actions = ['sow_outdoor', 'plant_out', 'sow_indoor'].filter((type) => now.has(type));
     if (actions.length === 0) continue;
 
@@ -214,6 +240,7 @@ const suggestPlants = ({ parcel, parcels, crops, plants, associations, month, to
     scoreWater(plant, parcel, add);
     scoreAssociations(plant, context, add);
     scoreRotation(plant, context, add);
+    scoreCapacity(plant, area, add);
 
     suggestions.push({
       plant_id  : plant.id,
