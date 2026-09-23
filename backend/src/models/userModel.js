@@ -1,58 +1,55 @@
 const db = require('../database/db');
+const { buildUpdateSet } = require('../utils/sql');
+
+// password_hash is never selected, except by findByEmailWithPassword / findPasswordHash
+const PUBLIC_COLUMNS = 'id, username, email, birthdate, role, created_at, updated_at';
+const UPDATABLE      = ['username', 'email', 'birthdate', 'role'];
 
 const User = {
-  getAll: () => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM user WHERE deleted_at IS NULL', (err, results) => {
-        if (err) return reject(err);
-        resolve(results);
-      });
-    });
+  findAll: async () => {
+    const [rows] = await db.query(`SELECT ${PUBLIC_COLUMNS} FROM user ORDER BY id`);
+    return rows;
   },
 
-  getById: (id) => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM user WHERE id = ? AND deleted_at IS NULL', [id], (err, results) => {
-        if (err) return reject(err);
-        resolve(results[0]);
-      });
-    });
+  findById: async (id) => {
+    const [rows] = await db.query(`SELECT ${PUBLIC_COLUMNS} FROM user WHERE id = ?`, [id]);
+    return rows[0] || null;
   },
 
-  getByEmail: (email) => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM user WHERE email = ? AND deleted_at IS NULL', [email], (err, results) => {
-        if (err) return reject(err);
-        resolve(results[0]);
-      });
-    });
+  findByEmailWithPassword: async (email) => {
+    const [rows] = await db.query(`SELECT ${PUBLIC_COLUMNS}, password_hash FROM user WHERE email = ?`, [email]);
+    return rows[0] || null;
   },
 
-  create: (user) => {
-    return new Promise((resolve, reject) => {
-      db.query('INSERT INTO user (username, email, password, birthdate, role) VALUES (?, ?, ?, ?, ?)', [user.username, user.email, user.password, user.birthdate, user.role || 'user'], (err, result) => {
-        if (err) return reject(err);
-        resolve({ id: result.insertId, ...user });
-      });
-    });
+  findPasswordHash: async (id) => {
+    const [rows] = await db.query('SELECT password_hash FROM user WHERE id = ?', [id]);
+    return rows[0]?.password_hash || null;
   },
 
-  update: (id, user) => {
-    return new Promise((resolve, reject) => {
-      db.query('UPDATE user SET username = ?, email = ?, password = ?, birthdate = ?, role = ? WHERE id = ? AND deleted_at IS NULL', [user.username, user.email, user.password, user.birthdate, user.role, id], (err, result) => {
-        if (err) return reject(err);
-        resolve(result);
-      });
-    });
+  create: async ({ username, email, passwordHash, birthdate }) => {
+    const [result] = await db.query(
+      'INSERT INTO user (username, email, password_hash, birthdate) VALUES (?, ?, ?, ?)',
+      [username, email, passwordHash, birthdate ?? null]
+    );
+    return User.findById(result.insertId);
   },
 
-  softDelete: (id) => {
-    return new Promise((resolve, reject) => {
-      db.query('UPDATE user SET deleted_at = NOW() WHERE id = ?', [id], (err, result) => {
-        if (err) return reject(err);
-        resolve(result);
-      });
-    });
+  update: async (id, data) => {
+    const { clause, values } = buildUpdateSet(data, UPDATABLE);
+    if (clause) {
+      await db.query(`UPDATE user SET ${clause} WHERE id = ?`, [...values, id]);
+    }
+    return User.findById(id);
+  },
+
+  updatePassword: async (id, passwordHash) => {
+    await db.query('UPDATE user SET password_hash = ? WHERE id = ?', [passwordHash, id]);
+  },
+
+  /** Hard delete : gardens, parcels and crops are removed by ON DELETE CASCADE. */
+  delete: async (id) => {
+    const [result] = await db.query('DELETE FROM user WHERE id = ?', [id]);
+    return result.affectedRows > 0;
   },
 };
 

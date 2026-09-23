@@ -1,12 +1,23 @@
-require('dotenv').config();
+const config  = require('./config/env');
 const express = require('express');
-const multer = require('multer');
-const app = express();
-const routes = require('./routes');
+const cors    = require('cors');
+const helmet  = require('helmet');
+const multer  = require('multer');
+const routes  = require('./routes');
 const { logRequest } = require('./utils/logger');
+const { notFoundHandler, errorHandler } = require('./middlewares/errorHandler');
+
+// The app is exported without listening (see server.js) so the tests can use it.
+const app = express();
+
+// security headers
+app.use(helmet());
+
+// CORS : only needed by Flutter Web, mobile apps are not concerned
+app.use(cors(config.corsOrigins.length ? { origin: config.corsOrigins } : {}));
 
 // Support JSON et form-data
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 app.use(multer().none());
 
 // logger
@@ -16,21 +27,9 @@ app.use(logRequest);
 app.use('/api', routes);
 
 // Management route not found
-app.use((req, res) => {
-  res.status(404).json({ message: 'Route not found' });
-});
+app.use(notFoundHandler);
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({
-    message: err.message || 'Internal Server Error',
-    error: process.env.NODE_ENV === 'development' ? err : {}
-  });
-});
+// Global error handler (Express 5 forwards errors thrown in async handlers here)
+app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🌱 GardenFlow Server running on port ${PORT}`);
-  console.log(`📍 API available at http://localhost:${PORT}/api`);
-});
+module.exports = app;

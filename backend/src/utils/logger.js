@@ -1,3 +1,5 @@
+const config = require('../config/env');
+
 const colors = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
@@ -11,6 +13,9 @@ const colors = {
   white: '\x1b[37m',
   gray: '\x1b[90m'
 };
+
+// never print these fields, even in development
+const SENSITIVE_FIELDS = ['password', 'current_password', 'new_password', 'token'];
 
 function getStatusColor(status) {
   if (status >= 200 && status < 300) return colors.green;
@@ -44,60 +49,54 @@ function formatTimestamp() {
   });
 }
 
+function redact(data) {
+  if (!data || typeof data !== 'object') return data;
+  if (Array.isArray(data)) return data.map(redact);
+
+  return Object.fromEntries(Object.entries(data).map(([key, value]) => [
+    key,
+    SENSITIVE_FIELDS.includes(key) ? '***' : redact(value),
+  ]));
+}
+
 function logRequest(req, res, next) {
+  if (config.isTest) return next();
+
   const startTime = Date.now();
   const timestamp = formatTimestamp();
-  
-  // capture de la réponse
-  const originalJson = res.json;
   let responseData = null;
-  
-  res.json = function(data) {
-    responseData = data;
-    return originalJson.call(this, data);
-  };
-  
-  const originalEnd = res.end;
-  res.end = function(...args) {
-    const endTime = Date.now();
-    const duration = endTime - startTime;
+
+  // capture the response body only when explicitly asked
+  if (config.logResponseData) {
+    const originalJson = res.json;
+    res.json = function (data) {
+      responseData = data;
+      return originalJson.call(this, data);
+    };
+  }
+
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
     const statusCode = res.statusCode;
-    
-    const methodColor = getMethodColor(req.method);
-    const statusColor = getStatusColor(statusCode);
-    
+
     console.log(
       `${colors.gray}[${timestamp}]${colors.reset} ` +
-      `${methodColor}${req.method.padEnd(6)}${colors.reset} ` +
+      `${getMethodColor(req.method)}${req.method.padEnd(6)}${colors.reset} ` +
       `${colors.white}${req.originalUrl.padEnd(50)}${colors.reset} ` +
-      `${statusColor}${statusCode.toString().padStart(3)}${colors.reset} ` +
+      `${getStatusColor(statusCode)}${statusCode.toString().padStart(3)}${colors.reset} ` +
       `${colors.gray}${duration.toString().padStart(4)}ms${colors.reset}`
     );
-    
-    if (process.env.LOG_RESPONSE_DATA === 'true' && responseData) {
-      console.log(`${colors.dim}Response:${colors.reset}`, responseData);
+
+    if (responseData) {
+      console.log(`${colors.dim}Response:${colors.reset}`, redact(responseData));
     }
-    
-    if (statusCode >= 400) {
-      const isExpectedConflict = statusCode === 409 && (
-        req.originalUrl.includes('/register') || 
-        req.originalUrl.includes('/auth')
-      );
-      
-      if (!isExpectedConflict) {
-        console.log(`${colors.red}Error Details:${colors.reset}`, {
-          path: req.originalUrl,
-          method: req.method,
-          query: req.query,
-          body: req.body,
-          headers: req.headers
-        });
-      }
+
+    // client errors : show what was sent (without secrets or headers) to ease debugging
+    if (statusCode >= 400 && statusCode < 500 && config.isDev) {
+      console.log(`${colors.dim}Request body:${colors.reset}`, redact(req.body));
     }
-    
-    return originalEnd.apply(this, args);
-  };
-  
+  });
+
   next();
 }
 

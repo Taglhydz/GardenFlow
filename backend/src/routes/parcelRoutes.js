@@ -1,13 +1,21 @@
 const express = require('express');
 const router  = express.Router();
 const parcelController = require('../controllers/parcelController');
-const authMiddleware   = require('../middlewares/authMiddleware');
+const cropController   = require('../controllers/cropController');
+const validate         = require('../middlewares/validate');
+const { authenticate } = require('../middlewares/authMiddleware');
+const { idParam } = require('../validators/common');
+const { updateParcelSchema, createCropSchema } = require('../validators/gardenValidators');
 
-router.get	 ('/'				  , authMiddleware, parcelController.getAllParcels		 );
-router.get	 ('/:id'			  , authMiddleware, parcelController.getParcelById		 );
-router.get	 ('/garden/:garden_id', authMiddleware, parcelController.getParcelsByGardenId);
-router.post	 ('/'				  , authMiddleware, parcelController.createParcel		 );
-router.put	 ('/:id'			  , authMiddleware, parcelController.updateParcel		 );
-router.delete('/:id'			  , authMiddleware, parcelController.deleteParcel		 );
+// list / create parcels : see gardenRoutes (/gardens/:gardenId/parcels)
+router.use(authenticate);
+
+router.get   ('/:id', validate({ params: idParam() }), parcelController.getParcelById);
+router.patch ('/:id', validate({ params: idParam(), body: updateParcelSchema }), parcelController.updateParcel);
+router.delete('/:id', validate({ params: idParam() }), parcelController.deleteParcel);
+
+// crops of a parcel
+router.get ('/:parcelId/crops', validate({ params: idParam('parcelId') }), cropController.getCropsByParcel);
+router.post('/:parcelId/crops', validate({ params: idParam('parcelId'), body: createCropSchema }), cropController.createCrop);
 
 module.exports = router;

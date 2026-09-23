@@ -1,80 +1,47 @@
 const PlantAssociation = require('../models/plantAssociationModel');
+const AppError         = require('../utils/AppError');
 
+// Reference data : every logged in user can read it, only admins can modify it.
+
+/** GET /plant-associations?plant_id=3 */
 exports.getAllPlantAssociations = async (req, res) => {
-  try {
-    const associations = await PlantAssociation.getAll();
-
-    res.status(200).json(associations);
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la récupération des associations de plantes', details: err.message });
-  }
+  res.json(await PlantAssociation.findAll({ plantId: req.valid.query.plant_id }));
 };
 
+/** GET /plant-associations/:id */
 exports.getPlantAssociationById = async (req, res) => {
-  const { id } = req.params;
+  const association = await PlantAssociation.findById(req.valid.params.id);
 
-  try {
-    const association = await PlantAssociation.getById(id);
+  // check association found
+  if (!association) { throw AppError.notFound('Plant association'); }
 
-	// check association found
-    if (!association) { return res.status(404).json({ error: 'Association non trouvée' }); }
-
-    res.status(200).json(association);
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la récupération de l’association', details: err.message });
-  }
+  res.json(association);
 };
 
+/** POST /plant-associations (admin) - (A, B) and (B, A) are the same association */
 exports.createPlantAssociation = async (req, res) => {
-  const { plant_id_1, plant_id_2, relation_type, comment } = req.body;
-
-  // check required fields
-  if (!plant_id_1 || !plant_id_2 || !relation_type) { return res.status(400).json({ error: 'plant_id_1, plant_id_2 et relation_type sont requis' }); }
-
-  const newAssociation = { plant_id_1, plant_id_2, relation_type, comment };
-
   try {
-    const created = await PlantAssociation.create(newAssociation);
-	
-    res.status(201).json(created);
-
+    res.status(201).json(await PlantAssociation.create(req.valid.body));
   } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la création de l’association', details: err.message });
+    if (err.code === 'ER_DUP_ENTRY') { throw AppError.conflict('ASSOCIATION_ALREADY_EXISTS', 'These two plants already have an association'); }
+    throw err;
   }
 };
 
+/** PATCH /plant-associations/:id (admin) - relation_type and comment only */
 exports.updatePlantAssociation = async (req, res) => {
-  const { id } = req.params;
-  const { plant_id_1, plant_id_2, relation_type, comment } = req.body;
-  const updatedAssociation = { plant_id_1, plant_id_2, relation_type, comment };
+  const { id } = req.valid.params;
 
-  try {
-    const result = await PlantAssociation.update(id, updatedAssociation);
+  // check association found
+  if (!(await PlantAssociation.findById(id))) { throw AppError.notFound('Plant association'); }
 
-	// check association deleted or not found
-    if (result.affectedRows === 0) { return res.status(404).json({ error: 'Association non trouvée ou déjà supprimée' }); }
-
-    res.status(200).json({ message: 'Association mise à jour avec succès' });
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la mise à jour de l’association', details: err.message });
-  }
+  res.json(await PlantAssociation.update(id, req.valid.body));
 };
 
+/** DELETE /plant-associations/:id (admin) */
 exports.deletePlantAssociation = async (req, res) => {
-  const { id } = req.params;
+  // check association deleted
+  if (!(await PlantAssociation.delete(req.valid.params.id))) { throw AppError.notFound('Plant association'); }
 
-  try {
-    const result = await PlantAssociation.softDelete(id);
-
-	// check association deleted or not found
-    if (result.affectedRows === 0) { return res.status(404).json({ error: 'Association non trouvée ou déjà supprimée' }); }
-
-    res.status(200).json({ message: 'Association supprimée (soft delete) avec succès' });
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la suppression de l’association', details: err.message });
-  }
+  res.status(204).end();
 };

@@ -1,79 +1,66 @@
-const Crop = require('../models/cropModel');
+const Parcel   = require('../models/parcelModel');
+const Crop     = require('../models/cropModel');
+const AppError = require('../utils/AppError');
+const { cropDatesIssues } = require('../validators/gardenValidators');
 
-exports.getAllCrops = async (req, res) => {
-  try {
-    const crops = await Crop.getAll();
+// Ownership : a crop belongs to the user who owns its parcel's garden.
+// An unknown plant_id is rejected by the foreign key (400 INVALID_REFERENCE).
 
-    res.status(200).json(crops);
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la récupération des cultures', details: err.message });
-  }
+const checkDates = (crop) => {
+  const issues = cropDatesIssues(crop);
+  if (issues.length) { throw AppError.badRequest('VALIDATION_ERROR', 'Invalid crop dates', issues); }
 };
 
-exports.getCropById = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const crop = await Crop.getById(id);
+/** GET /parcels/:parcelId/crops */
+exports.getCropsByParcel = async (req, res) => {
+  const { parcelId } = req.valid.params;
 
-	// check crop found
-    if (!crop) { return res.status(404).json({ error: 'Culture non trouvée' }); }
+  // check parcel found
+  if (!(await Parcel.findOwned(parcelId, req.user.id))) { throw AppError.notFound('Parcel'); }
 
-    res.status(200).json(crop);
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la récupération de la culture', details: err.message });
-  }
+  res.json(await Crop.findAllByParcel(parcelId));
 };
 
+/** POST /parcels/:parcelId/crops */
 exports.createCrop = async (req, res) => {
-  const { parcel_id, plant_id, sow_date, expected_harvest_date, actual_harvest_date, comment } = req.body;
-  
-  // check required fields
-  if (!parcel_id || !plant_id) { return res.status(400).json({ error: 'parcel_id et plant_id sont requis' }); }
+  const { parcelId } = req.valid.params;
 
-  const newCrop = { parcel_id, plant_id, sow_date, expected_harvest_date, actual_harvest_date, comment };
+  // check parcel found
+  if (!(await Parcel.findOwned(parcelId, req.user.id))) { throw AppError.notFound('Parcel'); }
 
-  try {
-    const created = await Crop.create(newCrop);
+  checkDates(req.valid.body);
 
-    res.status(201).json(created);
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la création de la culture', details: err.message });
-  }
+  res.status(201).json(await Crop.create(parcelId, req.valid.body));
 };
 
+/** GET /crops/:id */
+exports.getCropById = async (req, res) => {
+  const crop = await Crop.findOwned(req.valid.params.id, req.user.id);
+
+  // check crop found
+  if (!crop) { throw AppError.notFound('Crop'); }
+
+  res.json(crop);
+};
+
+/** PATCH /crops/:id */
 exports.updateCrop = async (req, res) => {
-  const { id } = req.params;
-  const { parcel_id, plant_id, sow_date, expected_harvest_date, actual_harvest_date, comment } = req.body;
-  const updatedCrop = { parcel_id, plant_id, sow_date, expected_harvest_date, actual_harvest_date, comment };
+  const { id } = req.valid.params;
+  const crop = await Crop.findOwned(id, req.user.id);
 
-  try {
-    const result = await Crop.update(id, updatedCrop);
+  // check crop found
+  if (!crop) { throw AppError.notFound('Crop'); }
 
-	// check crop deleted or not found
-    if (result.affectedRows === 0) { return res.status(404).json({ error: 'Culture non trouvée ou déjà supprimée' }); }
+  // the dates are checked on the final state : stored values + modified values
+  checkDates({ ...crop, ...req.valid.body });
 
-    res.status(200).json({ message: 'Culture mise à jour avec succès' });
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la mise à jour de la culture', details: err.message });
-  }
+  res.json(await Crop.update(id, req.valid.body));
 };
 
+/** DELETE /crops/:id */
 exports.deleteCrop = async (req, res) => {
-  const { id } = req.params;
+  // check crop deleted
+  if (!(await Crop.deleteOwned(req.valid.params.id, req.user.id))) { throw AppError.notFound('Crop'); }
 
-  try {
-    const result = await Crop.softDelete(id);
-
-	// check crop deleted or not found
-    if (result.affectedRows === 0) { return res.status(404).json({ error: 'Culture non trouvée ou déjà supprimée' }); }
-
-    res.status(200).json({ message: 'Culture supprimée (soft delete) avec succès' });
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la suppression de la culture', details: err.message });
-  }
+  res.status(204).end();
 };

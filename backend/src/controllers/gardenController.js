@@ -1,86 +1,43 @@
-const Garden = require('../models/gardenModel');
+const Garden   = require('../models/gardenModel');
+const AppError = require('../utils/AppError');
 
-exports.getAllGardens = async (req, res) => {
-  try {
-    const gardens = await Garden.getAll();
+// All routes only access the gardens of the logged in user (req.user.id).
+// A garden of another user answers 404, so we don't reveal that it exists.
 
-    res.json(gardens);
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+/** GET /gardens - my gardens */
+exports.getMyGardens = async (req, res) => {
+  res.json(await Garden.findAllByUser(req.user.id));
 };
 
+/** GET /gardens/:id */
 exports.getGardenById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const garden = await Garden.getById(id);
+  const garden = await Garden.findOwned(req.valid.params.id, req.user.id);
 
-	// check garden found
-    if (!garden) { return res.status(404).json({ message: 'Garden not found' }); }
+  // check garden found
+  if (!garden) { throw AppError.notFound('Garden'); }
 
-    res.json(garden);
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.json(garden);
 };
 
+/** POST /gardens - the owner is the logged in user, never a user_id from the body */
 exports.createGarden = async (req, res) => {
-  try {
-    const { user_id, name, location, description } = req.body;
-
-	// check required fields
-    if (!user_id || !name) { return res.status(400).json({ message: 'Missing required fields' }); }
-
-    const newGarden = await Garden.create({ user_id, name, location, description });
-
-    res.status(201).json(newGarden);
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.status(201).json(await Garden.create(req.user.id, req.valid.body));
 };
 
+/** PATCH /gardens/:id */
 exports.updateGarden = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, location, description } = req.body;
-    const result = await Garden.update(id, { name, location, description });
+  const { id } = req.valid.params;
 
-	// check garden deleted or not found
-    if (result.affectedRows === 0) { return res.status(404).json({ message: 'Garden not found or not updated' }); }
+  // check garden found
+  if (!(await Garden.findOwned(id, req.user.id))) { throw AppError.notFound('Garden'); }
 
-    res.json({ message: 'Garden updated' });
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.json(await Garden.update(id, req.user.id, req.valid.body));
 };
 
+/** DELETE /gardens/:id - also deletes its parcels and crops */
 exports.deleteGarden = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await Garden.softDelete(id);
+  // check garden deleted
+  if (!(await Garden.delete(req.valid.params.id, req.user.id))) { throw AppError.notFound('Garden'); }
 
-	// check garden deleted or not found
-    if (result.affectedRows === 0) { return res.status(404).json({ message: 'Garden not found or already deleted' }); }
-
-    res.json({ message: 'Garden deleted (soft)' });
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-};
-
-exports.getGardensByUserId = async (req, res) => {
-  try {
-    const { user_id } = req.params;
-    const gardens = await Garden.getByUserId(user_id);
-
-    res.json(gardens);
-	
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.status(204).end();
 };

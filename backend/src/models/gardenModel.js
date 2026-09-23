@@ -1,58 +1,40 @@
 const db = require('../database/db');
+const { buildUpdateSet } = require('../utils/sql');
 
+const UPDATABLE = ['name', 'location', 'description'];
+
+// Every query is scoped to the owner : a garden of another user is "not found".
 const Garden = {
-  getAll: () => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM garden WHERE deleted_at IS NULL', (err, results) => {
-        if (err) return reject(err);
-        resolve(results);
-      });
-    });
+  findAllByUser: async (userId) => {
+    const [rows] = await db.query('SELECT * FROM garden WHERE user_id = ? ORDER BY created_at, id', [userId]);
+    return rows;
   },
 
-  getById: (id) => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM garden WHERE id = ? AND deleted_at IS NULL', [id], (err, results) => {
-        if (err) return reject(err);
-        resolve(results[0]);
-      });
-    });
+  findOwned: async (id, userId) => {
+    const [rows] = await db.query('SELECT * FROM garden WHERE id = ? AND user_id = ?', [id, userId]);
+    return rows[0] || null;
   },
 
-  getByUserId: (user_id) => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM garden WHERE user_id = ? AND deleted_at IS NULL', [user_id], (err, results) => {
-        if (err) return reject(err);
-        resolve(results);
-      });
-    });
+  create: async (userId, { name, location, description }) => {
+    const [result] = await db.query(
+      'INSERT INTO garden (user_id, name, location, description) VALUES (?, ?, ?, ?)',
+      [userId, name, location ?? null, description ?? null]
+    );
+    return Garden.findOwned(result.insertId, userId);
   },
 
-  create: (garden) => {
-    return new Promise((resolve, reject) => {
-      db.query('INSERT INTO garden (user_id, name, location, description) VALUES (?, ?, ?, ?)', [garden.user_id, garden.name, garden.location, garden.description], (err, result) => {
-        if (err) return reject(err);
-        resolve({ id: result.insertId, ...garden });
-      });
-    });
+  update: async (id, userId, data) => {
+    const { clause, values } = buildUpdateSet(data, UPDATABLE);
+    if (clause) {
+      await db.query(`UPDATE garden SET ${clause} WHERE id = ? AND user_id = ?`, [...values, id, userId]);
+    }
+    return Garden.findOwned(id, userId);
   },
 
-  update: (id, garden) => {
-    return new Promise((resolve, reject) => {
-      db.query('UPDATE garden SET name = ?, location = ?, description = ? WHERE id = ? AND deleted_at IS NULL', [garden.name, garden.location, garden.description, id], (err, result) => {
-        if (err) return reject(err);
-        resolve(result);
-      });
-    });
-  },
-
-  softDelete: (id) => {
-    return new Promise((resolve, reject) => {
-      db.query('UPDATE garden SET deleted_at = NOW() WHERE id = ?', [id], (err, result) => {
-        if (err) return reject(err);
-        resolve(result);
-      });
-    });
+  /** Hard delete : parcels and crops are removed by ON DELETE CASCADE. */
+  delete: async (id, userId) => {
+    const [result] = await db.query('DELETE FROM garden WHERE id = ? AND user_id = ?', [id, userId]);
+    return result.affectedRows > 0;
   },
 };
 

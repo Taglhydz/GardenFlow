@@ -1,58 +1,59 @@
 const db = require('../database/db');
+const { buildUpdateSet } = require('../utils/sql');
 
+const UPDATABLE = ['name', 'area_m2', 'pos_x', 'pos_y', 'width', 'length', 'soil_type', 'sunlight', 'moisture'];
+
+// Ownership goes through the garden : parcel -> garden.user_id
 const Parcel = {
-  getAll: () => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM parcel WHERE deleted_at IS NULL', (err, results) => {
-        if (err) return reject(err);
-        resolve(results);
-      });
-    });
+  /** The caller must have checked that the garden belongs to the user. */
+  findAllByGarden: async (gardenId) => {
+    const [rows] = await db.query('SELECT * FROM parcel WHERE garden_id = ? ORDER BY created_at, id', [gardenId]);
+    return rows;
   },
 
-  getById: (id) => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM parcel WHERE id = ? AND deleted_at IS NULL', [id], (err, results) => {
-        if (err) return reject(err);
-        resolve(results[0]);
-      });
-    });
+  findOwned: async (id, userId) => {
+    const [rows] = await db.query(
+      `SELECT p.* FROM parcel p
+       JOIN garden g ON g.id = p.garden_id
+       WHERE p.id = ? AND g.user_id = ?`,
+      [id, userId]
+    );
+    return rows[0] || null;
   },
 
-  getByGardenId: (garden_id) => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM parcel WHERE garden_id = ? AND deleted_at IS NULL', [garden_id], (err, results) => {
-        if (err) return reject(err);
-        resolve(results);
-      });
-    });
+  /** The caller must have checked that the garden belongs to the user. */
+  create: async (gardenId, data) => {
+    const fields  = UPDATABLE.filter((key) => data[key] !== undefined);
+    const columns = ['garden_id', ...fields];
+    const values  = [gardenId, ...fields.map((key) => data[key])];
+
+    const [result] = await db.query(
+      `INSERT INTO parcel (${columns.map((c) => `\`${c}\``).join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+      values
+    );
+    const [rows] = await db.query('SELECT * FROM parcel WHERE id = ?', [result.insertId]);
+    return rows[0];
   },
 
-  create: (parcel) => {
-    return new Promise((resolve, reject) => {
-      db.query('INSERT INTO parcel (garden_id, name, area_m2, pos_x, pos_y, width, length, soil_type, sunlight, moisture) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [parcel.garden_id, parcel.name, parcel.area_m2, parcel.pos_x, parcel.pos_y, parcel.width, parcel.length, parcel.soil_type, parcel.sunlight, parcel.moisture], (err, result) => {
-        if (err) return reject(err);
-        resolve({ id: result.insertId, ...parcel });
-      });
-    });
+  /** The caller must have checked ownership with findOwned. */
+  update: async (id, data) => {
+    const { clause, values } = buildUpdateSet(data, UPDATABLE);
+    if (clause) {
+      await db.query(`UPDATE parcel SET ${clause} WHERE id = ?`, [...values, id]);
+    }
+    const [rows] = await db.query('SELECT * FROM parcel WHERE id = ?', [id]);
+    return rows[0] || null;
   },
 
-  update: (id, parcel) => {
-    return new Promise((resolve, reject) => {
-      db.query('UPDATE parcel SET name = ?, area_m2 = ?, pos_x = ?, pos_y = ?, width = ?, length = ?, soil_type = ?, sunlight = ?, moisture = ? WHERE id = ? AND deleted_at IS NULL', [parcel.name, parcel.area_m2, parcel.pos_x, parcel.pos_y, parcel.width, parcel.length, parcel.soil_type, parcel.sunlight, parcel.moisture, id], (err, result) => {
-        if (err) return reject(err);
-        resolve(result);
-      });
-    });
-  },
-
-  softDelete: (id) => {
-    return new Promise((resolve, reject) => {
-      db.query('UPDATE parcel SET deleted_at = NOW() WHERE id = ?', [id], (err, result) => {
-        if (err) return reject(err);
-        resolve(result);
-      });
-    });
+  /** Hard delete : crops are removed by ON DELETE CASCADE. */
+  deleteOwned: async (id, userId) => {
+    const [result] = await db.query(
+      `DELETE p FROM parcel p
+       JOIN garden g ON g.id = p.garden_id
+       WHERE p.id = ? AND g.user_id = ?`,
+      [id, userId]
+    );
+    return result.affectedRows > 0;
   },
 };
 

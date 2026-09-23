@@ -1,98 +1,92 @@
-const User = require('../models/userModel');
+const User     = require('../models/userModel');
+const AppError = require('../utils/AppError');
+const { hashPassword, comparePassword } = require('../utils/hash');
 
+/** Updates a user and turns a duplicate email into a clear error. */
+const updateUser = async (id, data) => {
+  try {
+    return await User.update(id, data);
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') { throw AppError.conflict('EMAIL_ALREADY_USED', 'Email already in use'); }
+    throw err;
+  }
+};
+
+// ==================
+// Current user (/me)
+// ==================
+
+/** GET /users/me */
+exports.getMe = async (req, res) => {
+  res.json(await User.findById(req.user.id));
+};
+
+/** PATCH /users/me - username, email, birthdate (not the role) */
+exports.updateMe = async (req, res) => {
+  res.json(await updateUser(req.user.id, req.valid.body));
+};
+
+/** PATCH /users/me/password */
+exports.changePassword = async (req, res) => {
+  const { current_password, new_password } = req.valid.body;
+
+  const hash = await User.findPasswordHash(req.user.id);
+
+  // check current password
+  if (!(await comparePassword(current_password, hash))) { throw AppError.badRequest('WRONG_PASSWORD', 'Current password is incorrect'); }
+
+  await User.updatePassword(req.user.id, await hashPassword(new_password));
+
+  res.status(204).end();
+};
+
+/** DELETE /users/me - deletes the account and all its gardens */
+exports.deleteMe = async (req, res) => {
+  await User.delete(req.user.id);
+
+  res.status(204).end();
+};
+
+// ===========
+// Admin only
+// ===========
+
+/** GET /users */
 exports.getAllUsers = async (req, res) => {
-  try {
-    const users = await User.getAll();
-
-    res.status(200).json(users);
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la récupération des utilisateurs', details: err.message });
-  }
+  res.json(await User.findAll());
 };
 
+/** GET /users/:id */
 exports.getUserById = async (req, res) => {
-  const { id } = req.params;
+  const user = await User.findById(req.valid.params.id);
 
-  try {
-    const user = await User.getById(id);
+  // check user found
+  if (!user) { throw AppError.notFound('User'); }
 
-    // check user found
-    if (!user) { return res.status(404).json({ error: 'Utilisateur non trouvé' }); }
-
-    res.status(200).json(user);
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la récupération de l’utilisateur', details: err.message });
-  }
+  res.json(user);
 };
 
-exports.createUser = async (req, res) => {
-  const { username, email, password, birthdate, role } = req.body;
+/** PATCH /users/:id - username, email, role */
+exports.updateUserById = async (req, res) => {
+  const { id } = req.valid.params;
 
-  // check required fields
-  if (!username || !email || !password) { return res.status(400).json({ error: 'username, email et password sont requis' }); }
+  // an admin could lock themselves out by removing their own admin role
+  if (id === req.user.id && req.valid.body.role !== undefined) { throw AppError.forbidden('You cannot change your own role'); }
 
-  try {
-    const existingUser = await User.getByEmail(email);
+  // check user found
+  if (!(await User.findById(id))) { throw AppError.notFound('User'); }
 
-    // check email
-    if (existingUser) { return res.status(409).json({ error: 'Email déjà utilisé' }); }
-
-    const bcrypt = require('bcrypt');
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = { username, email, password: hashedPassword, birthdate, role };
-    const created = await User.create(newUser);
-
-    res.status(201).json({ message: 'Utilisateur créé', user: created });
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la création de l’utilisateur', details: err.message });
-  }
+  res.json(await updateUser(id, req.valid.body));
 };
 
-exports.updateUser = async (req, res) => {
-  const { id } = req.params;
-  const { username, email, password, birthdate, role } = req.body;
+/** DELETE /users/:id */
+exports.deleteUserById = async (req, res) => {
+  const { id } = req.valid.params;
 
-  try {
-    const user = await User.getById(id);
+  if (id === req.user.id) { throw AppError.forbidden('Use DELETE /users/me to delete your own account'); }
 
-    // check user found
-    if (!user) { return res.status(404).json({ error: 'Utilisateur non trouvé' }); }
+  // check user deleted
+  if (!(await User.delete(id))) { throw AppError.notFound('User'); }
 
-    let updatedPassword = user.password;
-
-    if (password) {
-      const bcrypt = require('bcrypt');
-      updatedPassword = await bcrypt.hash(password, 10);
-    }
-
-    const updatedUser = { username, email, password: updatedPassword, birthdate, role };
-    const result = await User.update(id, updatedUser);
-
-    // check no modification made
-    if (result.affectedRows === 0) {  return res.status(404).json({ error: 'Utilisateur non trouvé ou supprimé' }); }
-
-    res.status(200).json({ message: 'Utilisateur mis à jour avec succès' });
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la mise à jour de l’utilisateur', details: err.message });
-  }
-};
-
-exports.deleteUser = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const result = await User.softDelete(id);
-
-    // check user deleted
-    if (result.affectedRows === 0) { return res.status(404).json({ error: 'Utilisateur non trouvé ou déjà supprimé' }); }
-
-    res.status(200).json({ message: 'Utilisateur supprimé (soft delete) avec succès' });
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors de la suppression de l’utilisateur', details: err.message });
-  }
+  res.status(204).end();
 };

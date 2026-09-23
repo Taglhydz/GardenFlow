@@ -1,49 +1,53 @@
 const db = require('../database/db');
+const { buildUpdateSet } = require('../utils/sql');
+
+const UPDATABLE = ['relation_type', 'comment'];
+
+// The plant codes are joined so the app can translate the comment
+// (plant_associations.<code_a>__<code_b>, codes sorted alphabetically).
+const SELECT = `
+  SELECT pa.*, p1.code AS plant_code_1, p2.code AS plant_code_2
+  FROM plant_association pa
+  JOIN plant p1 ON p1.id = pa.plant_id_1
+  JOIN plant p2 ON p2.id = pa.plant_id_2`;
+
+/** Pairs are always stored with plant_id_1 < plant_id_2 (see schema.sql). */
+const orderPair = (a, b) => (a < b ? [a, b] : [b, a]);
 
 const PlantAssociation = {
-  getAll: () => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM plant_association WHERE deleted_at IS NULL', (err, results) => {
-        if (err) return reject(err);
-        resolve(results);
-      });
-    });
+  findAll: async ({ plantId } = {}) => {
+    const [rows] = plantId
+      ? await db.query(`${SELECT} WHERE pa.plant_id_1 = ? OR pa.plant_id_2 = ? ORDER BY pa.id`, [plantId, plantId])
+      : await db.query(`${SELECT} ORDER BY pa.id`);
+    return rows;
   },
 
-  getById: (id) => {
-    return new Promise((resolve, reject) => {
-      db.query('SELECT * FROM plant_association WHERE id = ? AND deleted_at IS NULL', [id], (err, results) => {
-        if (err) return reject(err);
-        resolve(results[0]);
-      });
-    });
+  findById: async (id) => {
+    const [rows] = await db.query(`${SELECT} WHERE pa.id = ?`, [id]);
+    return rows[0] || null;
   },
 
-  create: (association) => {
-    return new Promise((resolve, reject) => {
-      db.query('INSERT INTO plant_association (plant_id_1, plant_id_2, relation_type, comment) VALUES (?, ?, ?, ?)', [association.plant_id_1, association.plant_id_2, association.relation_type, association.comment], (err, result) => {
-        if (err) return reject(err);
-        resolve({ id: result.insertId, ...association });
-      });
-    });
+  /** Fails with ER_DUP_ENTRY (-> 409) if the pair already exists, in any order. */
+  create: async ({ plant_id_1, plant_id_2, relation_type, comment }) => {
+    const [first, second] = orderPair(plant_id_1, plant_id_2);
+    const [result] = await db.query(
+      'INSERT INTO plant_association (plant_id_1, plant_id_2, relation_type, comment) VALUES (?, ?, ?, ?)',
+      [first, second, relation_type, comment ?? null]
+    );
+    return PlantAssociation.findById(result.insertId);
   },
 
-  update: (id, association) => {
-    return new Promise((resolve, reject) => {
-      db.query('UPDATE plant_association SET plant_id_1 = ?, plant_id_2 = ?, relation_type = ?, comment = ? WHERE id = ? AND deleted_at IS NULL', [association.plant_id_1, association.plant_id_2, association.relation_type, association.comment, id], (err, result) => {
-        if (err) return reject(err);
-        resolve(result);
-      });
-    });
+  update: async (id, data) => {
+    const { clause, values } = buildUpdateSet(data, UPDATABLE);
+    if (clause) {
+      await db.query(`UPDATE plant_association SET ${clause} WHERE id = ?`, [...values, id]);
+    }
+    return PlantAssociation.findById(id);
   },
 
-  softDelete: (id) => {
-    return new Promise((resolve, reject) => {
-      db.query('UPDATE plant_association SET deleted_at = NOW() WHERE id = ?', [id], (err, result) => {
-        if (err) return reject(err);
-        resolve(result);
-      });
-    });
+  delete: async (id) => {
+    const [result] = await db.query('DELETE FROM plant_association WHERE id = ?', [id]);
+    return result.affectedRows > 0;
   },
 };
 

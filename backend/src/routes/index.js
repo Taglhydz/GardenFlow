@@ -8,7 +8,8 @@ const parcelRoutes 			 = require('./parcelRoutes'			 );
 const plantRoutes 			 = require('./plantRoutes'			 );
 const cropRoutes 			 = require('./cropRoutes'			 );
 const plantAssociationRoutes = require('./plantAssociationRoutes');
-const suggestionRoutes 		 = require('./suggestionRoutes'		 );
+
+router.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 router.use('/auth'				, authRoutes			);
 router.use('/users'				, userRoutes			);
@@ -17,6 +18,5 @@ router.use('/parcels'			, parcelRoutes			);
 router.use('/plants'			, plantRoutes			);
 router.use('/crops'			 	, cropRoutes			);
 router.use('/plant-associations', plantAssociationRoutes);
-router.use('/suggestions'		, suggestionRoutes		);
 
 module.exports = router;

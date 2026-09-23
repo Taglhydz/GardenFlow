@@ -1,74 +1,50 @@
-const Plant = require('../models/plantModel');
+const Plant    = require('../models/plantModel');
+const AppError = require('../utils/AppError');
 
+// Reference catalog : every logged in user can read it, only admins can modify it.
+
+/** Turns a duplicate code into a clear error. */
+const handleDuplicateCode = (err) => {
+  if (err.code === 'ER_DUP_ENTRY') { throw AppError.conflict('PLANT_CODE_ALREADY_USED', 'A plant with this code already exists'); }
+  throw err;
+};
+
+/** GET /plants?type=vegetable&search=tom */
 exports.getAllPlants = async (req, res) => {
-  try {
-    const plants = await Plant.getAll();
-
-    res.json(plants);
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.json(await Plant.findAll(req.valid.query));
 };
 
+/** GET /plants/:id */
 exports.getPlantById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const plant = await Plant.getById(id);
+  const plant = await Plant.findById(req.valid.params.id);
 
-	// check plant found
-    if (!plant) {  return res.status(404).json({ message: 'Plant not found' }); }
-	
-    res.json(plant);
+  // check plant found
+  if (!plant) { throw AppError.notFound('Plant'); }
 
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.json(plant);
 };
 
+/** POST /plants (admin) */
 exports.createPlant = async (req, res) => {
-  try {
-    const { name, type, description, sow_start_month, sow_end_month, harvest_start_month, harvest_end_month, sunlight_need, water_need, preferred_soil, spacing_cm } = req.body;
-    
-	// check required fields
-	if (!name) { return res.status(400).json({ message: 'Missing required field: name' }); }
+  const plant = await Plant.create(req.valid.body).catch(handleDuplicateCode);
 
-    const newPlant = await Plant.create({ name, type, description, sow_start_month, sow_end_month, harvest_start_month, harvest_end_month, sunlight_need, water_need, preferred_soil, spacing_cm });
-    
-	res.status(201).json(newPlant);
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.status(201).json(plant);
 };
 
+/** PATCH /plants/:id (admin) */
 exports.updatePlant = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, type, description, sow_start_month, sow_end_month, harvest_start_month, harvest_end_month, sunlight_need, water_need, preferred_soil, spacing_cm } = req.body;
-    const result = await Plant.update(id, { name, type, description, sow_start_month, sow_end_month, harvest_start_month, harvest_end_month, sunlight_need, water_need, preferred_soil, spacing_cm });
-    
-	// check plant deleted or not found
-	if (result.affectedRows === 0) { return res.status(404).json({ message: 'Plant not found or not updated' }); }
+  const { id } = req.valid.params;
 
-    res.json({ message: 'Plant updated' });
+  // check plant found
+  if (!(await Plant.findById(id))) { throw AppError.notFound('Plant'); }
 
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.json(await Plant.update(id, req.valid.body).catch(handleDuplicateCode));
 };
 
+/** DELETE /plants/:id (admin) - refused with 409 RESOURCE_IN_USE while crops use the plant */
 exports.deletePlant = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await Plant.softDelete(id);
+  // check plant deleted
+  if (!(await Plant.delete(req.valid.params.id))) { throw AppError.notFound('Plant'); }
 
-	// check plant deleted or not found
-    if (result.affectedRows === 0) { return res.status(404).json({ message: 'Plant not found or already deleted' }); }
-
-    res.json({ message: 'Plant deleted (soft)' });
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.status(204).end();
 };

@@ -1,86 +1,53 @@
-const Parcel = require('../models/parcelModel');
+const Garden   = require('../models/gardenModel');
+const Parcel   = require('../models/parcelModel');
+const AppError = require('../utils/AppError');
 
-exports.getAllParcels = async (req, res) => {
-  try {
-    const parcels = await Parcel.getAll();
+// Ownership : a parcel belongs to the user who owns its garden.
 
-    res.json(parcels);
+/** GET /gardens/:gardenId/parcels */
+exports.getParcelsByGarden = async (req, res) => {
+  const { gardenId } = req.valid.params;
 
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  // check garden found
+  if (!(await Garden.findOwned(gardenId, req.user.id))) { throw AppError.notFound('Garden'); }
+
+  res.json(await Parcel.findAllByGarden(gardenId));
 };
 
-exports.getParcelById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const parcel = await Parcel.getById(id);
-
-	// check parcel found
-    if (!parcel) { return res.status(404).json({ message: 'Parcel not found' }); }
-
-    res.json(parcel);
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-};
-
+/** POST /gardens/:gardenId/parcels */
 exports.createParcel = async (req, res) => {
-  try {
-    const { garden_id, name, area_m2, pos_x, pos_y, width, length, soil_type, sunlight, moisture } = req.body;
+  const { gardenId } = req.valid.params;
 
-	// check required fields
-    if (!garden_id || !name) { return res.status(400).json({ message: 'Missing required fields' }); }
+  // check garden found
+  if (!(await Garden.findOwned(gardenId, req.user.id))) { throw AppError.notFound('Garden'); }
 
-    const newParcel = await Parcel.create({ garden_id, name, area_m2, pos_x, pos_y, width, length, soil_type, sunlight, moisture });
-
-    res.status(201).json(newParcel);
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.status(201).json(await Parcel.create(gardenId, req.valid.body));
 };
 
+/** GET /parcels/:id */
+exports.getParcelById = async (req, res) => {
+  const parcel = await Parcel.findOwned(req.valid.params.id, req.user.id);
+
+  // check parcel found
+  if (!parcel) { throw AppError.notFound('Parcel'); }
+
+  res.json(parcel);
+};
+
+/** PATCH /parcels/:id */
 exports.updateParcel = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, area_m2, pos_x, pos_y, width, length, soil_type, sunlight, moisture } = req.body;
-    const result = await Parcel.update(id, { name, area_m2, pos_x, pos_y, width, length, soil_type, sunlight, moisture });
+  const { id } = req.valid.params;
 
-	// check parcel deleted or not found
-    if (result.affectedRows === 0) { return res.status(404).json({ message: 'Parcel not found or not updated' }); }
+  // check parcel found
+  if (!(await Parcel.findOwned(id, req.user.id))) { throw AppError.notFound('Parcel'); }
 
-    res.json({ message: 'Parcel updated' });
-	
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.json(await Parcel.update(id, req.valid.body));
 };
 
+/** DELETE /parcels/:id - also deletes its crops */
 exports.deleteParcel = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await Parcel.softDelete(id);
+  // check parcel deleted
+  if (!(await Parcel.deleteOwned(req.valid.params.id, req.user.id))) { throw AppError.notFound('Parcel'); }
 
-	// check parcel deleted or not found
-    if (result.affectedRows === 0) { return res.status(404).json({ message: 'Parcel not found or already deleted' }); }
-
-    res.json({ message: 'Parcel deleted (soft)' });
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-};
-
-exports.getParcelsByGardenId = async (req, res) => {
-  try {
-    const { garden_id } = req.params;
-    const parcels = await Parcel.getByGardenId(garden_id);
-
-    res.json(parcels);
-
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+  res.status(204).end();
 };
