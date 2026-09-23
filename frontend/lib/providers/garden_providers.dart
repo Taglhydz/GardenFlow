@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/constants.dart';
 import '../models/crop.dart';
 import '../models/garden.dart';
+import '../models/json_utils.dart';
 import '../models/parcel.dart';
+import '../models/suggestion.dart';
 import 'auth_provider.dart';
 import 'core_providers.dart';
 
@@ -97,14 +99,130 @@ final selectedGardenProvider = Provider<Garden?>((ref) {
 // ================
 
 /// Parcels of a garden : ref.watch(parcelsProvider(gardenId)).
-/// After a modification, call ref.invalidate(parcelsProvider(gardenId)) to reload.
-final parcelsProvider = FutureProvider.family<List<Parcel>, int>((ref, gardenId) {
-  ref.watch(currentUserIdProvider);
-  return ref.read(parcelServiceProvider).getParcelsByGarden(gardenId);
-});
+final parcelsProvider = AsyncNotifierProvider.family<ParcelsNotifier, List<Parcel>, int>(ParcelsNotifier.new);
 
-/// Crops of a parcel : ref.watch(cropsProvider(parcelId)).
-final cropsProvider = FutureProvider.family<List<Crop>, int>((ref, parcelId) {
+class ParcelsNotifier extends AsyncNotifier<List<Parcel>> {
+  ParcelsNotifier(this.gardenId);
+
+  final int gardenId;
+
+  @override
+  Future<List<Parcel>> build() async {
+    ref.watch(currentUserIdProvider);
+    return ref.read(parcelServiceProvider).getParcelsByGarden(gardenId);
+  }
+
+  List<Parcel> get _parcels => state.value ?? const [];
+
+  void _replace(Parcel parcel) {
+    state = AsyncData([for (final p in _parcels) p.id == parcel.id ? parcel : p]);
+  }
+
+  /// [fields] uses the API names : name, pos_x, pos_y, width, length, soil_type, sunlight, moisture
+  Future<Parcel> create(Map<String, dynamic> fields) async {
+    final parcel = await ref.read(parcelServiceProvider).createParcel(gardenId, fields);
+    state = AsyncData([..._parcels, parcel]);
+    return parcel;
+  }
+
+  /// Only the given fields are modified (API names).
+  Future<Parcel> updateParcel(int id, Map<String, dynamic> changes) async {
+    final parcel = await ref.read(parcelServiceProvider).updateParcel(id, changes);
+    _replace(parcel);
+    ref.invalidate(suggestionsProvider);
+    return parcel;
+  }
+
+  /// Move / resize from the plan : shown immediately, saved in the background,
+  /// the previous position comes back if the server refuses.
+  Future<void> updateGeometry(Parcel previous, Parcel updated) async {
+    _replace(updated);
+    try {
+      final saved = await ref.read(parcelServiceProvider).updateParcel(updated.id, {
+        'pos_x': updated.posX,
+        'pos_y': updated.posY,
+        'width': updated.width,
+        'length': updated.length,
+      });
+      _replace(saved);
+      ref.invalidate(suggestionsProvider);
+    } catch (_) {
+      _replace(previous);
+      rethrow;
+    }
+  }
+
+  /// Also deletes its crops on the server.
+  Future<void> delete(int id) async {
+    await ref.read(parcelServiceProvider).deleteParcel(id);
+    state = AsyncData([for (final p in _parcels) if (p.id != id) p]);
+    ref.invalidate(gardenCropsProvider(gardenId));
+    ref.invalidate(suggestionsProvider);
+  }
+}
+
+/// Crops of all the parcels of a garden : ref.watch(gardenCropsProvider(gardenId)).
+final gardenCropsProvider = AsyncNotifierProvider.family<GardenCropsNotifier, List<Crop>, int>(GardenCropsNotifier.new);
+
+class GardenCropsNotifier extends AsyncNotifier<List<Crop>> {
+  GardenCropsNotifier(this.gardenId);
+
+  final int gardenId;
+
+  @override
+  Future<List<Crop>> build() async {
+    ref.watch(currentUserIdProvider);
+    return ref.read(cropServiceProvider).getCropsByGarden(gardenId);
+  }
+
+  List<Crop> get _crops => state.value ?? const [];
+
+  void _changed(List<Crop> crops) {
+    state = AsyncData(crops);
+    // companions and rotation depend on the crops
+    ref.invalidate(suggestionsProvider);
+  }
+
+  Future<Crop> create(
+    int parcelId, {
+    required int plantId,
+    DateTime? sowDate,
+    DateTime? expectedHarvestDate,
+    String? comment,
+  }) async {
+    final crop = await ref.read(cropServiceProvider).createCrop(
+      parcelId,
+      plantId: plantId,
+      sowDate: sowDate,
+      expectedHarvestDate: expectedHarvestDate,
+      comment: comment,
+    );
+    _changed([..._crops, crop]);
+    return crop;
+  }
+
+  /// Only the given fields are modified. Dates must be formatted with JsonUtils.formatDate.
+  Future<Crop> updateCrop(int id, Map<String, dynamic> changes) async {
+    final crop = await ref.read(cropServiceProvider).updateCrop(id, changes);
+    _changed([for (final c in _crops) c.id == id ? crop : c]);
+    return crop;
+  }
+
+  Future<Crop> harvest(int id, DateTime date) => updateCrop(id, {'actual_harvest_date': JsonUtils.formatDate(date)});
+
+  Future<void> delete(int id) async {
+    await ref.read(cropServiceProvider).deleteCrop(id);
+    _changed([for (final c in _crops) if (c.id != id) c]);
+  }
+}
+
+// ===========
+// Suggestions
+// ===========
+
+/// Plants to sow / plant in a parcel for a month, computed by the server.
+/// Reloaded when the crops or the parcel change (the notifiers above invalidate it).
+final suggestionsProvider = FutureProvider.autoDispose.family<ParcelSuggestions, ({int parcelId, int month})>((ref, key) {
   ref.watch(currentUserIdProvider);
-  return ref.read(cropServiceProvider).getCropsByParcel(parcelId);
+  return ref.read(parcelServiceProvider).getSuggestions(key.parcelId, key.month);
 });

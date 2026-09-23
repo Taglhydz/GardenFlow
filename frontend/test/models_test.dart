@@ -3,6 +3,7 @@ import 'package:GardenFlow/models/json_utils.dart';
 import 'package:GardenFlow/models/parcel.dart';
 import 'package:GardenFlow/models/plant.dart';
 import 'package:GardenFlow/models/plant_association.dart';
+import 'package:GardenFlow/models/suggestion.dart';
 import 'package:GardenFlow/models/user.dart';
 
 void main() {
@@ -42,24 +43,75 @@ void main() {
     });
   });
 
-  group('Plant months', () {
-    test('normal range', () {
-      const plant = Plant(id: 1, code: 'tomato', name: 'Tomate', sowStartMonth: 3, sowEndMonth: 4);
-      expect(plant.canBeSownIn(3), isTrue);
-      expect(plant.canBeSownIn(5), isFalse);
+  group('Plant calendar', () {
+    test('parsed from the API with all its periods', () {
+      final spinach = Plant.fromJson({
+        'id': 1,
+        'code': 'spinach',
+        'name': 'Épinard',
+        'family': 'amaranthaceae',
+        'days_to_maturity': 45,
+        'periods': [
+          {'type': 'sow_outdoor', 'start_month': 2, 'end_month': 4},
+          {'type': 'sow_outdoor', 'start_month': 8, 'end_month': 10},
+          {'type': 'harvest', 'start_month': 4, 'end_month': 6},
+        ],
+      });
+      expect(spinach.family, 'amaranthaceae');
+      expect(spinach.periodsOf(PlantPeriod.sowOutdoor), hasLength(2));
+      // sown in spring AND in autumn
+      expect(spinach.canGoInGroundIn(3), isTrue);
+      expect(spinach.canGoInGroundIn(9), isTrue);
+      expect(spinach.canGoInGroundIn(6), isFalse);
+      expect(spinach.canBeHarvestedIn(5), isTrue);
     });
 
-    test('range wrapping around the year (October -> March)', () {
-      const garlic = Plant(id: 2, code: 'garlic', name: 'Ail', sowStartMonth: 10, sowEndMonth: 3);
-      expect(garlic.canBeSownIn(11), isTrue);
-      expect(garlic.canBeSownIn(1), isTrue);
-      expect(garlic.canBeSownIn(6), isFalse);
+    test('period wrapping around the year (October -> March)', () {
+      const garlic = PlantPeriod(type: PlantPeriod.plantOut, startMonth: 10, endMonth: 3);
+      expect(garlic.contains(11), isTrue);
+      expect(garlic.contains(1), isTrue);
+      expect(garlic.contains(6), isFalse);
     });
 
-    test('no range', () {
-      const plant = Plant(id: 3, code: 'x', name: 'X');
-      expect(plant.canBeSownIn(5), isFalse);
+    test('planting out counts as going in the ground, sowing under cover does not', () {
+      const tomato = Plant(id: 2, code: 'tomato', name: 'Tomate', periods: [
+        PlantPeriod(type: PlantPeriod.sowIndoor, startMonth: 3, endMonth: 4),
+        PlantPeriod(type: PlantPeriod.plantOut, startMonth: 5, endMonth: 6),
+      ]);
+      expect(tomato.canGoInGroundIn(4), isFalse);
+      expect(tomato.canGoInGroundIn(5), isTrue);
     });
+
+    test('expected harvest from days to maturity', () {
+      const radish = Plant(id: 3, code: 'radish', name: 'Radis', daysToMaturity: 30);
+      expect(radish.expectedHarvestFrom(DateTime(2026, 4, 10)), DateTime(2026, 5, 10));
+      const unknown = Plant(id: 4, code: 'x', name: 'X');
+      expect(unknown.expectedHarvestFrom(DateTime(2026, 4, 10)), isNull);
+    });
+  });
+
+  test('suggestions are parsed with their reasons', () {
+    final result = ParcelSuggestions.fromJson({
+      'parcel_id': 5,
+      'month': 5,
+      'suggestions': [
+        {
+          'plant_id': 24,
+          'plant_code': 'basil',
+          'score': 87,
+          'actions': ['sow_outdoor', 'plant_out'],
+          'reasons': [
+            {'code': 'good_companion', 'impact': 'positive', 'params': {'plant_code': 'tomato'}},
+            {'code': 'sow_indoor_now', 'impact': 'info', 'params': {}},
+          ],
+        },
+      ],
+    });
+    final basil = result.suggestions.single;
+    expect(basil.score, 87);
+    expect(basil.canGoInGroundNow, isTrue);
+    expect(basil.reasons.first.isPositive, isTrue);
+    expect(basil.reasons.first.params['plant_code'], 'tomato');
   });
 
   test('association translation key uses codes sorted alphabetically', () {

@@ -3,59 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:GardenFlow/config/constants.dart';
 import 'package:GardenFlow/models/garden.dart';
-import 'package:GardenFlow/models/user.dart';
 import 'package:GardenFlow/providers/auth_provider.dart';
 import 'package:GardenFlow/providers/core_providers.dart';
 import 'package:GardenFlow/providers/garden_providers.dart';
 import 'package:GardenFlow/services/api_service.dart';
-import 'package:GardenFlow/services/auth_service.dart';
-import 'package:GardenFlow/services/garden_service.dart';
-
-const alice = User(id: 1, username: 'alice', email: 'alice@test.dev');
-
-class FakeAuthService implements AuthService {
-  /// What restoreSession returns (a User, null, or an exception to throw)
-  Object? restoreResult;
-  bool loggedOut = false;
-
-  @override
-  Future<User?> restoreSession() async {
-    final result = restoreResult;
-    if (result is Exception) throw result;
-    return result as User?;
-  }
-
-  @override
-  Future<User> login({required String email, required String password}) async {
-    if (password != 'good') {
-      throw ApiException(statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'wrong');
-    }
-    return alice;
-  }
-
-  @override
-  Future<User> register({required String username, required String email, required String password, DateTime? birthdate}) async => alice;
-
-  @override
-  Future<void> logout() async => loggedOut = true;
-}
-
-class FakeGardenService implements GardenService {
-  List<Garden> gardens = [];
-
-  @override
-  Future<List<Garden>> getMyGardens() async => gardens;
-
-  @override
-  Future<Garden> createGarden({required String name, String? location, String? description}) async {
-    final garden = Garden(id: 100 + gardens.length, userId: alice.id, name: name);
-    gardens = [...gardens, garden];
-    return garden;
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
-}
+import 'fakes.dart';
 
 void main() {
   late FakeAuthService authService;

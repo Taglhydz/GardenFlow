@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/garden_providers.dart';
 import '../widgets/create_garden_dialog.dart';
 import '../widgets/welcome_dialog.dart';
+import 'garden_view.dart';
 import 'profile_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -81,7 +82,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // Afficher le jardin sélectionné
     if (selectedGarden != null) {
-      return _buildGardenView(selectedGarden);
+      return GardenView(
+        key: ValueKey(selectedGarden.id),
+        garden: selectedGarden,
+        onHome: () => ref.read(selectedGardenIdProvider.notifier).select(null),
+        onProfile: _openProfile,
+      );
     }
 
     // Afficher la sélection/création de jardin
@@ -121,73 +127,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           ..._buildTopButtons(onHome: null),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGardenView(Garden garden) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          _buildTitle(),
-          // Contenu principal
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.yard,
-                  size: 80,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  garden.name,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (garden.description != null) ...[
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      garden.description!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ),
-                ],
-                if (garden.location != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        garden.location!,
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 32),
-                Text(
-                  'home.garden_view_coming'.tr(),
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-          ),
-          // retour à la liste des jardins
-          ..._buildTopButtons(onHome: () => ref.read(selectedGardenIdProvider.notifier).select(null)),
         ],
       ),
     );

@@ -32,6 +32,25 @@ class Parcel {
     this.updatedAt,
   });
 
+  /// Used to show a move / resize on the plan before the server answers.
+  Parcel copyWith({double? posX, double? posY, double? width, double? length}) {
+    return Parcel(
+      id: id,
+      gardenId: gardenId,
+      name: name,
+      areaM2: width != null || length != null ? (width ?? this.width) * (length ?? this.length) : areaM2,
+      posX: posX ?? this.posX,
+      posY: posY ?? this.posY,
+      width: width ?? this.width,
+      length: length ?? this.length,
+      soilType: soilType,
+      sunlight: sunlight,
+      moisture: moisture,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
   factory Parcel.fromJson(Map<String, dynamic> json) {
     return Parcel(
       id: JsonUtils.toInt(json['id'])!,

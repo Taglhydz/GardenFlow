@@ -1,5 +1,6 @@
 import '../config/constants.dart';
 import '../models/parcel.dart';
+import '../models/suggestion.dart';
 import 'api_service.dart';
 
 class ParcelService {
@@ -24,6 +25,11 @@ class ParcelService {
   /// Only the given fields are modified.
   Future<Parcel> updateParcel(int id, Map<String, dynamic> changes) async {
     return Parcel.fromJson(await _api.patch('${AppConstants.parcelsEndpoint}/$id', changes));
+  }
+
+  /// Plants to sow / plant in the parcel for [month] (1-12), best first. Computed by the server.
+  Future<ParcelSuggestions> getSuggestions(int parcelId, int month) async {
+    return ParcelSuggestions.fromJson(await _api.get('${AppConstants.parcelsEndpoint}/$parcelId/suggestions?month=$month'));
   }
 
   /// Also deletes its crops.

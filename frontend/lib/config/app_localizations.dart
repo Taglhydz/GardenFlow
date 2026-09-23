@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import '../models/plant.dart';
 import '../models/plant_association.dart';
+import '../models/suggestion.dart';
 import '../services/api_service.dart';
 
 /// Classe utilitaire pour faciliter l'accès aux traductions
@@ -50,6 +51,16 @@ class AppLocalizations {
     return 'plant_type_$plantType'.tr();
   }
 
+  /// Obtient le label traduit pour une famille botanique (le code brut si elle n'est pas traduite)
+  static String getPlantFamilyLabel(String family) {
+    return _translatedOr('plant_family_$family', family);
+  }
+
+  /// Obtient le label traduit pour un type de période du calendrier (semis, plantation, récolte)
+  static String getPeriodLabel(String periodType) {
+    return 'period_$periodType'.tr();
+  }
+
   /// Obtient le label traduit pour le rôle utilisateur
   static String getRoleLabel(String role) {
     return 'role_$role'.tr();
@@ -80,6 +91,41 @@ class AppLocalizations {
   static String? associationComment(PlantAssociation association) {
     if (association.comment == null) return null;
     return _translatedOr(association.translationKey, association.comment!);
+  }
+
+  /// Raison d'une suggestion, traduite avec ses paramètres (suggestion_reasons.<code>).
+  /// [plantsByCode] sert à afficher le nom traduit des plantes citées.
+  static String suggestionReason(SuggestionReason reason, Map<String, Plant> plantsByCode) {
+    final params = reason.params;
+    final plantCode = params['plant_code'] as String?;
+    final plant = plantCode != null ? plantsByCode[plantCode] : null;
+
+    final args = <String, String>{
+      if (plantCode != null) 'plant': plant != null ? plantName(plant) : plantCode,
+      if (params['preferred_soil'] != null) 'soil': getSoilTypeLabel(params['preferred_soil'] as String).toLowerCase(),
+      // 'need' is a sunlight level for sun_too_low, a water need for too_dry / too_wet
+      if (params['need'] != null)
+        'need': (reason.code.startsWith('sun')
+                ? getSunlightLabel(params['need'] as String)
+                : getWaterNeedLabel(params['need'] as String))
+            .toLowerCase(),
+      if (params['family'] != null) 'family': getPlantFamilyLabel(params['family'] as String),
+      if (params['months_ago'] != null) 'months': '${params['months_ago']}',
+    };
+
+    final key = 'suggestion_reasons.${reason.code}';
+    return trExists(key) ? key.tr(namedArgs: args) : reason.code;
+  }
+
+  /// Mesure en mètres dans le format de la langue : 2,5 m / 2.5 m
+  static String meters(double value) {
+    return '${NumberFormat('0.##').format(value)} m';
+  }
+
+  /// Dimensions d'une parcelle : 2 × 1,5 m
+  static String dimensions(double width, double length) {
+    final format = NumberFormat('0.##');
+    return '${format.format(width)} × ${format.format(length)} m';
   }
 
   /// Message d'erreur traduit à afficher à l'utilisateur (errors.<code> des fichiers JSON).

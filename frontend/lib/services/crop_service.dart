@@ -8,6 +8,12 @@ class CropService {
 
   final ApiService _api;
 
+  /// Crops of all the parcels of a garden (one request for the garden plan).
+  Future<List<Crop>> getCropsByGarden(int gardenId) async {
+    final response = await _api.get('${AppConstants.gardensEndpoint}/$gardenId/crops') as List;
+    return response.map((json) => Crop.fromJson(json)).toList();
+  }
+
   Future<List<Crop>> getCropsByParcel(int parcelId) async {
     final response = await _api.get('${AppConstants.parcelsEndpoint}/$parcelId/crops') as List;
     return response.map((json) => Crop.fromJson(json)).toList();

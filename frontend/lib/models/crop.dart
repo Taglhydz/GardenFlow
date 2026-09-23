@@ -23,6 +23,9 @@ class Crop {
     this.updatedAt,
   });
 
+  /// Not harvested yet (planned crops included).
+  bool get isInGround => actualHarvestDate == null;
+
   factory Crop.fromJson(Map<String, dynamic> json) {
     return Crop(
       id: JsonUtils.toInt(json['id'])!,
