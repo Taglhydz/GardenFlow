@@ -1,23 +1,30 @@
 import 'package:easy_localization/easy_localization.dart';
+import '../models/plant.dart';
+import '../models/plant_association.dart';
+import '../services/api_service.dart';
 
 /// Classe utilitaire pour faciliter l'accès aux traductions
-/// 
+///
 /// Exemple d'utilisation dans vos widgets :
-/// 
+///
 /// 1. Import simple :
 ///    Text('welcome'.tr())
-/// 
+///
 /// 2. Avec contexte :
 ///    Text(context.tr('welcome'))
-/// 
+///
 /// 3. Pour les énumérations du schéma SQL :
 ///    String soilTypeLabel = AppLocalizations.getSoilTypeLabel('clay');
 ///    // Retourne "Argileux" en français ou "Clay" en anglais
-/// 
+///
 /// 4. Changer de langue :
 ///    await context.setLocale(Locale('en'));
+///
+/// 5. Plantes : la base de données stocke les textes en français,
+///    les autres langues sont dans les fichiers JSON (plants.<code>.name).
+///    Text(AppLocalizations.plantName(plant))
 class AppLocalizations {
-  
+
   /// Obtient le label traduit pour un type de sol
   static String getSoilTypeLabel(String soilType) {
     return 'soil_type_$soilType'.tr();
@@ -38,6 +45,11 @@ class AppLocalizations {
     return 'water_need_$waterNeed'.tr();
   }
 
+  /// Obtient le label traduit pour le type de plante
+  static String getPlantTypeLabel(String plantType) {
+    return 'plant_type_$plantType'.tr();
+  }
+
   /// Obtient le label traduit pour le rôle utilisateur
   static String getRoleLabel(String role) {
     return 'role_$role'.tr();
@@ -51,6 +63,35 @@ class AppLocalizations {
   /// Obtient le label traduit pour le type de relation (association)
   static String getRelationTypeLabel(String relationType) {
     return relationType.tr();
+  }
+
+  /// Nom de la plante dans la langue de l'app, sinon le nom français de la base.
+  static String plantName(Plant plant) {
+    return _translatedOr('plants.${plant.code}.name', plant.name);
+  }
+
+  /// Description de la plante dans la langue de l'app, sinon la description française de la base.
+  static String? plantDescription(Plant plant) {
+    if (plant.description == null) return null;
+    return _translatedOr('plants.${plant.code}.description', plant.description!);
+  }
+
+  /// Commentaire d'une association dans la langue de l'app, sinon le commentaire français de la base.
+  static String? associationComment(PlantAssociation association) {
+    if (association.comment == null) return null;
+    return _translatedOr(association.translationKey, association.comment!);
+  }
+
+  /// Message d'erreur traduit à afficher à l'utilisateur (errors.<code> des fichiers JSON).
+  static String errorMessage(Object error) {
+    if (error is ApiException && trExists('errors.${error.code}')) {
+      return 'errors.${error.code}'.tr();
+    }
+    return 'errors.UNKNOWN'.tr();
+  }
+
+  static String _translatedOr(String key, String fallback) {
+    return trExists(key) ? key.tr() : fallback;
   }
 
   /// Liste de tous les types de sol avec leurs labels

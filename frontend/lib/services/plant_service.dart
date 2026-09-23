@@ -1,66 +1,25 @@
 import '../config/constants.dart';
 import '../models/plant.dart';
+import '../models/plant_association.dart';
 import 'api_service.dart';
 
+/// Reference catalog (read only for users, admin endpoints are not used by the app yet).
 class PlantService {
-  final ApiService _apiService = ApiService();
+  PlantService(this._api);
+
+  final ApiService _api;
 
   Future<List<Plant>> getAllPlants() async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.get(AppConstants.plantsEndpoint);
-      
-      if (response is List) {
-        return response.map((json) => Plant.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      throw Exception('Erreur lors de la récupération des plantes: $e');
-    }
+    final response = await _api.get(AppConstants.plantsEndpoint) as List;
+    return response.map((json) => Plant.fromJson(json)).toList();
   }
 
   Future<Plant> getPlantById(int id) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.get('${AppConstants.plantsEndpoint}/$id');
-      return Plant.fromJson(response);
-    } catch (e) {
-      throw Exception('Erreur lors de la récupération de la plante: $e');
-    }
+    return Plant.fromJson(await _api.get('${AppConstants.plantsEndpoint}/$id'));
   }
 
-  Future<Plant> createPlant(Plant plant) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.post(
-        AppConstants.plantsEndpoint,
-        plant.toJson(),
-      );
-      return Plant.fromJson(response);
-    } catch (e) {
-      throw Exception('Erreur lors de la création de la plante: $e');
-    }
-  }
-
-  Future<Plant> updatePlant(int id, Plant plant) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.put(
-        '${AppConstants.plantsEndpoint}/$id',
-        plant.toJson(),
-      );
-      return Plant.fromJson(response);
-    } catch (e) {
-      throw Exception('Erreur lors de la mise à jour de la plante: $e');
-    }
-  }
-
-  Future<void> deletePlant(int id) async {
-    try {
-      await _apiService.loadToken();
-      await _apiService.delete('${AppConstants.plantsEndpoint}/$id');
-    } catch (e) {
-      throw Exception('Erreur lors de la suppression de la plante: $e');
-    }
+  Future<List<PlantAssociation>> getAllAssociations() async {
+    final response = await _api.get(AppConstants.plantAssociationsEndpoint) as List;
+    return response.map((json) => PlantAssociation.fromJson(json)).toList();
   }
 }

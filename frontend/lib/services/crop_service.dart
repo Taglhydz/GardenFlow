@@ -1,66 +1,44 @@
 import '../config/constants.dart';
 import '../models/crop.dart';
+import '../models/json_utils.dart';
 import 'api_service.dart';
 
 class CropService {
-  final ApiService _apiService = ApiService();
+  CropService(this._api);
 
-  Future<List<Crop>> getAllCrops() async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.get(AppConstants.cropsEndpoint);
-      
-      if (response is List) {
-        return response.map((json) => Crop.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      throw Exception('Erreur lors de la récupération des cultures: $e');
-    }
+  final ApiService _api;
+
+  Future<List<Crop>> getCropsByParcel(int parcelId) async {
+    final response = await _api.get('${AppConstants.parcelsEndpoint}/$parcelId/crops') as List;
+    return response.map((json) => Crop.fromJson(json)).toList();
   }
 
   Future<Crop> getCropById(int id) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.get('${AppConstants.cropsEndpoint}/$id');
-      return Crop.fromJson(response);
-    } catch (e) {
-      throw Exception('Erreur lors de la récupération de la culture: $e');
-    }
+    return Crop.fromJson(await _api.get('${AppConstants.cropsEndpoint}/$id'));
   }
 
-  Future<Crop> createCrop(Crop crop) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.post(
-        AppConstants.cropsEndpoint,
-        crop.toJson(),
-      );
-      return Crop.fromJson(response);
-    } catch (e) {
-      throw Exception('Erreur lors de la création de la culture: $e');
-    }
+  Future<Crop> createCrop(
+    int parcelId, {
+    required int plantId,
+    DateTime? sowDate,
+    DateTime? expectedHarvestDate,
+    DateTime? actualHarvestDate,
+    String? comment,
+  }) async {
+    final response = await _api.post('${AppConstants.parcelsEndpoint}/$parcelId/crops', {
+      'plant_id': plantId,
+      'sow_date': JsonUtils.formatDate(sowDate),
+      'expected_harvest_date': JsonUtils.formatDate(expectedHarvestDate),
+      'actual_harvest_date': JsonUtils.formatDate(actualHarvestDate),
+      'comment': comment,
+    });
+    return Crop.fromJson(response);
   }
 
-  Future<Crop> updateCrop(int id, Crop crop) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.put(
-        '${AppConstants.cropsEndpoint}/$id',
-        crop.toJson(),
-      );
-      return Crop.fromJson(response);
-    } catch (e) {
-      throw Exception('Erreur lors de la mise à jour de la culture: $e');
-    }
+  /// Only the given fields are modified. Dates must be 'YYYY-MM-DD' (JsonUtils.formatDate) or null.
+  Future<Crop> updateCrop(int id, Map<String, dynamic> changes) async {
+    return Crop.fromJson(await _api.patch('${AppConstants.cropsEndpoint}/$id', changes));
   }
 
-  Future<void> deleteCrop(int id) async {
-    try {
-      await _apiService.loadToken();
-      await _apiService.delete('${AppConstants.cropsEndpoint}/$id');
-    } catch (e) {
-      throw Exception('Erreur lors de la suppression de la culture: $e');
-    }
-  }
+  Future<void> deleteCrop(int id) => _api.delete('${AppConstants.cropsEndpoint}/$id');
 }

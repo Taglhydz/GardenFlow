@@ -2,16 +2,16 @@
   "app_name": "GardenFlow",
   "welcome": "Welcome",
   "login": "Login",
-  "register": "Register",
+  "register": "Sign up",
   "email": "Email",
   "password": "Password",
   "username": "Username",
   "birthdate": "Birthdate",
-  "logout": "Logout",
+  "logout": "Log out",
   "garden": "Garden",
   "gardens": "Gardens",
   "my_gardens": "My gardens",
-  "add_garden": "Add garden",
+  "add_garden": "Add a garden",
   "edit_garden": "Edit garden",
   "delete_garden": "Delete garden",
   "garden_name": "Garden name",
@@ -19,7 +19,7 @@
   "description": "Description",
   "parcel": "Parcel",
   "parcels": "Parcels",
-  "add_parcel": "Add parcel",
+  "add_parcel": "Add a parcel",
   "edit_parcel": "Edit parcel",
   "delete_parcel": "Delete parcel",
   "parcel_name": "Parcel name",
@@ -33,8 +33,8 @@
   "sunlight": "Sunlight",
   "moisture": "Moisture",
   "plant": "Plant",
-  "plants": "Plants",
-  "add_plant": "Add plant",
+  "plants_label": "Plants",
+  "add_plant": "Add a plant",
   "edit_plant": "Edit plant",
   "delete_plant": "Delete plant",
   "plant_name": "Plant name",
@@ -45,13 +45,13 @@
   "sow_end_month": "Sowing end",
   "harvest_start_month": "Harvest start",
   "harvest_end_month": "Harvest end",
-  "sunlight_need": "Light requirement",
-  "water_need": "Water requirement",
+  "sunlight_need": "Light need",
+  "water_need": "Water need",
   "preferred_soil": "Preferred soil",
   "spacing_cm": "Spacing (cm)",
   "crop": "Crop",
   "crops": "Crops",
-  "add_crop": "Add crop",
+  "add_crop": "Add a crop",
   "edit_crop": "Edit crop",
   "delete_crop": "Delete crop",
   "sow_date": "Sowing date",
@@ -59,34 +59,61 @@
   "actual_harvest_date": "Actual harvest date",
   "comment": "Comment",
   "plant_association": "Plant association",
-  "plant_associations": "Plant associations",
+  "plant_associations_label": "Plant associations",
   "relation_type": "Relation type",
   "positive": "Positive",
   "negative": "Negative",
-  "suggestion": "Suggestion",
-  "suggestions": "Suggestions",
-  "reason": "Reason",
   "save": "Save",
   "cancel": "Cancel",
   "delete": "Delete",
   "edit": "Edit",
+  "create": "Create",
   "confirm": "Confirm",
+  "retry": "Retry",
+  "back": "Back",
   "error": "Error",
   "success": "Success",
   "loading": "Loading...",
   "no_data": "No data available",
-  "email_already_exists": "This email is already in use",
-  "invalid_credentials": "Invalid credentials",
   "required_field": "This field is required",
-  "home": "Home",
-  "profile": "Profile",
+  "home": {
+    "title": "Home",
+    "no_garden_title": "No garden yet",
+    "no_garden_subtitle": "Create your first garden to get started",
+    "create_garden": "Create a garden",
+    "create_new_garden": "Create a new garden",
+    "select_garden": "Select a garden",
+    "garden_view_coming": "Garden view coming soon...",
+    "garden_created": "Garden created!",
+    "garden_name_required": "Garden name *",
+    "garden_name_hint": "My vegetable garden",
+    "location_hint": "London, United Kingdom",
+    "description_hint": "A small sunny garden...",
+    "load_error": "Unable to load your gardens"
+  },
+  "profile": {
+    "title": "Profile",
+    "information": "Information",
+    "role": "Role",
+    "user_fallback": "User",
+    "garden_count": {
+      "one": "{} garden",
+      "other": "{} gardens"
+    },
+    "logout_title": "Log out",
+    "logout_confirm": "Do you really want to log out?",
+    "logout_action": "Log out",
+    "choose_language": "Choose the language"
+  },
   "settings": "Settings",
   "language": "Language",
+  "language_fr": "Français",
+  "language_en": "English",
   "soil_type_standard": "Standard",
   "soil_type_clay": "Clay",
   "soil_type_sandy": "Sandy",
   "soil_type_loamy": "Loamy",
-  "soil_type_humus": "Humus",
+  "soil_type_humus": "Humus-rich",
   "soil_type_chalky": "Chalky",
   "sunlight_low": "Low",
   "sunlight_medium": "Medium",
@@ -97,6 +124,10 @@
   "water_need_low": "Low",
   "water_need_medium": "Medium",
   "water_need_high": "High",
+  "plant_type_vegetable": "Vegetable",
+  "plant_type_fruit": "Fruit",
+  "plant_type_herb": "Herb",
+  "plant_type_flower": "Flower",
   "role_user": "User",
   "role_admin": "Administrator",
   "month_1": "January",
@@ -110,5 +141,231 @@
   "month_9": "September",
   "month_10": "October",
   "month_11": "November",
-  "month_12": "December"
+  "month_12": "December",
+  "startup": {
+    "error_title": "Unable to reach the server",
+    "error_message": "Check your internet connection and try again."
+  },
+  "auth": {
+    "login_subtitle": "Manage your garden easily",
+    "login_button": "Log in",
+    "no_account": "No account yet?",
+    "register_title": "Create an account",
+    "register_subtitle": "Join GardenFlow",
+    "register_button": "Sign up",
+    "have_account": "Already have an account?",
+    "birthdate_optional": "Birthdate (optional)",
+    "select_date": "Select a date",
+    "birthdate_picker_help": "Select your birthdate",
+    "confirm_password": "Confirm password",
+    "show_password": "Show password",
+    "hide_password": "Hide password",
+    "welcome_title": "Welcome to GardenFlow!",
+    "welcome_message": "Your account has been created 🌱",
+    "welcome_start": "Get started",
+    "session_expired": "Your session has expired, please log in again."
+  },
+  "validation": {
+    "email_required": "Please enter your email",
+    "email_invalid": "Invalid email",
+    "password_required": "Please enter a password",
+    "password_min": "The password must contain at least {} characters",
+    "username_required": "Please enter a username",
+    "username_min": "The username must contain at least {} characters",
+    "confirm_password_required": "Please confirm your password",
+    "passwords_dont_match": "Passwords do not match",
+    "name_required": "The name is required"
+  },
+  "errors": {
+    "NETWORK_ERROR": "Unable to reach the server. Check your connection.",
+    "VALIDATION_ERROR": "Some information is invalid.",
+    "UNAUTHORIZED": "Your session has expired, please log in again.",
+    "INVALID_TOKEN": "Your session has expired, please log in again.",
+    "INVALID_CREDENTIALS": "Incorrect email or password.",
+    "EMAIL_ALREADY_USED": "This email is already in use.",
+    "WRONG_PASSWORD": "The current password is incorrect.",
+    "FORBIDDEN": "You are not allowed to do this.",
+    "NOT_FOUND": "Item not found.",
+    "ROUTE_NOT_FOUND": "Service not found, the app may need an update.",
+    "TOO_MANY_REQUESTS": "Too many attempts, try again in a few minutes.",
+    "DUPLICATE_ENTRY": "This item already exists.",
+    "INVALID_REFERENCE": "A linked item could not be found.",
+    "RESOURCE_IN_USE": "This item is used elsewhere and cannot be deleted.",
+    "PLANT_CODE_ALREADY_USED": "A plant with this code already exists.",
+    "ASSOCIATION_ALREADY_EXISTS": "These two plants already have an association.",
+    "INTERNAL_ERROR": "Server error, try again later.",
+    "UNKNOWN": "An unexpected error occurred."
+  },
+  "plants": {
+    "tomato": {
+      "name": "Tomato",
+      "description": "Heat-loving summer fruiting vegetable. Sow under cover, transplant after the last frosts."
+    },
+    "carrot": {
+      "name": "Carrot",
+      "description": "Root to sow directly in light, stone-free soil."
+    },
+    "lettuce": {
+      "name": "Lettuce",
+      "description": "Fast-growing salad, sow in succession to harvest all season long."
+    },
+    "radish": {
+      "name": "Radish",
+      "description": "Ready in about 4 weeks, ideal for beginners."
+    },
+    "green_bean": {
+      "name": "Green bean",
+      "description": "Frost-sensitive legume to sow directly once the soil is warm. Enriches the soil with nitrogen."
+    },
+    "pea": {
+      "name": "Pea",
+      "description": "Cool-season legume to sow early in spring. Enriches the soil with nitrogen."
+    },
+    "zucchini": {
+      "name": "Zucchini",
+      "description": "Vigorous and very productive plant, needs plenty of water and organic matter."
+    },
+    "cucumber": {
+      "name": "Cucumber",
+      "description": "Loves warmth and regular watering, can be trellised."
+    },
+    "potato": {
+      "name": "Potato",
+      "description": "Tuber planted in spring, to be earthed up as it grows."
+    },
+    "onion": {
+      "name": "Onion",
+      "description": "Bulb grown from seed or sets, dislikes excess water."
+    },
+    "garlic": {
+      "name": "Garlic",
+      "description": "Cloves planted in autumn or late winter in well-drained soil."
+    },
+    "leek": {
+      "name": "Leek",
+      "description": "Very hardy winter vegetable, transplanted in summer."
+    },
+    "spinach": {
+      "name": "Spinach",
+      "description": "Cool-season leafy vegetable that bolts quickly in hot weather."
+    },
+    "cabbage": {
+      "name": "Cabbage",
+      "description": "Nutrient-hungry vegetable that likes heavy, moist soils."
+    },
+    "beetroot": {
+      "name": "Beetroot",
+      "description": "Easy-to-grow root that stores well."
+    },
+    "pepper": {
+      "name": "Bell pepper",
+      "description": "Very frost-sensitive, sow in a warm place in late winter."
+    },
+    "eggplant": {
+      "name": "Eggplant",
+      "description": "Needs plenty of heat and sun to produce well."
+    },
+    "squash": {
+      "name": "Squash",
+      "description": "Trailing plant that takes a lot of space, harvest before the frosts."
+    },
+    "corn": {
+      "name": "Sweet corn",
+      "description": "Sow in blocks rather than rows for good pollination."
+    },
+    "celery": {
+      "name": "Celery",
+      "description": "Likes rich, moist soils, regular watering is essential."
+    },
+    "fennel": {
+      "name": "Fennel",
+      "description": "Bulb sown in summer, slows down the growth of many neighbouring plants."
+    },
+    "turnip": {
+      "name": "Turnip",
+      "description": "Fast root, mostly grown in late summer for autumn."
+    },
+    "strawberry": {
+      "name": "Strawberry",
+      "description": "Perennial planted in late summer or spring, spreads by runners."
+    },
+    "basil": {
+      "name": "Basil",
+      "description": "Frost-sensitive herb, sow in warmth and pinch regularly."
+    },
+    "parsley": {
+      "name": "Parsley",
+      "description": "Biennial with slow germination."
+    },
+    "chives": {
+      "name": "Chives",
+      "description": "Easy perennial that grows back after each cut."
+    },
+    "thyme": {
+      "name": "Thyme",
+      "description": "Mediterranean perennial herb that likes dry, poor soils."
+    },
+    "dill": {
+      "name": "Dill",
+      "description": "Annual herb that attracts beneficial insects."
+    },
+    "marigold": {
+      "name": "French marigold",
+      "description": "Flower that repels nematodes and some insects, a classic companion for tomatoes."
+    },
+    "nasturtium": {
+      "name": "Nasturtium",
+      "description": "Aphid trap plant, flowers and leaves are edible."
+    }
+  },
+  "plant_associations": {
+    "basil__tomato": "Basil repels some pests and is said to improve the flavour of tomatoes.",
+    "marigold__tomato": "French marigold repels nematodes and whiteflies.",
+    "carrot__tomato": "Carrots loosen the soil around tomatoes.",
+    "parsley__tomato": "Parsley attracts beneficial insects.",
+    "nasturtium__tomato": "Nasturtium draws aphids away from tomatoes.",
+    "carrot__onion": "Onion repels the carrot fly, carrot repels the onion fly.",
+    "carrot__leek": "Leek repels the carrot fly, and vice versa.",
+    "carrot__lettuce": "Complementary use of the soil: deep root and surface leaves.",
+    "carrot__radish": "Fast radishes mark the rows and loosen the soil for carrots.",
+    "carrot__chives": "Chives repel the carrot fly.",
+    "carrot__pea": "Peas enrich the soil with nitrogen.",
+    "lettuce__radish": "Fast crops that share the space well.",
+    "lettuce__strawberry": "Lettuce covers the soil between strawberry plants.",
+    "cucumber__lettuce": "Cucumber foliage shades the lettuce in summer.",
+    "beetroot__lettuce": "Different root depths, good use of the soil.",
+    "corn__green_bean": "Corn supports the bean, the bean brings nitrogen (\"three sisters\" planting).",
+    "green_bean__squash": "Squash covers the soil, the bean enriches it with nitrogen (\"three sisters\").",
+    "corn__squash": "Squash keeps the soil cool at the foot of the corn (\"three sisters\").",
+    "green_bean__potato": "Beans are said to repel the Colorado potato beetle.",
+    "eggplant__green_bean": "Beans are said to repel the Colorado potato beetle from eggplants.",
+    "green_bean__zucchini": "Beans enrich the soil with nitrogen for the hungry zucchini.",
+    "cucumber__dill": "Dill attracts beneficial insects that help cucumbers.",
+    "nasturtium__zucchini": "Nasturtium draws aphids away from zucchini.",
+    "cabbage__celery": "Celery repels the cabbage white butterfly.",
+    "cabbage__thyme": "Thyme repels the cabbage white butterfly.",
+    "beetroot__onion": "Good neighbours with complementary needs.",
+    "garlic__strawberry": "Garlic is said to limit fungal diseases of strawberries.",
+    "leek__strawberry": "Leek is said to limit strawberry diseases.",
+    "spinach__strawberry": "Spinach covers the soil between strawberry plants.",
+    "celery__leek": "Celery and leek protect each other from their pests.",
+    "basil__pepper": "Basil repels some pests of bell peppers.",
+    "pea__radish": "Compatible spring crops.",
+    "radish__spinach": "Compatible fast crops.",
+    "marigold__potato": "French marigold repels nematodes.",
+    "potato__tomato": "Same family (nightshades): they share blight and the same pests.",
+    "fennel__tomato": "Fennel slows down the growth of tomatoes.",
+    "cabbage__tomato": "Competition and slower growth for both.",
+    "corn__tomato": "They share some pests (corn earworm).",
+    "green_bean__onion": "Alliums slow down the growth of beans.",
+    "garlic__green_bean": "Alliums slow down the growth of beans.",
+    "green_bean__leek": "Alliums slow down the growth of beans.",
+    "fennel__green_bean": "Fennel slows down the growth of beans.",
+    "onion__pea": "Alliums slow down the growth of peas.",
+    "garlic__pea": "Alliums slow down the growth of peas.",
+    "potato__squash": "Competition for water and nutrients, both susceptible to blight.",
+    "cucumber__potato": "Cucumber is said to encourage potato blight.",
+    "cabbage__strawberry": "Cabbage hinders the development of strawberries.",
+    "carrot__dill": "Same family (umbellifers): flowering dill can slow down carrots."
+  }
 }

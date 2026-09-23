@@ -1,249 +1,161 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/garden_service.dart';
-import '../models/garden.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/constants.dart';
+import '../models/garden.dart';
+import '../providers/auth_provider.dart';
+import '../providers/garden_providers.dart';
+import '../widgets/create_garden_dialog.dart';
+import '../widgets/welcome_dialog.dart';
 import 'profile_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final _gardenService = GardenService();
-  List<Garden> _gardens = [];
-  Garden? _selectedGarden;
-  bool _isLoading = true;
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _autoSelectChecked = false;
 
   @override
   void initState() {
     super.initState();
-    _loadGardens();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      // pop-up de bienvenue après une inscription
+      if (ref.read(welcomePendingProvider.notifier).consume()) {
+        WelcomeDialog.show(context);
+      }
+
+      final gardens = ref.read(gardensProvider).value;
+      if (gardens != null) _autoSelectSingleGarden(gardens);
+    });
   }
 
-  Future<void> _loadGardens() async {
-    try {
-      final gardens = await _gardenService.getAllGardens();
-      final prefs = await SharedPreferences.getInstance();
-      final lastGardenId = prefs.getInt('last_garden_id');
+  /// Au premier chargement : si un seul jardin et aucun jardin mémorisé, l'ouvrir directement.
+  void _autoSelectSingleGarden(List<Garden> gardens) {
+    if (_autoSelectChecked) return;
+    _autoSelectChecked = true;
 
-      if (mounted) {
-        setState(() {
-          _gardens = gardens;
-          
-          // Si un seul jardin, le sélectionner automatiquement
-          if (gardens.length == 1) {
-            _selectedGarden = gardens.first;
-            _saveLastGarden(gardens.first.id!);
-          } 
-          // Si plusieurs jardins et qu'un dernier jardin existe, le charger
-          else if (gardens.length > 1 && lastGardenId != null) {
-            _selectedGarden = gardens.firstWhere(
-              (g) => g.id == lastGardenId,
-              orElse: () => gardens.first,
-            );
-          }
-          
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e')),
-        );
-      }
+    if (gardens.length == 1 && ref.read(selectedGardenIdProvider) == null) {
+      ref.read(selectedGardenIdProvider.notifier).select(gardens.first.id);
     }
   }
 
-  Future<void> _saveLastGarden(int gardenId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('last_garden_id', gardenId);
-  }
-
-  void _selectGarden(Garden garden) {
-    setState(() => _selectedGarden = garden);
-    _saveLastGarden(garden.id!);
-  }
-
-  Future<void> _showCreateGardenDialog() async {
-    final nameController = TextEditingController();
-    final locationController = TextEditingController();
-    final descriptionController = TextEditingController();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Créer un jardin'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nom du jardin *',
-                  hintText: 'Mon potager',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: locationController,
-                decoration: const InputDecoration(
-                  labelText: 'Localisation',
-                  hintText: 'Paris, France',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  hintText: 'Un petit jardin ensoleillé...',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ),
+  Future<void> _createGarden() async {
+    final created = await CreateGardenDialog.show(context);
+    if (created && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('home.garden_created'.tr()),
+          backgroundColor: AppColors.success,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Le nom est obligatoire')),
-                );
-                return;
-              }
-
-              try {
-                // Récupérer l'ID utilisateur depuis le profil
-                final prefs = await SharedPreferences.getInstance();
-                final userId = prefs.getInt('user_id');
-                
-                if (userId == null) {
-                  throw Exception('Utilisateur non trouvé');
-                }
-
-                final newGarden = Garden(
-                  userId: userId,
-                  name: nameController.text.trim(),
-                  location: locationController.text.trim().isEmpty 
-                      ? null 
-                      : locationController.text.trim(),
-                  description: descriptionController.text.trim().isEmpty 
-                      ? null 
-                      : descriptionController.text.trim(),
-                );
-
-                await _gardenService.createGarden(newGarden);
-                
-                if (context.mounted) {
-                  Navigator.pop(context, true);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Jardin créé avec succès !'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erreur: $e')),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.white,
-            ),
-            child: const Text('Créer'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      _loadGardens();
+      );
     }
+  }
+
+  void _openProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ProfileScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+    ref.listen(gardensProvider, (_, next) {
+      if (next.hasValue) _autoSelectSingleGarden(next.value!);
+    });
+
+    final gardensAsync = ref.watch(gardensProvider);
+    final selectedGarden = ref.watch(selectedGardenProvider);
+
+    if (!gardensAsync.hasValue) {
+      return gardensAsync.hasError
+          ? _buildErrorView()
+          : const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // Afficher le jardin sélectionné
-    if (_selectedGarden != null) {
-      return _buildGardenView();
+    if (selectedGarden != null) {
+      return _buildGardenView(selectedGarden);
     }
 
     // Afficher la sélection/création de jardin
-    return _buildGardenSelectionView();
+    return _buildGardenSelectionView(gardensAsync.value!);
   }
 
-  Widget _buildGardenView() {
+  Widget _buildErrorView() {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // Titre "GardenFlow" aux 3/4 de la hauteur
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.25 - 30,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                'GardenFlow',
-                style: TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.cloud_off, size: 80, color: Colors.grey[400]),
+                  const SizedBox(height: 24),
+                  Text(
+                    'home.load_error'.tr(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => ref.invalidate(gardensProvider),
+                    icon: const Icon(Icons.refresh),
+                    label: Text('retry'.tr()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.white,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+          ..._buildTopButtons(onHome: null),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGardenView(Garden garden) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          _buildTitle(),
           // Contenu principal
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.yard,
                   size: 80,
                   color: AppColors.primary,
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  _selectedGarden!.name,
+                  garden.name,
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (_selectedGarden!.description != null) ...[
+                if (garden.description != null) ...[
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: Text(
-                      _selectedGarden!.description!,
+                      garden.description!,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,
@@ -252,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
-                if (_selectedGarden!.location != null) ...[
+                if (garden.location != null) ...[
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -260,136 +172,96 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
                       const SizedBox(width: 4),
                       Text(
-                        _selectedGarden!.location!,
+                        garden.location!,
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],
                   ),
                 ],
                 const SizedBox(height: 32),
-                const Text(
-                  'Vue du jardin à venir...',
-                  style: TextStyle(fontSize: 16),
+                Text(
+                  'home.garden_view_coming'.tr(),
+                  style: const TextStyle(fontSize: 16),
                 ),
               ],
             ),
           ),
-          // Icône maison en haut à gauche
-          Positioned(
-            top: 40,
-            left: 16,
-            child: IconButton(
-              icon: const Icon(Icons.home_outlined, color: AppColors.primary, size: 28),
-              onPressed: () {
-                setState(() => _selectedGarden = null);
-              },
-              tooltip: 'Mes jardins',
-            ),
-          ),
-          // Boutons en haut à droite
-          Positioned(
-            top: 47,
-            right: 8,
-            child: Row(
-              children: [
-                // Bouton profil
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.primary,
-                      width: 2,
-                    ),
-                  ),
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.person_outline, color: AppColors.primary, size: 20),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                      );
-                    },
-                    tooltip: 'Profil',
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // retour à la liste des jardins
+          ..._buildTopButtons(onHome: () => ref.read(selectedGardenIdProvider.notifier).select(null)),
         ],
       ),
     );
   }
 
-  Widget _buildGardenSelectionView() {
+  Widget _buildGardenSelectionView(List<Garden> gardens) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // Titre "GardenFlow" aux 3/4 de la hauteur
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.25 - 30,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                'GardenFlow',
-                style: TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-          ),
+          _buildTitle(),
           // Contenu principal
-          _gardens.isEmpty ? _buildNoGardenView() : _buildGardenListView(),
-          // Icône maison en haut à gauche
-          Positioned(
-            top: 40,
-            left: 16,
-            child: IconButton(
-              icon: const Icon(Icons.home_outlined, color: AppColors.primary, size: 28),
-              onPressed: () {
-                // Déjà sur la page d'accueil, ne rien faire
-              },
-              tooltip: 'Accueil',
-            ),
-          ),
-          // Icône profil en haut à droite
-          Positioned(
-            top: 47,
-            right: 16,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.primary,
-                  width: 2,
-                ),
-              ),
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.person_outline, color: AppColors.primary, size: 20),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                  );
-                },
-                tooltip: 'Profil',
-              ),
-            ),
-          ),
+          gardens.isEmpty ? _buildNoGardenView() : _buildGardenListView(gardens),
+          // Déjà sur la page d'accueil : le bouton maison ne fait rien
+          ..._buildTopButtons(onHome: null),
         ],
       ),
     );
+  }
+
+  /// Titre "GardenFlow" au quart de la hauteur
+  Widget _buildTitle() {
+    return Positioned(
+      top: MediaQuery.of(context).size.height * 0.25 - 30,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Text(
+          'app_name'.tr(),
+          style: const TextStyle(
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Icône maison en haut à gauche, icône profil en haut à droite.
+  List<Widget> _buildTopButtons({required VoidCallback? onHome}) {
+    return [
+      Positioned(
+        top: 40,
+        left: 16,
+        child: IconButton(
+          icon: const Icon(Icons.home_outlined, color: AppColors.primary, size: 28),
+          onPressed: onHome ?? () {},
+          tooltip: onHome != null ? 'my_gardens'.tr() : 'home.title'.tr(),
+        ),
+      ),
+      Positioned(
+        top: 47,
+        right: 16,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.primary,
+              width: 2,
+            ),
+          ),
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            icon: const Icon(Icons.person_outline, color: AppColors.primary, size: 20),
+            onPressed: _openProfile,
+            tooltip: 'profile.title'.tr(),
+          ),
+        ),
+      ),
+    ];
   }
 
   Widget _buildNoGardenView() {
@@ -405,16 +277,17 @@ class _HomeScreenState extends State<HomeScreen> {
               color: Colors.grey[400],
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Aucun jardin pour le moment',
-              style: TextStyle(
+            Text(
+              'home.no_garden_title'.tr(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              'Créez votre premier jardin pour commencer',
+              'home.no_garden_subtitle'.tr(),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -423,9 +296,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: _showCreateGardenDialog,
+              onPressed: _createGarden,
               icon: const Icon(Icons.add),
-              label: const Text('Créer un jardin'),
+              label: Text('home.create_garden'.tr()),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -441,13 +314,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGardenListView() {
+  Widget _buildGardenListView(List<Garden> gardens) {
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
-            'Sélectionnez un jardin',
+            'home.select_garden'.tr(),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -456,50 +329,53 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _gardens.length,
-            itemBuilder: (context, index) {
-              final garden = _gardens[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  leading: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.yard,
-                      color: AppColors.primary,
-                    ),
+          child: RefreshIndicator(
+            onRefresh: () => ref.refresh(gardensProvider.future),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: gardens.length,
+              itemBuilder: (context, index) {
+                final garden = gardens[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  title: Text(
-                    garden.name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.yard,
+                        color: AppColors.primary,
+                      ),
                     ),
+                    title: Text(
+                      garden.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: garden.description != null
+                        ? Text(
+                            garden.description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : null,
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: () => ref.read(selectedGardenIdProvider.notifier).select(garden.id),
                   ),
-                  subtitle: garden.description != null
-                      ? Text(
-                          garden.description!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      : null,
-                  trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () => _selectGarden(garden),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
         Padding(
@@ -507,9 +383,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _showCreateGardenDialog,
+              onPressed: _createGarden,
               icon: const Icon(Icons.add),
-              label: const Text('Créer un nouveau jardin'),
+              label: Text('home.create_new_garden'.tr()),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),

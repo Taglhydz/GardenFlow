@@ -1,5 +1,7 @@
+import 'json_utils.dart';
+
 class Crop {
-  final int? id;
+  final int id;
   final int parcelId;
   final int plantId;
   final DateTime? sowDate;
@@ -9,8 +11,8 @@ class Crop {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  Crop({
-    this.id,
+  const Crop({
+    required this.id,
     required this.parcelId,
     required this.plantId,
     this.sowDate,
@@ -23,37 +25,15 @@ class Crop {
 
   factory Crop.fromJson(Map<String, dynamic> json) {
     return Crop(
-      id: json['id'],
-      parcelId: json['parcel_id'],
-      plantId: json['plant_id'],
-      sowDate: json['sow_date'] != null 
-          ? DateTime.parse(json['sow_date']) 
-          : null,
-      expectedHarvestDate: json['expected_harvest_date'] != null 
-          ? DateTime.parse(json['expected_harvest_date']) 
-          : null,
-      actualHarvestDate: json['actual_harvest_date'] != null 
-          ? DateTime.parse(json['actual_harvest_date']) 
-          : null,
-      comment: json['comment'],
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
-          : null,
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at']) 
-          : null,
+      id: JsonUtils.toInt(json['id'])!,
+      parcelId: JsonUtils.toInt(json['parcel_id'])!,
+      plantId: JsonUtils.toInt(json['plant_id'])!,
+      sowDate: JsonUtils.toDate(json['sow_date']),
+      expectedHarvestDate: JsonUtils.toDate(json['expected_harvest_date']),
+      actualHarvestDate: JsonUtils.toDate(json['actual_harvest_date']),
+      comment: json['comment'] as String?,
+      createdAt: JsonUtils.toDate(json['created_at']),
+      updatedAt: JsonUtils.toDate(json['updated_at']),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'parcel_id': parcelId,
-      'plant_id': plantId,
-      'sow_date': sowDate?.toIso8601String(),
-      'expected_harvest_date': expectedHarvestDate?.toIso8601String(),
-      'actual_harvest_date': actualHarvestDate?.toIso8601String(),
-      'comment': comment,
-    };
   }
 }

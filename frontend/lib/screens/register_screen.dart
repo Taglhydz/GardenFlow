@@ -1,23 +1,26 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../config/app_localizations.dart';
 import '../config/constants.dart';
-import 'home_screen.dart';
-import 'login_screen.dart';
+import '../providers/auth_provider.dart';
+import '../utils/validators.dart';
+import '../widgets/custom_button.dart';
 
-class RegisterScreen extends StatefulWidget {
+/// Opened on top of the login screen. On success, AuthGate closes it and shows the home screen.
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey                   = GlobalKey<FormState>();
   final _usernameController        = TextEditingController();
   final _emailController           = TextEditingController();
   final _passwordController        = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _authService               = AuthService();
   bool _isLoading                = false;
   bool _isPasswordVisible        = false;
   bool _isConfirmPasswordVisible = false;
@@ -35,13 +38,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _selectBirthdate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime(2000),
+      initialDate: _selectedBirthdate ?? DateTime(2000),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
-      locale: const Locale('fr', 'FR'),
-      helpText: 'Sélectionnez votre date de naissance',
-      cancelText: 'Annuler',
-      confirmText: 'OK',
+      helpText: 'auth.birthdate_picker_help'.tr(),
     );
     if (picked != null && picked != _selectedBirthdate) {
       setState(() {
@@ -50,117 +50,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-  }
-
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      await _authService.register(
+      await ref.read(authProvider.notifier).register(
         username: _usernameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
         birthdate: _selectedBirthdate,
       );
-
-      if (mounted) {
-        // Rediriger vers l'écran d'accueil et afficher la pop-up
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) {
-              // Afficher la pop-up après un court délai
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                Future.delayed(const Duration(milliseconds: 300), () {
-                  showDialog(
-                    context: context,
-                    barrierColor: Colors.black.withValues(alpha: 0.3),
-                    builder: (BuildContext context) {
-                      return Dialog(
-                        backgroundColor: Colors.transparent,
-                        child: Container(
-                          padding: const EdgeInsets.all(32),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.check_circle,
-                                  color: AppColors.primary,
-                                  size: 60,
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              const Text(
-                                'Bienvenue dans GardenFlow !',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primaryDark,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Votre compte a été créé avec succès 🌱',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 24),
-                              ElevatedButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Commencer',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                });
-              });
-              return const HomeScreen();
-            },
-          ),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: ${e.toString()}'),
+            content: Text(AppLocalizations.errorMessage(e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -192,20 +98,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     color: AppColors.primary,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Créer un compte',
+                  Text(
+                    'auth.register_title'.tr(),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Rejoignez GardenFlow',
+                  Text(
+                    'auth.register_subtitle'.tr(),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       color: AppColors.grey,
                     ),
@@ -215,20 +121,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // username
                   TextFormField(
                     controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nom d\'utilisateur',
-                      prefixIcon: Icon(Icons.person),
-                      border: OutlineInputBorder(),
+                    autofillHints: const [AutofillHints.username],
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: 'username'.tr(),
+                      prefixIcon: const Icon(Icons.person),
+                      border: const OutlineInputBorder(),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer un nom d\'utilisateur';
-                      }
-                      if (value.length < 3) {
-                        return 'Le nom doit contenir au moins 3 caractères';
-                      }
-                      return null;
-                    },
+                    validator: Validators.username,
                   ),
                   const SizedBox(height: 16),
 
@@ -236,20 +136,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.email),
-                      border: OutlineInputBorder(),
+                    autofillHints: const [AutofillHints.email],
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: 'email'.tr(),
+                      prefixIcon: const Icon(Icons.email),
+                      border: const OutlineInputBorder(),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer votre email';
-                      }
-                      if (!value.contains('@') || !value.contains('.')) {
-                        return 'Email invalide';
-                      }
-                      return null;
-                    },
+                    validator: Validators.email,
                   ),
                   const SizedBox(height: 16),
 
@@ -257,15 +151,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   InkWell(
                     onTap: _selectBirthdate,
                     child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Date de naissance (optionnel)',
-                        prefixIcon: Icon(Icons.calendar_today),
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: 'auth.birthdate_optional'.tr(),
+                        prefixIcon: const Icon(Icons.calendar_today),
+                        border: const OutlineInputBorder(),
                       ),
                       child: Text(
                         _selectedBirthdate == null
-                            ? 'Sélectionner une date'
-                            : _formatDate(_selectedBirthdate!),
+                            ? 'auth.select_date'.tr()
+                            : MaterialLocalizations.of(context).formatCompactDate(_selectedBirthdate!),
                         style: TextStyle(
                           color: _selectedBirthdate == null
                               ? AppColors.grey
@@ -280,8 +174,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: !_isPasswordVisible,
+                    autofillHints: const [AutofillHints.newPassword],
+                    textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      labelText: 'Mot de passe',
+                      labelText: 'password'.tr(),
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -289,6 +185,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ? Icons.visibility
                               : Icons.visibility_off,
                         ),
+                        tooltip: _isPasswordVisible ? 'auth.hide_password'.tr() : 'auth.show_password'.tr(),
                         onPressed: () {
                           setState(() {
                             _isPasswordVisible = !_isPasswordVisible;
@@ -297,15 +194,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       border: const OutlineInputBorder(),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer un mot de passe';
-                      }
-                      if (value.length < 6) {
-                        return 'Le mot de passe doit contenir au moins 6 caractères';
-                      }
-                      return null;
-                    },
+                    validator: Validators.newPassword,
                   ),
                   const SizedBox(height: 16),
 
@@ -313,8 +202,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: !_isConfirmPasswordVisible,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _isLoading ? null : _register(),
                     decoration: InputDecoration(
-                      labelText: 'Confirmer le mot de passe',
+                      labelText: 'auth.confirm_password'.tr(),
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -322,6 +213,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ? Icons.visibility
                               : Icons.visibility_off,
                         ),
+                        tooltip: _isConfirmPasswordVisible ? 'auth.hide_password'.tr() : 'auth.show_password'.tr(),
                         onPressed: () {
                           setState(() {
                             _isConfirmPasswordVisible =
@@ -333,10 +225,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Veuillez confirmer votre mot de passe';
+                        return 'validation.confirm_password_required'.tr();
                       }
                       if (value != _passwordController.text) {
-                        return 'Les mots de passe ne correspondent pas';
+                        return 'validation.passwords_dont_match'.tr();
                       }
                       return null;
                     },
@@ -344,29 +236,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 24),
 
                   // submit button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _register,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.white,
-                            ),
-                          )
-                        : const Text(
-                            'S\'inscrire',
-                            style: TextStyle(fontSize: 16),
-                          ),
+                  CustomButton(
+                    text: 'auth.register_button'.tr(),
+                    onPressed: _register,
+                    isLoading: _isLoading,
                   ),
                   const SizedBox(height: 16),
 
@@ -374,19 +247,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Déjà un compte ? '),
+                      Text('auth.have_account'.tr()),
                       TextButton(
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LoginScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          'Se connecter',
-                          style: TextStyle(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'auth.login_button'.tr(),
+                          style: const TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.bold,
                           ),

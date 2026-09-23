@@ -1,5 +1,7 @@
+import 'json_utils.dart';
+
 class Garden {
-  final int? id;
+  final int id;
   final int userId;
   final String name;
   final String? location;
@@ -7,8 +9,8 @@ class Garden {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  Garden({
-    this.id,
+  const Garden({
+    required this.id,
     required this.userId,
     required this.name,
     this.location,
@@ -19,27 +21,13 @@ class Garden {
 
   factory Garden.fromJson(Map<String, dynamic> json) {
     return Garden(
-      id: json['id'],
-      userId: json['user_id'],
-      name: json['name'],
-      location: json['location'],
-      description: json['description'],
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
-          : null,
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at']) 
-          : null,
+      id: JsonUtils.toInt(json['id'])!,
+      userId: JsonUtils.toInt(json['user_id'])!,
+      name: json['name'] as String,
+      location: json['location'] as String?,
+      description: json['description'] as String?,
+      createdAt: JsonUtils.toDate(json['created_at']),
+      updatedAt: JsonUtils.toDate(json['updated_at']),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'user_id': userId,
-      'name': name,
-      'location': location,
-      'description': description,
-    };
   }
 }

@@ -1,102 +1,85 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../config/app_localizations.dart';
 import '../config/constants.dart';
-import '../services/auth_service.dart';
-import '../services/garden_service.dart';
 import '../models/user.dart';
-import 'login_screen.dart';
+import '../providers/auth_provider.dart';
+import '../providers/garden_providers.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  final _authService = AuthService();
-  final _gardenService = GardenService();
-  User? _user;
-  bool _isLoading = true;
-  int _gardenCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadProfile();
-  }
-
-  Future<void> _loadProfile() async {
-    try {
-      final user = await _authService.getProfile();
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getInt('user_id');
-      
-      int gardenCount = 0;
-      if (userId != null) {
-        try {
-          final gardens = await _gardenService.getGardensByUserId(userId);
-          gardenCount = gardens.length;
-        } catch (e) {
-          // Ignorer l'erreur, garder gardenCount à 0
-        }
-      }
-      
-      if (mounted) {
-        setState(() {
-          _user = user;
-          _gardenCount = gardenCount;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _logout() async {
+  Future<void> _logout(BuildContext context, WidgetRef ref) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Déconnexion'),
-        content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+        title: Text('profile.logout_title'.tr()),
+        content: Text('profile.logout_confirm'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: Text('cancel'.tr()),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Déconnexion'),
+            child: Text('profile.logout_action'.tr()),
           ),
         ],
       ),
     );
 
-    if (confirm == true && mounted) {
-      await _authService.logout();
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
+    // AuthGate closes this screen and shows the login screen
+    if (confirm == true) {
+      await ref.read(authProvider.notifier).logout();
+    }
+  }
+
+  Future<void> _chooseLanguage(BuildContext context) async {
+    final locale = await showModalBottomSheet<Locale>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'profile.choose_language'.tr(),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            for (final supported in context.supportedLocales)
+              ListTile(
+                leading: const Icon(Icons.language),
+                title: Text('language_${supported.languageCode}'.tr()),
+                trailing: supported == context.locale
+                    ? const Icon(Icons.check, color: AppColors.primary)
+                    : null,
+                onTap: () => Navigator.pop(sheetContext, supported),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (locale != null && context.mounted) {
+      await context.setLocale(locale);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).value;
+    final gardenCount = ref.watch(gardensProvider).value?.length ?? 0;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
           // Contenu principal
-          _isLoading
+          user == null
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(16, 120, 16, 16),
@@ -153,7 +136,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _user?.username ?? 'Utilisateur',
+                                  user.username,
                                   style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
@@ -162,14 +145,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.yard,
                                       size: 18,
                                       color: AppColors.primary,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      '$_gardenCount jardin${_gardenCount > 1 ? 's' : ''}',
+                                      'profile.garden_count'.plural(gardenCount),
                                       style: TextStyle(
                                         fontSize: 16,
                                         color: Colors.grey[700],
@@ -185,16 +168,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 32),
 
                       // Informations
-                      _buildInfoCard(),
+                      _buildInfoCard(context, user),
                       const SizedBox(height: 16),
 
                       // Bouton de déconnexion
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: _logout,
+                          onPressed: () => _logout(context, ref),
                           icon: const Icon(Icons.logout),
-                          label: const Text('Se déconnecter'),
+                          label: Text('logout'.tr()),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.error,
                             foregroundColor: AppColors.white,
@@ -222,13 +205,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     IconButton(
                       icon: const Icon(Icons.arrow_back, color: AppColors.primary, size: 28),
                       onPressed: () => Navigator.pop(context),
-                      tooltip: 'Retour',
+                      tooltip: 'back'.tr(),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Center(
                         child: Text(
-                          'Profil',
-                          style: TextStyle(
+                          'profile.title'.tr(),
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: AppColors.primary,
@@ -236,7 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
-                    // Icône paramètres
+                    // Icône paramètres : choix de la langue
                     Container(
                       width: 32,
                       height: 32,
@@ -251,13 +234,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: IconButton(
                         padding: EdgeInsets.zero,
                         icon: const Icon(Icons.settings_outlined, color: AppColors.primary, size: 18),
-                        onPressed: () {
-                          // TODO: Navigation vers les paramètres
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Paramètres à venir...')),
-                          );
-                        },
-                        tooltip: 'Paramètres',
+                        onPressed: () => _chooseLanguage(context),
+                        tooltip: 'settings'.tr(),
                       ),
                     ),
                   ],
@@ -270,7 +248,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoCard() {
+  Widget _buildInfoCard(BuildContext context, User user) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -281,9 +259,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Informations',
-              style: TextStyle(
+            Text(
+              'profile.information'.tr(),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -291,29 +269,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 16),
             _buildInfoRow(
               icon: Icons.person,
-              label: 'Nom d\'utilisateur',
-              value: _user?.username ?? '-',
+              label: 'username'.tr(),
+              value: user.username,
             ),
             const Divider(height: 24),
             _buildInfoRow(
               icon: Icons.email,
-              label: 'Email',
-              value: _user?.email ?? '-',
+              label: 'email'.tr(),
+              value: user.email,
             ),
-            if (_user?.birthdate != null) ...[
+            if (user.birthdate != null) ...[
               const Divider(height: 24),
               _buildInfoRow(
                 icon: Icons.cake,
-                label: 'Date de naissance',
-                value: _user!.birthdate!.toString().split(' ')[0],
+                label: 'birthdate'.tr(),
+                value: MaterialLocalizations.of(context).formatMediumDate(user.birthdate!),
               ),
             ],
-            if (_user?.role.toLowerCase() == 'admin') ...[
+            if (user.isAdmin) ...[
               const Divider(height: 24),
               _buildInfoRow(
                 icon: Icons.shield,
-                label: 'Rôle',
-                value: _user!.role,
+                label: 'profile.role'.tr(),
+                value: AppLocalizations.getRoleLabel(user.role),
               ),
             ],
           ],

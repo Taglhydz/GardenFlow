@@ -3,78 +3,29 @@ import '../models/parcel.dart';
 import 'api_service.dart';
 
 class ParcelService {
-  final ApiService _apiService = ApiService();
+  ParcelService(this._api);
 
-  Future<List<Parcel>> getAllParcels() async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.get(AppConstants.parcelsEndpoint);
-      
-      if (response is List) {
-        return response.map((json) => Parcel.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      throw Exception('Erreur lors de la récupération des parcelles: $e');
-    }
+  final ApiService _api;
+
+  Future<List<Parcel>> getParcelsByGarden(int gardenId) async {
+    final response = await _api.get('${AppConstants.gardensEndpoint}/$gardenId/parcels') as List;
+    return response.map((json) => Parcel.fromJson(json)).toList();
   }
 
   Future<Parcel> getParcelById(int id) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.get('${AppConstants.parcelsEndpoint}/$id');
-      return Parcel.fromJson(response);
-    } catch (e) {
-      throw Exception('Erreur lors de la récupération de la parcelle: $e');
-    }
+    return Parcel.fromJson(await _api.get('${AppConstants.parcelsEndpoint}/$id'));
   }
 
-  Future<List<Parcel>> getParcelsByGardenId(int gardenId) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.get('${AppConstants.parcelsEndpoint}/garden/$gardenId');
-      
-      if (response is List) {
-        return response.map((json) => Parcel.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      throw Exception('Erreur lors de la récupération des parcelles: $e');
-    }
+  /// [fields] uses the API names : name, area_m2, pos_x, pos_y, width, length, soil_type, sunlight, moisture
+  Future<Parcel> createParcel(int gardenId, Map<String, dynamic> fields) async {
+    return Parcel.fromJson(await _api.post('${AppConstants.gardensEndpoint}/$gardenId/parcels', fields));
   }
 
-  Future<Parcel> createParcel(Parcel parcel) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.post(
-        AppConstants.parcelsEndpoint,
-        parcel.toJson(),
-      );
-      return Parcel.fromJson(response);
-    } catch (e) {
-      throw Exception('Erreur lors de la création de la parcelle: $e');
-    }
+  /// Only the given fields are modified.
+  Future<Parcel> updateParcel(int id, Map<String, dynamic> changes) async {
+    return Parcel.fromJson(await _api.patch('${AppConstants.parcelsEndpoint}/$id', changes));
   }
 
-  Future<Parcel> updateParcel(int id, Parcel parcel) async {
-    try {
-      await _apiService.loadToken();
-      final response = await _apiService.put(
-        '${AppConstants.parcelsEndpoint}/$id',
-        parcel.toJson(),
-      );
-      return Parcel.fromJson(response);
-    } catch (e) {
-      throw Exception('Erreur lors de la mise à jour de la parcelle: $e');
-    }
-  }
-
-  Future<void> deleteParcel(int id) async {
-    try {
-      await _apiService.loadToken();
-      await _apiService.delete('${AppConstants.parcelsEndpoint}/$id');
-    } catch (e) {
-      throw Exception('Erreur lors de la suppression de la parcelle: $e');
-    }
-  }
+  /// Also deletes its crops.
+  Future<void> deleteParcel(int id) => _api.delete('${AppConstants.parcelsEndpoint}/$id');
 }
