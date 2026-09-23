@@ -11,6 +11,18 @@ const Crop = {
     return rows;
   },
 
+  /** Crops of all the parcels of a garden. The caller must have checked that the garden belongs to the user. */
+  findAllByGarden: async (gardenId) => {
+    const [rows] = await db.query(
+      `SELECT c.* FROM crop c
+       JOIN parcel p ON p.id = c.parcel_id
+       WHERE p.garden_id = ?
+       ORDER BY c.created_at, c.id`,
+      [gardenId]
+    );
+    return rows;
+  },
+
   findOwned: async (id, userId) => {
     const [rows] = await db.query(
       `SELECT c.* FROM crop c

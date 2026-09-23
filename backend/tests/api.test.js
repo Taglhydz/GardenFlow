@@ -346,6 +346,146 @@ describe('plant associations', () => {
   });
 });
 
+describe('plant calendar (periods) and family', () => {
+  test('plants are returned with their family and all their periods', async () => {
+    const res = await api.get('/api/plants?search=pinard').set(auth(alice.token));
+    const spinach = res.body.find((p) => p.code === 'spinach');
+
+    expect(spinach.family).toBe('amaranthaceae');
+    expect(spinach.days_to_maturity).toBe(45);
+    // sown in spring AND in autumn
+    expect(spinach.periods.filter((p) => p.type === 'sow_outdoor')).toEqual([
+      { type: 'sow_outdoor', start_month: 2, end_month: 4 },
+      { type: 'sow_outdoor', start_month: 8, end_month: 10 },
+    ]);
+  });
+
+  test('an admin creates a plant with periods, an update replaces them', async () => {
+    const created = await api.post('/api/plants').set(auth(admin.token)).send({
+      code: 'rocket', name: 'Roquette', family: 'brassicaceae',
+      periods: [{ type: 'sow_outdoor', start_month: 3, end_month: 5 }, { type: 'sow_outdoor', start_month: 8, end_month: 9 }],
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.periods).toHaveLength(2);
+
+    const updated = await api.patch(`/api/plants/${created.body.id}`).set(auth(admin.token))
+      .send({ periods: [{ type: 'harvest', start_month: 11, end_month: 2 }] });
+    expect(updated.body.periods).toEqual([{ type: 'harvest', start_month: 11, end_month: 2 }]);
+
+    // an update without periods keeps them
+    const renamed = await api.patch(`/api/plants/${created.body.id}`).set(auth(admin.token)).send({ name: 'Roquette cultivée' });
+    expect(renamed.body.periods).toHaveLength(1);
+
+    await api.delete(`/api/plants/${created.body.id}`).set(auth(admin.token));
+  });
+
+  test('invalid period -> 400, and nothing is created', async () => {
+    const res = await api.post('/api/plants').set(auth(admin.token))
+      .send({ code: 'bad_period', name: 'X', periods: [{ type: 'sow_outdoor', start_month: 13, end_month: 2 }] });
+    expect(res.status).toBe(400);
+
+    const search = await api.get('/api/plants?search=bad_period').set(auth(admin.token));
+    expect(search.body).toHaveLength(0);
+  });
+});
+
+describe('garden plan and suggestions', () => {
+  let gardenId;
+  let parcelA; // tomato is growing here
+  let parcelB; // touches parcel A
+  let parcelC; // far away
+  let ids;
+
+  beforeAll(async () => {
+    const [rows] = await db.query("SELECT id, code FROM plant WHERE code IN ('tomato', 'basil', 'potato', 'eggplant')");
+    ids = Object.fromEntries(rows.map((r) => [r.code, r.id]));
+
+    const garden = await api.post('/api/gardens').set(auth(alice.token)).send({ name: 'Plan' });
+    gardenId = garden.body.id;
+
+    const create = (body) => api.post(`/api/gardens/${gardenId}/parcels`).set(auth(alice.token)).send(body);
+    parcelA = (await create({ name: 'A', pos_x: 0, pos_y: 0, width: 2, length: 1.5, soil_type: 'humus', sunlight: 'high' })).body;
+    parcelB = (await create({ name: 'B', pos_x: 2, pos_y: 0, width: 1, length: 1.5, soil_type: 'humus', sunlight: 'high' })).body;
+    parcelC = (await create({ name: 'C', pos_x: 6, pos_y: 4, width: 1, length: 1 })).body;
+
+    await api.post(`/api/parcels/${parcelA.id}/crops`).set(auth(alice.token)).send({ plant_id: ids.tomato, sow_date: '2026-05-01' });
+  });
+
+  test('the area is computed from the dimensions, and recomputed when they change', async () => {
+    expect(parcelA.area_m2).toBe(3);
+
+    const res = await api.patch(`/api/parcels/${parcelA.id}`).set(auth(alice.token)).send({ width: 3 });
+    expect(res.body.area_m2).toBe(4.5);
+
+    const back = await api.patch(`/api/parcels/${parcelA.id}`).set(auth(alice.token)).send({ width: 2 });
+    expect(back.body.area_m2).toBe(3);
+  });
+
+  test('moving a parcel keeps its area', async () => {
+    const res = await api.patch(`/api/parcels/${parcelC.id}`).set(auth(alice.token)).send({ pos_x: 7 });
+    expect(res.body).toMatchObject({ pos_x: 7, area_m2: 1 });
+  });
+
+  test('GET /gardens/:id/crops returns the crops of every parcel, only for the owner', async () => {
+    await api.post(`/api/parcels/${parcelC.id}/crops`).set(auth(alice.token)).send({ plant_id: ids.basil });
+
+    const res = await api.get(`/api/gardens/${gardenId}/crops`).set(auth(alice.token));
+    expect(res.status).toBe(200);
+    expect(res.body.map((c) => c.parcel_id).sort()).toEqual([parcelA.id, parcelC.id].sort());
+
+    expect((await api.get(`/api/gardens/${gardenId}/crops`).set(auth(bob.token))).status).toBe(404);
+  });
+
+  test('suggestions in the parcel : companions first, bad companions last', async () => {
+    const res = await api.get(`/api/parcels/${parcelA.id}/suggestions?month=5`).set(auth(alice.token));
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ parcel_id: parcelA.id, month: 5 });
+
+    const { suggestions } = res.body;
+    const basil  = suggestions.find((s) => s.plant_id === ids.basil);
+    const potato = suggestions.find((s) => s.plant_id === ids.potato);
+
+    expect(basil.reasons.map((r) => r.code)).toContain('good_companion');
+    expect(potato.reasons.map((r) => r.code)).toContain('bad_companion');
+    expect(basil.score).toBeGreaterThan(potato.score);
+    // sorted by score
+    expect(suggestions.map((s) => s.score)).toEqual([...suggestions.map((s) => s.score)].sort((a, b) => b - a));
+    // only plants that can be sown / planted in May
+    expect(suggestions.every((s) => s.actions.length > 0)).toBe(true);
+  });
+
+  test('the neighbour parcel sees the tomato as a neighbour', async () => {
+    const res = await api.get(`/api/parcels/${parcelB.id}/suggestions?month=5`).set(auth(alice.token));
+    const basil = res.body.suggestions.find((s) => s.plant_id === ids.basil);
+    expect(basil.reasons.map((r) => r.code)).toContain('good_neighbour');
+  });
+
+  test('crop rotation : eggplant after harvested tomatoes is penalized', async () => {
+    const before = await api.get(`/api/parcels/${parcelB.id}/suggestions?month=5`).set(auth(alice.token));
+    const eggplantBefore = before.body.suggestions.find((s) => s.plant_id === ids.eggplant);
+
+    const lastYear = new Date(Date.now() - 200 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    await api.post(`/api/parcels/${parcelB.id}/crops`).set(auth(alice.token))
+      .send({ plant_id: ids.tomato, sow_date: lastYear, actual_harvest_date: lastYear });
+
+    const after = await api.get(`/api/parcels/${parcelB.id}/suggestions?month=5`).set(auth(alice.token));
+    const eggplantAfter = after.body.suggestions.find((s) => s.plant_id === ids.eggplant);
+
+    expect(eggplantAfter.reasons.map((r) => r.code)).toContain('rotation_same_family');
+    expect(eggplantAfter.score).toBeLessThan(eggplantBefore.score);
+  });
+
+  test('without month : the current month is used', async () => {
+    const res = await api.get(`/api/parcels/${parcelA.id}/suggestions`).set(auth(alice.token));
+    expect(res.body.month).toBe(new Date().getMonth() + 1);
+  });
+
+  test('invalid month -> 400, other user -> 404', async () => {
+    expect((await api.get(`/api/parcels/${parcelA.id}/suggestions?month=13`).set(auth(alice.token))).status).toBe(400);
+    expect((await api.get(`/api/parcels/${parcelA.id}/suggestions`).set(auth(bob.token))).status).toBe(404);
+  });
+});
+
 describe('seed translations (frontend/assets/translations/en.json)', () => {
   // French comes from the database, other languages must translate every seeded plant
   const en = require('../../frontend/assets/translations/en.json');
@@ -354,6 +494,16 @@ describe('seed translations (frontend/assets/translations/en.json)', () => {
     const [plants] = await db.query("SELECT code FROM plant WHERE code <> 'kale'");
     const missing = plants.filter((p) => !en.plants?.[p.code]?.name || !en.plants?.[p.code]?.description);
     expect(missing.map((p) => p.code)).toEqual([]);
+  });
+
+  test('every botanical family of the seed is translated in every language', async () => {
+    const fr = require('../../frontend/assets/translations/fr.json');
+    const [families] = await db.query('SELECT DISTINCT family FROM plant WHERE family IS NOT NULL');
+
+    for (const translations of [fr, en]) {
+      const missing = families.filter((f) => !translations[`plant_family_${f.family}`]);
+      expect(missing.map((f) => f.family)).toEqual([]);
+    }
   });
 
   test('every seeded association comment is translated (key: codes sorted alphabetically)', async () => {

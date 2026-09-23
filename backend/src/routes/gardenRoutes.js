@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const gardenController = require('../controllers/gardenController');
 const parcelController = require('../controllers/parcelController');
+const cropController   = require('../controllers/cropController');
 const validate         = require('../middlewares/validate');
 const { authenticate } = require('../middlewares/authMiddleware');
 const { idParam } = require('../validators/common');
@@ -18,5 +19,8 @@ router.delete('/:id', validate({ params: idParam() }), gardenController.deleteGa
 // parcels of a garden
 router.get ('/:gardenId/parcels', validate({ params: idParam('gardenId') }), parcelController.getParcelsByGarden);
 router.post('/:gardenId/parcels', validate({ params: idParam('gardenId'), body: createParcelSchema }), parcelController.createParcel);
+
+// crops of all the parcels of a garden
+router.get('/:gardenId/crops', validate({ params: idParam('gardenId') }), cropController.getCropsByGarden);
 
 module.exports = router;

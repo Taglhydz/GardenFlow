@@ -1,6 +1,6 @@
 const { z } = require('zod');
 const {
-  SOIL_TYPES, LEVELS, id, requiredText, optionalText, optionalDate, positiveDecimal, nonEmpty,
+  SOIL_TYPES, LEVELS, id, requiredText, optionalText, optionalDate, positiveDecimal, month, nonEmpty,
 } = require('./common');
 
 // ======
@@ -61,6 +61,14 @@ const cropDatesIssues = (crop) => {
 const createCropSchema = z.object(cropFields);
 const updateCropSchema = nonEmpty(z.object(cropFields).partial());
 
+// ===========
+// Suggestions
+// ===========
+// the app sends its own month (the server may be in another timezone)
+const suggestionsQuerySchema = z.object({
+  month: month.optional(),
+});
+
 module.exports = {
   createGardenSchema,
   updateGardenSchema,
@@ -69,4 +77,5 @@ module.exports = {
   createCropSchema,
   updateCropSchema,
   cropDatesIssues,
+  suggestionsQuerySchema,
 };

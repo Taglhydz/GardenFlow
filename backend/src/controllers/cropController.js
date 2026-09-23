@@ -1,3 +1,4 @@
+const Garden   = require('../models/gardenModel');
 const Parcel   = require('../models/parcelModel');
 const Crop     = require('../models/cropModel');
 const AppError = require('../utils/AppError');
@@ -9,6 +10,16 @@ const { cropDatesIssues } = require('../validators/gardenValidators');
 const checkDates = (crop) => {
   const issues = cropDatesIssues(crop);
   if (issues.length) { throw AppError.badRequest('VALIDATION_ERROR', 'Invalid crop dates', issues); }
+};
+
+/** GET /gardens/:gardenId/crops - crops of all the parcels of the garden (one request for the garden plan) */
+exports.getCropsByGarden = async (req, res) => {
+  const { gardenId } = req.valid.params;
+
+  // check garden found
+  if (!(await Garden.findOwned(gardenId, req.user.id))) { throw AppError.notFound('Garden'); }
+
+  res.json(await Crop.findAllByGarden(gardenId));
 };
 
 /** GET /parcels/:parcelId/crops */

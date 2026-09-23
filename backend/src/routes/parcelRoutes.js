@@ -2,10 +2,11 @@ const express = require('express');
 const router  = express.Router();
 const parcelController = require('../controllers/parcelController');
 const cropController   = require('../controllers/cropController');
+const suggestionController = require('../controllers/suggestionController');
 const validate         = require('../middlewares/validate');
 const { authenticate } = require('../middlewares/authMiddleware');
 const { idParam } = require('../validators/common');
-const { updateParcelSchema, createCropSchema } = require('../validators/gardenValidators');
+const { updateParcelSchema, createCropSchema, suggestionsQuerySchema } = require('../validators/gardenValidators');
 
 // list / create parcels : see gardenRoutes (/gardens/:gardenId/parcels)
 router.use(authenticate);
@@ -17,5 +18,8 @@ router.delete('/:id', validate({ params: idParam() }), parcelController.deletePa
 // crops of a parcel
 router.get ('/:parcelId/crops', validate({ params: idParam('parcelId') }), cropController.getCropsByParcel);
 router.post('/:parcelId/crops', validate({ params: idParam('parcelId'), body: createCropSchema }), cropController.createCrop);
+
+// computed suggestions for a parcel
+router.get('/:id/suggestions', validate({ params: idParam(), query: suggestionsQuerySchema }), suggestionController.getParcelSuggestions);
 
 module.exports = router;

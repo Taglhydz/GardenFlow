@@ -13,6 +13,7 @@
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS suggestion;
 DROP TABLE IF EXISTS plant_association;
+DROP TABLE IF EXISTS plant_period;
 DROP TABLE IF EXISTS crop;
 DROP TABLE IF EXISTS parcel;
 DROP TABLE IF EXISTS garden;
@@ -77,24 +78,44 @@ CREATE TABLE parcel (
 -- ======
 -- Reference catalog, only admins can modify it.
 -- `code` is a stable identifier used as translation key in the app (plants.<code>.name).
--- Month ranges may wrap around the year : sow_start_month = 10 and sow_end_month = 3
--- means "from October to March".
+-- `family` is the botanical family (snake_case code, e.g. solanaceae), used for crop rotation
+-- and translated in the app (plant_family_<family>).
+-- `days_to_maturity` : approximate days from sowing / planting out to the first harvest.
+-- The calendar (sowing, planting out, harvest) is in plant_period.
 CREATE TABLE plant (
     id                  INT AUTO_INCREMENT PRIMARY KEY,
     code                VARCHAR(50)  NOT NULL UNIQUE,
     name                VARCHAR(100) NOT NULL,
     type                ENUM('vegetable', 'fruit', 'herb', 'flower') NOT NULL DEFAULT 'vegetable',
+    family              VARCHAR(50)  NULL,
     description         TEXT NULL,
-    sow_start_month     TINYINT NULL CHECK (sow_start_month     BETWEEN 1 AND 12),
-    sow_end_month       TINYINT NULL CHECK (sow_end_month       BETWEEN 1 AND 12),
-    harvest_start_month TINYINT NULL CHECK (harvest_start_month BETWEEN 1 AND 12),
-    harvest_end_month   TINYINT NULL CHECK (harvest_end_month   BETWEEN 1 AND 12),
+    days_to_maturity    SMALLINT UNSIGNED NULL,
     sunlight_need  ENUM('low', 'medium', 'high')                                 NOT NULL DEFAULT 'medium',
     water_need     ENUM('low', 'medium', 'high')                                 NOT NULL DEFAULT 'medium',
     preferred_soil ENUM('standard', 'clay', 'sandy', 'loamy', 'humus', 'chalky') NOT NULL DEFAULT 'standard',
     spacing_cm     SMALLINT UNSIGNED NOT NULL DEFAULT 20,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+-- =============
+-- Plant periods
+-- =============
+-- Calendar of a plant : a plant can have several periods of each type
+-- (e.g. spinach is sown outdoors in spring AND in autumn).
+--   sow_indoor  : sowing under cover (the seedling is not in the parcel yet)
+--   sow_outdoor : sowing directly in the ground
+--   plant_out   : planting seedlings / bulbs / tubers in the ground
+--   harvest     : harvest
+-- Ranges may wrap around the year : start_month = 10 and end_month = 3 means "from October to March".
+CREATE TABLE plant_period (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    plant_id    INT NOT NULL,
+    type        ENUM('sow_indoor', 'sow_outdoor', 'plant_out', 'harvest') NOT NULL,
+    start_month TINYINT NOT NULL CHECK (start_month BETWEEN 1 AND 12),
+    end_month   TINYINT NOT NULL CHECK (end_month   BETWEEN 1 AND 12),
+    KEY idx_plant_period_plant (plant_id),
+    FOREIGN KEY (plant_id) REFERENCES plant(id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 -- =====

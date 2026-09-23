@@ -6,6 +6,7 @@ const LEVELS         = ['low', 'medium', 'high'];
 const PLANT_TYPES    = ['vegetable', 'fruit', 'herb', 'flower'];
 const RELATION_TYPES = ['positive', 'negative'];
 const ROLES          = ['user', 'admin'];
+const PERIOD_TYPES   = ['sow_indoor', 'sow_outdoor', 'plant_out', 'harvest'];
 
 /** Positive integer id, accepts '12' (URL params) as well as 12. */
 const id = z.coerce.number().int().positive();
@@ -21,7 +22,7 @@ const optionalText = (max) => z.string().trim().max(max).transform((v) => v || n
 /** 'YYYY-MM-DD' date, nullable */
 const optionalDate = z.iso.date().nullable().optional();
 
-const month = z.coerce.number().int().min(1).max(12).nullable().optional();
+const month = z.coerce.number().int().min(1).max(12);
 
 /** Positive decimal number (meters, m²...), 2 decimals are stored */
 const positiveDecimal = z.coerce.number().min(0).max(99999999);
@@ -39,6 +40,7 @@ module.exports = {
   PLANT_TYPES,
   RELATION_TYPES,
   ROLES,
+  PERIOD_TYPES,
   id,
   idParam,
   requiredText,

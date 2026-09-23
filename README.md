@@ -62,7 +62,7 @@ GRANT ALL PRIVILEGES ON gardenflow_test.* TO 'gardenuser'@'localhost';
 
 ```bash
 cd frontend
-cp .env.example .env        # API_BASE_URL : use your computer's IP (not localhost) for a physical phone
+cp .env.example .env        # API_BASE_URL=http://localhost:3000/api works on a phone with .\dev (adb reverse)
 flutter pub get
 flutter run
 flutter test
@@ -80,13 +80,31 @@ All routes are prefixed with `/api`. Except `/auth/*` and `/health`, they requir
 | `GET / POST /gardens`, `GET / PATCH / DELETE /gardens/:id` | Owner only |
 | `GET / POST /gardens/:gardenId/parcels`, `GET / PATCH / DELETE /parcels/:id` | Owner of the garden |
 | `GET / POST /parcels/:parcelId/crops`, `GET / PATCH / DELETE /crops/:id` | Owner of the garden |
+| `GET /gardens/:gardenId/crops` (all the crops of a garden, for the plan) | Owner of the garden |
+| `GET /parcels/:id/suggestions?month=5` | Owner of the garden |
 | `GET /plants`, `GET /plants/:id`, `GET /plant-associations` | Logged in user |
 | `POST / PATCH / DELETE /plants`, `/plant-associations` | Admin |
 
 - The user is always taken from the token, never from the request body or URL. A resource of another user answers `404`.
 - `PATCH` only modifies the fields that are sent and returns the updated resource.
 - Deletions are real deletions : deleting a garden deletes its parcels and crops. A plant used by a crop can't be deleted (`409 RESOURCE_IN_USE`).
+- Plants are returned with their `family` and their calendar `periods` : `[{ type, start_month, end_month }]` with `type` = `sow_indoor`, `sow_outdoor`, `plant_out` or `harvest`. A plant can have several periods of the same type (spinach is sown in spring and in autumn), and a period can wrap around the year (10 -> 3).
+- The parcel area is computed from `width x length`.
 - Errors have the format `{ "code": "EMAIL_ALREADY_USED", "message": "...", "details": [...] }`. The app translates `code` with the `errors.<code>` translation keys.
+
+## Suggestions
+
+`GET /parcels/:id/suggestions?month=5` ranks the plants that can be sown or planted in the parcel that month (nothing is stored, it is computed on each request). The rules are in `backend/src/services/suggestionEngine.js` (weights in `WEIGHTS`, unit tests in `backend/tests/suggestionEngine.test.js`). Each plant starts at 50 points :
+
+| Rule | Effect |
+| --- | --- |
+| Season | can go in the ground this month : +15. Only sowing under cover this month : listed, without bonus |
+| Soil | preferred soil = parcel soil : +10, different : -5 (a `standard` soil suits everything) |
+| Sunlight / moisture | matching : bonus, not enough sun or too dry / too wet : penalty |
+| Associations | good / bad companion among the crops in the ground of the parcel : +12 / -20, of an adjacent parcel (gap of 50 cm at most) : +6 / -10 |
+| Crop rotation | same botanical family harvested in the parcel less than 1 / 2 / 3 years ago : -25 / -15 / -8 |
+
+Each score change comes with a reason `{ code, impact, params }`, translated in the app with `suggestion_reasons.<code>`.
 
 ## Translations
 
