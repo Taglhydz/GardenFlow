@@ -38,7 +38,7 @@ if (Get-Command adb -ErrorAction SilentlyContinue) {
 
 # ---- 2. Backend in a new window ----
 # -NoExit : if the backend fails at startup (port already used...), the error stays readable
-$backend = Start-Process powershell -PassThru -ArgumentList '-NoExit', '-Command', "Set-Location '$root\backend'; npm run dev"
+$backend = Start-Process powershell -PassThru -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', "`"$root\dev-backend.ps1`""
 Write-Host "[OK] Backend starting in a new window (it closes when you quit the app)" -ForegroundColor Green
 
 # ---- 3. Flutter app ----
