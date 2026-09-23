@@ -3,6 +3,9 @@ import 'json_utils.dart';
 class Crop {
   final int id;
   final int parcelId;
+
+  /// Zone of the parcel, null = the whole parcel
+  final int? zoneId;
   final int plantId;
   final DateTime? sowDate;
   final DateTime? expectedHarvestDate;
@@ -14,6 +17,7 @@ class Crop {
   const Crop({
     required this.id,
     required this.parcelId,
+    this.zoneId,
     required this.plantId,
     this.sowDate,
     this.expectedHarvestDate,
@@ -30,6 +34,7 @@ class Crop {
     return Crop(
       id: JsonUtils.toInt(json['id'])!,
       parcelId: JsonUtils.toInt(json['parcel_id'])!,
+      zoneId: JsonUtils.toInt(json['zone_id']),
       plantId: JsonUtils.toInt(json['plant_id'])!,
       sowDate: JsonUtils.toDate(json['sow_date']),
       expectedHarvestDate: JsonUtils.toDate(json['expected_harvest_date']),

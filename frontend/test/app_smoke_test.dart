@@ -48,7 +48,7 @@ void main() {
     await pumpApp(tester, services);
 
     expect(find.text('Mon potager'), findsOneWidget);
-    expect(find.text('Aucune parcelle pour le moment'), findsOneWidget);
+    expect(find.text('Dessiner une parcelle'), findsOneWidget);
   });
 
   testWidgets('register from the login screen -> home with welcome dialog', (tester) async {

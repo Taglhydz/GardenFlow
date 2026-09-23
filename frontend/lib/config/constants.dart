@@ -13,6 +13,7 @@ class AppConstants {
   static const String parcelsEndpoint           = '/parcels'           ;
   static const String plantsEndpoint            = '/plants'            ;
   static const String cropsEndpoint             = '/crops'             ;
+  static const String zonesEndpoint             = '/zones'             ;
   static const String plantAssociationsEndpoint = '/plant-associations';
 
   // Storage Keys

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/constants.dart';
 import '../models/crop.dart';
@@ -5,6 +6,7 @@ import '../models/garden.dart';
 import '../models/json_utils.dart';
 import '../models/parcel.dart';
 import '../models/suggestion.dart';
+import '../models/zone.dart';
 import 'auth_provider.dart';
 import 'core_providers.dart';
 
@@ -118,7 +120,7 @@ class ParcelsNotifier extends AsyncNotifier<List<Parcel>> {
     state = AsyncData([for (final p in _parcels) p.id == parcel.id ? parcel : p]);
   }
 
-  /// [fields] uses the API names : name, pos_x, pos_y, width, length, soil_type, sunlight, moisture
+  /// [fields] uses the API names : name, pos_x, pos_y, shape (see shapeToJson), soil_type, sunlight, moisture
   Future<Parcel> create(Map<String, dynamic> fields) async {
     final parcel = await ref.read(parcelServiceProvider).createParcel(gardenId, fields);
     state = AsyncData([..._parcels, parcel]);
@@ -133,18 +135,25 @@ class ParcelsNotifier extends AsyncNotifier<List<Parcel>> {
     return parcel;
   }
 
-  /// Move / resize from the plan : shown immediately, saved in the background,
-  /// the previous position comes back if the server refuses.
-  Future<void> updateGeometry(Parcel previous, Parcel updated) async {
+  /// Moves the parcel on the plan (its zones follow it).
+  Future<void> move(Parcel parcel, Offset position) => _optimistic(
+        parcel,
+        parcel.copyWith(position: position),
+        {'pos_x': position.dx, 'pos_y': position.dy},
+      );
+
+  /// New shape (points relative to the parcel position). Refused by the server if a zone would be outside.
+  Future<void> reshape(Parcel parcel, List<Offset> shape) => _optimistic(
+        parcel,
+        parcel.copyWith(shape: shape),
+        {'shape': shapeToJson(shape)},
+      );
+
+  /// Shown immediately, saved in the background, the previous parcel comes back if the server refuses.
+  Future<void> _optimistic(Parcel previous, Parcel updated, Map<String, dynamic> changes) async {
     _replace(updated);
     try {
-      final saved = await ref.read(parcelServiceProvider).updateParcel(updated.id, {
-        'pos_x': updated.posX,
-        'pos_y': updated.posY,
-        'width': updated.width,
-        'length': updated.length,
-      });
-      _replace(saved);
+      _replace(await ref.read(parcelServiceProvider).updateParcel(updated.id, changes));
       ref.invalidate(suggestionsProvider);
     } catch (_) {
       _replace(previous);
@@ -157,6 +166,7 @@ class ParcelsNotifier extends AsyncNotifier<List<Parcel>> {
     await ref.read(parcelServiceProvider).deleteParcel(id);
     state = AsyncData([for (final p in _parcels) if (p.id != id) p]);
     ref.invalidate(gardenCropsProvider(gardenId));
+    ref.invalidate(zonesProvider(gardenId));
     ref.invalidate(suggestionsProvider);
   }
 }
@@ -185,6 +195,7 @@ class GardenCropsNotifier extends AsyncNotifier<List<Crop>> {
 
   Future<Crop> create(
     int parcelId, {
+    int? zoneId,
     required int plantId,
     DateTime? sowDate,
     DateTime? expectedHarvestDate,
@@ -192,6 +203,7 @@ class GardenCropsNotifier extends AsyncNotifier<List<Crop>> {
   }) async {
     final crop = await ref.read(cropServiceProvider).createCrop(
       parcelId,
+      zoneId: zoneId,
       plantId: plantId,
       sowDate: sowDate,
       expectedHarvestDate: expectedHarvestDate,
@@ -216,13 +228,73 @@ class GardenCropsNotifier extends AsyncNotifier<List<Crop>> {
   }
 }
 
+// =====
+// Zones
+// =====
+
+/// Zones of all the parcels of a garden : ref.watch(zonesProvider(gardenId)).
+final zonesProvider = AsyncNotifierProvider.family<ZonesNotifier, List<Zone>, int>(ZonesNotifier.new);
+
+class ZonesNotifier extends AsyncNotifier<List<Zone>> {
+  ZonesNotifier(this.gardenId);
+
+  final int gardenId;
+
+  @override
+  Future<List<Zone>> build() async {
+    ref.watch(currentUserIdProvider);
+    return ref.read(zoneServiceProvider).getZonesByGarden(gardenId);
+  }
+
+  List<Zone> get _zones => state.value ?? const [];
+
+  void _replace(Zone zone) => state = AsyncData([for (final z in _zones) z.id == zone.id ? zone : z]);
+
+  /// The server refuses a zone outside its parcel or overlapping another zone.
+  Future<Zone> create(int parcelId, {required String name, required List<Offset> shape}) async {
+    final zone = await ref.read(zoneServiceProvider).createZone(parcelId, name: name, shape: shape);
+    state = AsyncData([..._zones, zone]);
+    ref.invalidate(suggestionsProvider);
+    return zone;
+  }
+
+  Future<Zone> rename(int id, String name) async {
+    final zone = await ref.read(zoneServiceProvider).updateZone(id, name: name);
+    _replace(zone);
+    return zone;
+  }
+
+  /// New shape : shown immediately, the previous one comes back if the server refuses.
+  Future<void> reshape(Zone zone, List<Offset> shape) async {
+    _replace(zone.copyWith(shape: shape));
+    try {
+      _replace(await ref.read(zoneServiceProvider).updateZone(zone.id, shape: shape));
+      ref.invalidate(suggestionsProvider);
+    } catch (_) {
+      _replace(zone);
+      rethrow;
+    }
+  }
+
+  /// Its crops stay in the parcel, without zone.
+  Future<void> delete(int id) async {
+    await ref.read(zoneServiceProvider).deleteZone(id);
+    state = AsyncData([for (final z in _zones) if (z.id != id) z]);
+    ref.invalidate(gardenCropsProvider(gardenId));
+    ref.invalidate(suggestionsProvider);
+  }
+}
+
 // ===========
 // Suggestions
 // ===========
 
-/// Plants to sow / plant in a parcel for a month, computed by the server.
-/// Reloaded when the crops or the parcel change (the notifiers above invalidate it).
-final suggestionsProvider = FutureProvider.autoDispose.family<ParcelSuggestions, ({int parcelId, int month})>((ref, key) {
+/// Plants to sow / plant in a zone (or the whole parcel when zoneId is null) for a month,
+/// computed by the server. Reloaded when the crops, parcels or zones change (the notifiers invalidate it).
+final suggestionsProvider =
+    FutureProvider.autoDispose.family<ParcelSuggestions, ({int parcelId, int? zoneId, int month})>((ref, key) {
   ref.watch(currentUserIdProvider);
-  return ref.read(parcelServiceProvider).getSuggestions(key.parcelId, key.month);
+  return key.zoneId != null
+      ? ref.read(zoneServiceProvider).getSuggestions(key.zoneId!, key.month)
+      : ref.read(parcelServiceProvider).getSuggestions(key.parcelId, key.month);
 });

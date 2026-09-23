@@ -17,6 +17,7 @@ class CropFormSheet extends ConsumerStatefulWidget {
     super.key,
     required this.gardenId,
     required this.parcelId,
+    this.zoneId,
     this.crop,
     this.plant,
     this.sowDate,
@@ -24,6 +25,9 @@ class CropFormSheet extends ConsumerStatefulWidget {
 
   final int gardenId;
   final int parcelId;
+
+  /// Zone where the crop is planted (null = the whole parcel)
+  final int? zoneId;
 
   /// null = creation
   final Crop? crop;
@@ -38,6 +42,7 @@ class CropFormSheet extends ConsumerStatefulWidget {
     BuildContext context, {
     required int gardenId,
     required int parcelId,
+    int? zoneId,
     Crop? crop,
     Plant? plant,
     DateTime? sowDate,
@@ -46,7 +51,7 @@ class CropFormSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => CropFormSheet(gardenId: gardenId, parcelId: parcelId, crop: crop, plant: plant, sowDate: sowDate),
+      builder: (_) => CropFormSheet(gardenId: gardenId, parcelId: parcelId, zoneId: zoneId, crop: crop, plant: plant, sowDate: sowDate),
     );
     return saved ?? false;
   }
@@ -145,6 +150,7 @@ class _CropFormSheetState extends ConsumerState<CropFormSheet> {
       } else {
         await notifier.create(
           widget.parcelId,
+          zoneId: widget.zoneId,
           plantId: _plant!.id,
           sowDate: _sowDate,
           expectedHarvestDate: _expectedHarvestDate,

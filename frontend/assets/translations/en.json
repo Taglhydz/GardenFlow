@@ -193,7 +193,11 @@
     "PLANT_CODE_ALREADY_USED": "A plant with this code already exists.",
     "ASSOCIATION_ALREADY_EXISTS": "These two plants already have an association.",
     "INTERNAL_ERROR": "Server error, try again later.",
-    "UNKNOWN": "An unexpected error occurred."
+    "UNKNOWN": "An unexpected error occurred.",
+    "ZONE_OUTSIDE_PARCEL": "The zone must be inside the parcel.",
+    "ZONES_OVERLAP": "The zone overlaps another zone.",
+    "ZONES_OUTSIDE_PARCEL": "This shape would leave zones outside the parcel.",
+    "INVALID_ZONE": "This zone does not belong to the parcel."
   },
   "plant_family_solanaceae": "Nightshade family",
   "plant_family_apiaceae": "Carrot family",
@@ -212,23 +216,19 @@
   "period_plant_out": "Plant out",
   "period_harvest": "Harvest",
   "garden_view": {
-    "empty_title": "No parcel yet",
-    "empty_subtitle": "Add a parcel, then place it on the plan of your garden",
+    "draw_parcel": "Draw a parcel",
+    "draw_hint": "Tap the plan to place each corner of the parcel, then tap the first point or \"Finish\".",
+    "empty_hint": "Tap \"Draw a parcel\" to draw your first parcel.",
     "hint": "Tap a parcel to select it. Pinch to zoom.",
-    "hint_selected": "Drag the parcel to move it, drag the green dot to resize it. Tap it again to open it, tap outside to finish.",
-    "resize": "Resize",
+    "hint_selected": "Drag the parcel or its corners, tap a + to add a corner, long press a corner to remove it. Tap it again to go inside.",
+    "invalid_shape": "Invalid shape: the sides must not cross each other.",
     "open_parcel": "Open",
     "rename_garden": "Rename the garden",
     "delete_garden_confirm": "Delete \"{}\" and all its parcels and crops?",
     "load_error": "Unable to load the plan"
   },
   "parcel_form": {
-    "title_create": "New parcel",
-    "title_edit": "Edit parcel",
-    "name_hint": "Raised bed",
-    "width_m": "Width (m)",
-    "length_m": "Length (m)",
-    "invalid_size": "Between {} and {} m"
+    "title_edit": "Edit parcel"
   },
   "crop_form": {
     "title_create": "New crop",
@@ -259,14 +259,36 @@
     "bad_companion": "Bad companion for {plant}",
     "good_neighbour": "Good companion for {plant} (neighbour parcel)",
     "bad_neighbour": "Bad companion for {plant} (neighbour parcel)",
-    "already_in_parcel": "Already in the parcel",
-    "rotation_same_family": "Rotation: same family ({family}) as {plant}, harvested {months} months ago"
+    "rotation_same_family": "Rotation: same family ({family}) as {plant}, harvested {months} months ago",
+    "good_in_parcel": "Good companion for {plant} (elsewhere in the parcel)",
+    "bad_in_parcel": "Bad companion for {plant} (elsewhere in the parcel)",
+    "already_here": "Already here",
+    "capacity": "About {count} plants fit here",
+    "too_small": "Not enough space ({spacing} cm spacing)"
   },
   "parcel_screen": {
+    "draw_zone": "Draw a zone",
+    "draw_hint": "Tap the parcel to place each corner of the zone, then tap the first point or \"Finish\".",
+    "empty_hint": "Draw zones (rows, beds, corners) to place your plants.",
+    "hint": "Tap a zone to select it.",
+    "hint_selected": "Drag the zone or its corners, tap a + to add a corner, long press a corner to remove it. Tap it again to open it.",
+    "zone_name": "Zone name",
+    "rename_zone": "Rename the zone",
+    "delete_zone": "Delete the zone",
+    "delete_zone_confirm": "Delete the zone \"{}\"? Its crops stay in the parcel.",
+    "delete_confirm": "Delete the parcel \"{}\" with its zones and crops?"
+  },
+  "zone": "Zone",
+  "drawing": {
+    "undo": "Undo point",
+    "finish": "Finish"
+  },
+  "zone_screen": {
+    "whole_parcel": "Whole parcel",
+    "no_zone": "No zone",
     "tab_crops": "Crops",
     "tab_suggestions": "Suggestions",
-    "delete_confirm": "Delete the parcel \"{}\" and its crops?",
-    "no_crops": "No crop in this parcel",
+    "no_crops": "No crop here",
     "no_crops_hint": "Check the Suggestions tab to find what to plant",
     "in_ground": "In the ground",
     "harvested": "Harvested",

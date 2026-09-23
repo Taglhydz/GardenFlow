@@ -193,7 +193,11 @@
     "PLANT_CODE_ALREADY_USED": "Une plante avec ce code existe déjà.",
     "ASSOCIATION_ALREADY_EXISTS": "Ces deux plantes ont déjà une association.",
     "INTERNAL_ERROR": "Erreur du serveur, réessayez plus tard.",
-    "UNKNOWN": "Une erreur inattendue est survenue."
+    "UNKNOWN": "Une erreur inattendue est survenue.",
+    "ZONE_OUTSIDE_PARCEL": "La zone doit être à l'intérieur de la parcelle.",
+    "ZONES_OVERLAP": "La zone chevauche une autre zone.",
+    "ZONES_OUTSIDE_PARCEL": "Cette forme laisserait des zones en dehors de la parcelle.",
+    "INVALID_ZONE": "Cette zone n'appartient pas à la parcelle."
   },
   "plant_family_solanaceae": "Solanacées",
   "plant_family_apiaceae": "Apiacées (ombellifères)",
@@ -212,23 +216,19 @@
   "period_plant_out": "Plantation",
   "period_harvest": "Récolte",
   "garden_view": {
-    "empty_title": "Aucune parcelle pour le moment",
-    "empty_subtitle": "Ajoutez une parcelle, puis placez-la sur le plan de votre jardin",
+    "draw_parcel": "Dessiner une parcelle",
+    "draw_hint": "Touchez le plan pour poser chaque coin de la parcelle, puis touchez le premier point ou « Terminer ».",
+    "empty_hint": "Touchez « Dessiner une parcelle » pour tracer votre première parcelle.",
     "hint": "Touchez une parcelle pour la sélectionner. Pincez pour zoomer.",
-    "hint_selected": "Glissez la parcelle pour la déplacer, tirez le rond vert pour la redimensionner. Touchez-la à nouveau pour l'ouvrir, touchez à côté pour terminer.",
-    "resize": "Redimensionner",
+    "hint_selected": "Glissez la parcelle ou ses coins, touchez un + pour ajouter un coin, appui long sur un coin pour le supprimer. Touchez-la à nouveau pour entrer dedans.",
+    "invalid_shape": "Forme invalide : les côtés ne doivent pas se croiser.",
     "open_parcel": "Ouvrir",
     "rename_garden": "Renommer le jardin",
     "delete_garden_confirm": "Supprimer « {} » ainsi que toutes ses parcelles et cultures ?",
     "load_error": "Impossible de charger le plan"
   },
   "parcel_form": {
-    "title_create": "Nouvelle parcelle",
-    "title_edit": "Modifier la parcelle",
-    "name_hint": "Carré potager",
-    "width_m": "Largeur (m)",
-    "length_m": "Longueur (m)",
-    "invalid_size": "Entre {} et {} m"
+    "title_edit": "Modifier la parcelle"
   },
   "crop_form": {
     "title_create": "Nouvelle culture",
@@ -259,14 +259,36 @@
     "bad_companion": "Mauvaise association avec {plant}",
     "good_neighbour": "Bonne association avec {plant} (parcelle voisine)",
     "bad_neighbour": "Mauvaise association avec {plant} (parcelle voisine)",
-    "already_in_parcel": "Déjà présente dans la parcelle",
-    "rotation_same_family": "Rotation : même famille ({family}) que {plant}, récoltée il y a {months} mois"
+    "rotation_same_family": "Rotation : même famille ({family}) que {plant}, récoltée il y a {months} mois",
+    "good_in_parcel": "Bonne association avec {plant} (ailleurs dans la parcelle)",
+    "bad_in_parcel": "Mauvaise association avec {plant} (ailleurs dans la parcelle)",
+    "already_here": "Déjà présente ici",
+    "capacity": "Environ {count} plants tiennent ici",
+    "too_small": "Pas assez de place (espacement de {spacing} cm)"
   },
   "parcel_screen": {
+    "draw_zone": "Dessiner une zone",
+    "draw_hint": "Touchez la parcelle pour poser chaque coin de la zone, puis touchez le premier point ou « Terminer ».",
+    "empty_hint": "Délimitez des zones (rangs, planches, coins) pour y placer vos plantes.",
+    "hint": "Touchez une zone pour la sélectionner.",
+    "hint_selected": "Glissez la zone ou ses coins, touchez un + pour ajouter un coin, appui long sur un coin pour le supprimer. Touchez-la à nouveau pour l'ouvrir.",
+    "zone_name": "Nom de la zone",
+    "rename_zone": "Renommer la zone",
+    "delete_zone": "Supprimer la zone",
+    "delete_zone_confirm": "Supprimer la zone « {} » ? Ses cultures restent dans la parcelle.",
+    "delete_confirm": "Supprimer la parcelle « {} » avec ses zones et ses cultures ?"
+  },
+  "zone": "Zone",
+  "drawing": {
+    "undo": "Annuler le point",
+    "finish": "Terminer"
+  },
+  "zone_screen": {
+    "whole_parcel": "Toute la parcelle",
+    "no_zone": "Sans zone",
     "tab_crops": "Cultures",
     "tab_suggestions": "Suggestions",
-    "delete_confirm": "Supprimer la parcelle « {} » et ses cultures ?",
-    "no_crops": "Aucune culture dans cette parcelle",
+    "no_crops": "Aucune culture ici",
     "no_crops_hint": "Consultez l'onglet Suggestions pour savoir quoi planter",
     "in_ground": "En terre",
     "harvested": "Récoltées",

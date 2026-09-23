@@ -14,6 +14,7 @@ class FakeServices {
   final parcels = FakeParcelService();
   final crops = FakeCropService();
   final plants = FakePlantService();
+  final zones = FakeZoneService();
 }
 
 /// Call once per test file (setUpAll).
@@ -36,6 +37,7 @@ Future<void> pumpApp(WidgetTester tester, FakeServices services) async {
         parcelServiceProvider.overrideWithValue(services.parcels),
         cropServiceProvider.overrideWithValue(services.crops),
         plantServiceProvider.overrideWithValue(services.plants),
+        zoneServiceProvider.overrideWithValue(services.zones),
       ],
       child: EasyLocalization(
         supportedLocales: const [Locale('fr'), Locale('en')],

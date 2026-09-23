@@ -111,6 +111,8 @@ class AppLocalizations {
             .toLowerCase(),
       if (params['family'] != null) 'family': getPlantFamilyLabel(params['family'] as String),
       if (params['months_ago'] != null) 'months': '${params['months_ago']}',
+      if (params['count'] != null) 'count': '${params['count']}',
+      if (params['spacing_cm'] != null) 'spacing': '${params['spacing_cm']}',
     };
 
     final key = 'suggestion_reasons.${reason.code}';
@@ -122,10 +124,9 @@ class AppLocalizations {
     return '${NumberFormat('0.##').format(value)} m';
   }
 
-  /// Dimensions d'une parcelle : 2 × 1,5 m
-  static String dimensions(double width, double length) {
-    final format = NumberFormat('0.##');
-    return '${format.format(width)} × ${format.format(length)} m';
+  /// Surface dans le format de la langue : 3,5 m² / 3.5 m²
+  static String area(double squareMeters) {
+    return '${NumberFormat('0.##').format(squareMeters)} m²';
   }
 
   /// Message d'erreur traduit à afficher à l'utilisateur (errors.<code> des fichiers JSON).

@@ -60,14 +60,18 @@ class Suggestion {
 
 class ParcelSuggestions {
   final int parcelId;
+
+  /// Suggestions for a zone of the parcel, null = the whole parcel
+  final int? zoneId;
   final int month;
   final List<Suggestion> suggestions;
 
-  const ParcelSuggestions({required this.parcelId, required this.month, required this.suggestions});
+  const ParcelSuggestions({required this.parcelId, this.zoneId, required this.month, required this.suggestions});
 
   factory ParcelSuggestions.fromJson(Map<String, dynamic> json) {
     return ParcelSuggestions(
       parcelId: JsonUtils.toInt(json['parcel_id'])!,
+      zoneId: JsonUtils.toInt(json['zone_id']),
       month: JsonUtils.toInt(json['month'])!,
       suggestions: (json['suggestions'] as List)
           .map((s) => Suggestion.fromJson(Map<String, dynamic>.from(s as Map)))

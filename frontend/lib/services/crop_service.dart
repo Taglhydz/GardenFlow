@@ -25,6 +25,7 @@ class CropService {
 
   Future<Crop> createCrop(
     int parcelId, {
+    int? zoneId,
     required int plantId,
     DateTime? sowDate,
     DateTime? expectedHarvestDate,
@@ -33,6 +34,7 @@ class CropService {
   }) async {
     final response = await _api.post('${AppConstants.parcelsEndpoint}/$parcelId/crops', {
       'plant_id': plantId,
+      'zone_id': zoneId,
       'sow_date': JsonUtils.formatDate(sowDate),
       'expected_harvest_date': JsonUtils.formatDate(expectedHarvestDate),
       'actual_harvest_date': JsonUtils.formatDate(actualHarvestDate),

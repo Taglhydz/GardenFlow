@@ -8,6 +8,7 @@ import '../services/parcel_service.dart';
 import '../services/plant_service.dart';
 import '../services/token_storage.dart';
 import '../services/user_service.dart';
+import '../services/zone_service.dart';
 import 'auth_provider.dart';
 
 /// Loaded once in main() and injected with ProviderScope overrides,
@@ -33,6 +34,7 @@ final gardenServiceProvider = Provider((ref) => GardenService(ref.watch(apiServi
 final parcelServiceProvider = Provider((ref) => ParcelService(ref.watch(apiServiceProvider)));
 final cropServiceProvider   = Provider((ref) => CropService(ref.watch(apiServiceProvider)));
 final plantServiceProvider  = Provider((ref) => PlantService(ref.watch(apiServiceProvider)));
+final zoneServiceProvider   = Provider((ref) => ZoneService(ref.watch(apiServiceProvider)));
 
 /// Retry policy of the providers that fail (ProviderScope.retry) :
 /// network and server errors are retried 3 times, client errors (4xx) are not.

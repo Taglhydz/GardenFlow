@@ -46,4 +46,18 @@ void main() {
       expect(duplicates, isEmpty, reason: 'duplicate keys in $lang.json');
     }
   });
+
+  test('every translation key used in lib/ exists', () {
+    final fr = json.decode(read('fr')) as Map<String, dynamic>;
+    dynamic lookup(String key) => key.split('.').fold<dynamic>(fr, (node, part) => node is Map ? node[part] : null);
+
+    final missing = <String>[];
+    final usage = RegExp(r"'([a-z_]+(?:\.[A-Za-z_]+)*)'\.(?:tr|plural)\(");
+    for (final file in Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'))) {
+      for (final match in usage.allMatches(file.readAsStringSync())) {
+        if (lookup(match.group(1)!) == null) missing.add('${match.group(1)} (${file.path})');
+      }
+    }
+    expect(missing, isEmpty);
+  });
 }

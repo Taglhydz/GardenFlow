@@ -3,18 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_localizations.dart';
 import '../config/constants.dart';
+import '../models/crop.dart';
 import '../models/garden.dart';
 import '../models/parcel.dart';
 import '../models/plant.dart';
+import '../models/zone.dart';
 import '../providers/garden_providers.dart';
 import '../providers/plant_providers.dart';
-import '../widgets/garden_plan.dart';
+import '../utils/geometry.dart';
+import '../utils/plan_geometry.dart';
+import '../widgets/drawing_bar.dart';
 import '../widgets/parcel_form_sheet.dart';
+import '../widgets/shape_canvas.dart';
 import 'parcel_screen.dart';
 
 enum _GardenAction { rename, delete }
 
-/// Opened garden : 2D plan of its parcels.
+/// Opened garden : plan of its parcels, drawn with the finger.
 class GardenView extends ConsumerStatefulWidget {
   const GardenView({super.key, required this.garden, required this.onHome, required this.onProfile});
 
@@ -31,40 +36,114 @@ class GardenView extends ConsumerStatefulWidget {
 class _GardenViewState extends ConsumerState<GardenView> {
   int? _selectedParcelId;
 
+  /// Points of the parcel being drawn (null = not drawing)
+  List<Offset>? _draft;
+  bool _isSaving = false;
+
   int get _gardenId => widget.garden.id;
 
   void _showError(Object error) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.errorMessage(error)), backgroundColor: AppColors.error),
-    );
+    // the new message replaces the current one instead of waiting behind it
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(error is String ? error : AppLocalizations.errorMessage(error)),
+          backgroundColor: AppColors.error,
+        ),
+      );
   }
 
-  Future<void> _addParcel() async {
-    final parcel = await ParcelFormSheet.show(context, gardenId: _gardenId);
-    // the new parcel is selected so it can be moved right away
-    if (parcel != null && mounted) setState(() => _selectedParcelId = parcel.id);
+  Parcel? _parcel(int id) {
+    for (final p in ref.read(parcelsProvider(_gardenId)).value ?? const <Parcel>[]) {
+      if (p.id == id) return p;
+    }
+    return null;
   }
 
-  Future<void> _editParcel(Parcel parcel) async {
-    await ParcelFormSheet.show(context, gardenId: _gardenId, parcel: parcel);
-  }
+  // =======
+  // Drawing
+  // =======
+  void _startDrawing() => setState(() {
+    _draft = [];
+    _selectedParcelId = null;
+  });
 
-  void _openParcel(Parcel parcel) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ParcelScreen(gardenId: _gardenId, parcelId: parcel.id)),
-    );
-  }
+  Future<void> _finishDrawing() async {
+    final points = _draft;
+    if (points == null || _isSaving) return;
+    if (!PlanGeometry.isValidShape(points)) {
+      _showError('garden_view.invalid_shape'.tr());
+      return;
+    }
 
-  Future<void> _onGeometryChanged(Parcel previous, Parcel updated) async {
+    setState(() => _isSaving = true);
     try {
-      await ref.read(parcelsProvider(_gardenId).notifier).updateGeometry(previous, updated);
+      // the position is the top-left corner of the drawing, the shape is relative to it
+      final origin = Geometry.bounds(points).topLeft;
+      final existing = ref.read(parcelsProvider(_gardenId)).value ?? const <Parcel>[];
+      final parcel = await ref.read(parcelsProvider(_gardenId).notifier).create({
+        'name': PlanGeometry.nextName('parcel'.tr(), existing.map((p) => p.name)),
+        'pos_x': origin.dx,
+        'pos_y': origin.dy,
+        'shape': shapeToJson(Geometry.translate(points, -origin)),
+      });
+      if (mounted) {
+        setState(() {
+          _draft = null;
+          _selectedParcelId = parcel.id;
+        });
+      }
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  // =======
+  // Editing
+  // =======
+  Future<void> _onMoved(int id, Offset delta) async {
+    final parcel = _parcel(id);
+    if (parcel == null) return;
+    try {
+      await ref.read(parcelsProvider(_gardenId).notifier).move(parcel, parcel.position + delta);
     } catch (e) {
       _showError(e);
     }
   }
 
+  Future<void> _onReshaped(int id, List<Offset> absolutePoints) async {
+    final parcel = _parcel(id);
+    if (parcel == null) return;
+    if (!PlanGeometry.isValidShape(absolutePoints)) {
+      _showError('garden_view.invalid_shape'.tr());
+      return;
+    }
+    try {
+      // the position doesn't change (the zones are relative to it), only the shape
+      await ref
+          .read(parcelsProvider(_gardenId).notifier)
+          .reshape(parcel, Geometry.translate(absolutePoints, -parcel.position));
+    } catch (e) {
+      _showError(e);
+    }
+  }
+
+  void _openParcel(int id) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ParcelScreen(gardenId: _gardenId, parcelId: id),
+      ),
+    );
+  }
+
+  // ======
+  // Garden
+  // ======
   Future<void> _onGardenAction(_GardenAction action) async {
     switch (action) {
       case _GardenAction.rename:
@@ -128,20 +207,17 @@ class _GardenViewState extends ConsumerState<GardenView> {
     }
   }
 
+  // ====
+  // View
+  // ====
   @override
   Widget build(BuildContext context) {
     final parcelsAsync = ref.watch(parcelsProvider(_gardenId));
-    final crops = ref.watch(gardenCropsProvider(_gardenId)).value ?? const [];
+    final parcels = parcelsAsync.value ?? const <Parcel>[];
+    final zones = ref.watch(zonesProvider(_gardenId)).value ?? const <Zone>[];
+    final crops = ref.watch(gardenCropsProvider(_gardenId)).value ?? const <Crop>[];
     final plantsById = ref.watch(plantsByIdProvider);
 
-    // plants in the ground, by parcel
-    final plantsByParcel = <int, List<Plant>>{};
-    for (final crop in crops.where((c) => c.isInGround)) {
-      final plant = plantsById[crop.plantId];
-      if (plant != null) plantsByParcel.putIfAbsent(crop.parcelId, () => []).add(plant);
-    }
-
-    final parcels = parcelsAsync.value ?? const <Parcel>[];
     Parcel? selected;
     for (final p in parcels) {
       if (p.id == _selectedParcelId) selected = p;
@@ -183,56 +259,85 @@ class _GardenViewState extends ConsumerState<GardenView> {
           ),
         ],
       ),
-      floatingActionButton: parcelsAsync.hasValue && selected == null
+      floatingActionButton: parcelsAsync.hasValue && _draft == null && selected == null
           ? FloatingActionButton.extended(
-              onPressed: _addParcel,
+              onPressed: _startDrawing,
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.white,
-              icon: const Icon(Icons.add),
-              label: Text('add_parcel'.tr()),
+              icon: const Icon(Icons.draw_outlined),
+              label: Text('garden_view.draw_parcel'.tr()),
             )
           : null,
       body: !parcelsAsync.hasValue
           ? (parcelsAsync.hasError ? _buildError() : const Center(child: CircularProgressIndicator()))
-          : parcels.isEmpty
-              ? _buildEmpty()
-              : Column(
-                  children: [
-                    _buildHint(selected != null),
-                    Expanded(
-                      child: GardenPlan(
-                        parcels: parcels,
-                        plantsByParcel: plantsByParcel,
-                        selectedId: selected?.id,
-                        onSelect: (id) => setState(() => _selectedParcelId = id),
-                        onOpen: _openParcel,
-                        onGeometryChanged: _onGeometryChanged,
-                      ),
-                    ),
-                    if (selected != null) _buildSelectedBar(selected),
-                  ],
+          : Column(
+              children: [
+                _Hint(
+                  text: _draft != null
+                      ? 'garden_view.draw_hint'.tr()
+                      : selected != null
+                      ? 'garden_view.hint_selected'.tr()
+                      : parcels.isEmpty
+                      ? 'garden_view.empty_hint'.tr()
+                      : 'garden_view.hint'.tr(),
                 ),
+                Expanded(
+                  child: ShapeCanvas(
+                    world: PlanGeometry.gardenWorld([
+                      for (final p in parcels) p.absoluteShape,
+                      if (_draft != null) _draft!,
+                    ]),
+                    nonNegative: true,
+                    shapes: [
+                      for (final p in parcels)
+                        CanvasShape(id: p.id, points: p.absoluteShape, fill: soilColor(p.soilType), labels: [p.name]),
+                    ],
+                    overlay: _zoneShapes(parcels, zones, crops, plantsById),
+                    selectedId: selected?.id,
+                    draft: _draft,
+                    onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
+                    onDraftClose: _finishDrawing,
+                    onSelect: (id) => setState(() => _selectedParcelId = id),
+                    onOpen: _openParcel,
+                    onMoved: _onMoved,
+                    onReshaped: _onReshaped,
+                  ),
+                ),
+              ],
+            ),
+      // in the bottom bar of the Scaffold, error messages are shown above it instead of hiding it
+      bottomNavigationBar: _draft != null
+          ? DrawingBar(
+              pointCount: _draft!.length,
+              isSaving: _isSaving,
+              onUndo: () => setState(() => _draft = [..._draft!]..removeLast()),
+              onCancel: () => setState(() => _draft = null),
+              onFinish: _finishDrawing,
+            )
+          : selected != null
+          ? _buildSelectedBar(selected)
+          : null,
     );
   }
 
-  Widget _buildHint(bool hasSelection) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: AppColors.primaryLight.withValues(alpha: 0.5),
-      child: Row(
-        children: [
-          const Icon(Icons.touch_app, size: 18, color: AppColors.primaryDark),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              hasSelection ? 'garden_view.hint_selected'.tr() : 'garden_view.hint'.tr(),
-              style: const TextStyle(fontSize: 13, color: AppColors.primaryDark),
-            ),
+  /// Zones drawn inside the parcels, with their plants in the ground.
+  List<CanvasShape> _zoneShapes(List<Parcel> parcels, List<Zone> zones, List<Crop> crops, Map<int, Plant> plantsById) {
+    final parcelsById = {for (final p in parcels) p.id: p};
+    return [
+      for (final zone in zones)
+        if (parcelsById[zone.parcelId] != null)
+          CanvasShape(
+            id: zone.id,
+            points: zone.absoluteShape(parcelsById[zone.parcelId]!),
+            fill: AppColors.primaryLight.withValues(alpha: 0.5),
+            border: AppColors.primaryDark.withValues(alpha: 0.6),
+            labels: [
+              for (final crop in crops)
+                if (crop.zoneId == zone.id && crop.isInGround && plantsById[crop.plantId] != null)
+                  AppLocalizations.plantName(plantsById[crop.plantId]!),
+            ],
           ),
-        ],
-      ),
-    );
+    ];
   }
 
   Widget _buildSelectedBar(Parcel parcel) {
@@ -251,7 +356,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
                   children: [
                     Text(parcel.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     Text(
-                      '${AppLocalizations.dimensions(parcel.width, parcel.length)} · ${AppLocalizations.getSoilTypeLabel(parcel.soilType)}',
+                      '${AppLocalizations.area(parcel.areaM2)} · ${AppLocalizations.getSoilTypeLabel(parcel.soilType)}',
                       style: TextStyle(color: Colors.grey[600]),
                     ),
                   ],
@@ -260,41 +365,15 @@ class _GardenViewState extends ConsumerState<GardenView> {
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'edit_parcel'.tr(),
-                onPressed: () => _editParcel(parcel),
+                onPressed: () => ParcelFormSheet.show(context, gardenId: _gardenId, parcel: parcel),
               ),
               ElevatedButton(
-                onPressed: () => _openParcel(parcel),
+                onPressed: () => _openParcel(parcel.id),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.white),
                 child: Text('garden_view.open_parcel'.tr()),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmpty() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.grid_view, size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 24),
-            Text(
-              'garden_view.empty_title'.tr(),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'garden_view.empty_subtitle'.tr(),
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-            ),
-          ],
         ),
       ),
     );
@@ -313,6 +392,42 @@ class _GardenViewState extends ConsumerState<GardenView> {
             onPressed: () => ref.invalidate(parcelsProvider(_gardenId)),
             icon: const Icon(Icons.refresh),
             label: Text('retry'.tr()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Color of a parcel according to its soil.
+Color soilColor(String soilType) =>
+    const {
+      'standard': Color(0xD9D7CCC8),
+      'clay': Color(0xD9E6B89C),
+      'sandy': Color(0xD9F3E5AB),
+      'loamy': Color(0xD9C8B6A6),
+      'humus': Color(0xD9A1887F),
+      'chalky': Color(0xD9E0E0E0),
+    }[soilType] ??
+    const Color(0xD9D7CCC8);
+
+class _Hint extends StatelessWidget {
+  const _Hint({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: AppColors.primaryLight.withValues(alpha: 0.5),
+      child: Row(
+        children: [
+          const Icon(Icons.touch_app, size: 18, color: AppColors.primaryDark),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.primaryDark)),
           ),
         ],
       ),

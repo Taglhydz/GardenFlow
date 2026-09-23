@@ -5,27 +5,48 @@ import 'package:GardenFlow/models/plant.dart';
 import 'package:GardenFlow/models/plant_association.dart';
 import 'package:GardenFlow/models/suggestion.dart';
 import 'package:GardenFlow/models/user.dart';
+import 'package:GardenFlow/models/zone.dart';
 
 void main() {
-  group('Parcel.fromJson', () {
-    test('accepts numbers', () {
-      final parcel = Parcel.fromJson({'id': 1, 'garden_id': 2, 'name': 'A', 'area_m2': 3, 'width': 1.5, 'length': 2});
-      expect(parcel.areaM2, 3.0);
-      expect(parcel.width, 1.5);
-      expect(parcel.length, 2.0);
-    });
-
-    test('accepts decimals sent as strings (MySQL DECIMAL)', () {
-      final parcel = Parcel.fromJson({'id': 1, 'garden_id': 2, 'name': 'A', 'area_m2': '12.50', 'pos_x': '0.00'});
+  group('Parcel and Zone', () {
+    test('parcel : shape relative to its position, numbers or strings', () {
+      final parcel = Parcel.fromJson({
+        'id': 1,
+        'garden_id': 2,
+        'name': 'A',
+        'pos_x': '1.50',
+        'pos_y': 2,
+        'area_m2': '12.50',
+        'shape': [
+          {'x': 0, 'y': 0},
+          {'x': '2', 'y': 0},
+          {'x': 2, 'y': 1.5},
+        ],
+      });
       expect(parcel.areaM2, 12.5);
-      expect(parcel.posX, 0.0);
+      expect(parcel.shape, const [Offset(0, 0), Offset(2, 0), Offset(2, 1.5)]);
+      expect(parcel.absoluteShape, const [Offset(1.5, 2), Offset(3.5, 2), Offset(3.5, 3.5)]);
     });
 
-    test('applies defaults', () {
+    test('parcel defaults', () {
       final parcel = Parcel.fromJson({'id': 1, 'garden_id': 2, 'name': 'A'});
-      expect(parcel.areaM2, isNull);
-      expect(parcel.width, 0);
+      expect(parcel.shape, isEmpty);
       expect(parcel.soilType, 'standard');
+    });
+
+    test('moving a parcel keeps its shape, the zones follow its position', () {
+      const parcel = Parcel(id: 1, gardenId: 2, name: 'A', posX: 1, posY: 1, shape: [Offset(0, 0), Offset(2, 0), Offset(2, 2)]);
+      final zone = Zone.fromJson({'id': 5, 'parcel_id': 1, 'name': 'Z', 'area_m2': 0.5, 'shape': [{'x': 0, 'y': 0}, {'x': 1, 'y': 0}, {'x': 1, 'y': 1}]});
+
+      final moved = parcel.copyWith(position: const Offset(3, 0));
+      expect(moved.shape, parcel.shape);
+      expect(zone.absoluteShape(moved).first, const Offset(3, 0));
+    });
+
+    test('shapes are sent rounded to the cm', () {
+      expect(shapeToJson(const [Offset(0.123, 1.0 / 3)]), [
+        {'x': 0.12, 'y': 0.33},
+      ]);
     });
   });
 
