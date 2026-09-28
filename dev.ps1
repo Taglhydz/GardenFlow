@@ -43,7 +43,8 @@ Write-Host "[OK] Backend starting in a new window (it closes when you quit the a
 
 # ---- 3. Flutter app ----
 try {
-    Set-Location "$root\frontend"
+    # Push/Pop : the terminal goes back to where .\dev was launched, ready to run it again
+    Push-Location "$root\frontend"
     if ($device) {
         flutter run -d $device
     } else {
@@ -51,6 +52,7 @@ try {
         flutter run
     }
 } finally {
+    Pop-Location
     # quitting the app ('q' or Ctrl+C) also stops the backend : /T kills the whole tree (npm, nodemon, node)
     if (-not $backend.HasExited) {
         taskkill /PID $backend.Id /T /F | Out-Null
