@@ -287,6 +287,9 @@
     "undo": "Annuler le point",
     "finish": "Terminer"
   },
+  "plan": {
+    "recenter": "Recentrer le plan"
+  },
   "help": {
     "hide": "Masquer l'aide",
     "show": "Afficher l'aide"
@@ -311,7 +314,7 @@
     "outside_garden": "La parcelle doit rester dans le jardin : X et Y ne peuvent pas être négatifs."
   },
   "zone_screen": {
-    "whole_parcel": "Toute la parcelle",
+    "whole_parcel": "Toutes les plantes",
     "no_zone": "Sans zone",
     "tab_crops": "Cultures",
     "tab_suggestions": "Suggestions",

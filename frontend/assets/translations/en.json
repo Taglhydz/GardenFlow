@@ -287,6 +287,9 @@
     "undo": "Undo point",
     "finish": "Finish"
   },
+  "plan": {
+    "recenter": "Recenter the plan"
+  },
   "help": {
     "hide": "Hide help",
     "show": "Show help"
@@ -311,7 +314,7 @@
     "outside_garden": "The parcel must stay in the garden: X and Y can't be negative."
   },
   "zone_screen": {
-    "whole_parcel": "Whole parcel",
+    "whole_parcel": "All plants",
     "no_zone": "No zone",
     "tab_crops": "Crops",
     "tab_suggestions": "Suggestions",
