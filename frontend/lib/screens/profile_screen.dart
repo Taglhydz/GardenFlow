@@ -136,7 +136,7 @@ class ProfileScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  user.username,
+                                  user.displayName,
                                   style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
@@ -270,7 +270,7 @@ class ProfileScreen extends ConsumerWidget {
             _buildInfoRow(
               icon: Icons.person,
               label: 'username'.tr(),
-              value: user.username,
+              value: user.displayName,
             ),
             const Divider(height: 24),
             _buildInfoRow(

@@ -64,8 +64,9 @@ describe('auth', () => {
 
   test('register normalizes the email and keeps the birthdate as YYYY-MM-DD', async () => {
     const res = await api.post('/api/auth/register')
-      .send({ username: 'carol', email: '  Carol@Test.DEV ', password: 'password123', birthdate: '2000-01-01' });
+      .send({ username: ' Carol la Plus Belle ', email: '  Carol@Test.DEV ', password: 'password123', birthdate: '2000-01-01' });
     expect(res.status).toBe(201);
+    expect(res.body.user.username).toBe('carol la plus belle'); // the app capitalizes it for display
     expect(res.body.user.email).toBe('carol@test.dev');
     expect(res.body.user.birthdate).toBe('2000-01-01');
   });
@@ -671,7 +672,7 @@ describe('users', () => {
   test('PATCH /users/me cannot change the role', async () => {
     const res = await api.patch('/api/users/me').set(auth(alice.token)).send({ username: 'Alice', role: 'admin' });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ username: 'Alice', role: 'user' });
+    expect(res.body).toMatchObject({ username: 'alice', role: 'user' });
   });
 
   test('PATCH /users/me with the email of another user -> 409', async () => {

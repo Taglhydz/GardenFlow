@@ -21,6 +21,10 @@ class User {
 
   bool get isAdmin => role == 'admin';
 
+  /// Username as displayed : stored in lowercase, first letter in uppercase ('tom le plus beau' -> 'Tom le plus beau')
+  String get displayName =>
+      username.isEmpty ? username : username[0].toUpperCase() + username.substring(1).toLowerCase();
+
   // Convertir JSON en User
   factory User.fromJson(Map<String, dynamic> json) {
     return User(

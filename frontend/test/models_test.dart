@@ -50,6 +50,13 @@ void main() {
     });
   });
 
+  test('the username is shown with a capital first letter only', () {
+    User user(String name) => User(id: 1, username: name, email: 'a@b.c');
+    expect(user('tom').displayName, 'Tom');
+    expect(user('tom le plus beau').displayName, 'Tom le plus beau');
+    expect(user('Tom le plus Beau').displayName, 'Tom le plus beau'); // old accounts saved before the lowercase
+  });
+
   group('dates', () {
     test("a 'YYYY-MM-DD' birthdate keeps its day (no timezone shift)", () {
       final user = User.fromJson({'id': 1, 'username': 'a', 'email': 'a@b.c', 'birthdate': '2000-01-01'});
