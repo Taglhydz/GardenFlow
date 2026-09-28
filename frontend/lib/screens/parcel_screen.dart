@@ -13,6 +13,7 @@ import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
 import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
+import '../widgets/help_banner.dart';
 import '../widgets/parcel_form_sheet.dart';
 import '../widgets/shape_canvas.dart';
 import '../widgets/snap_button.dart';
@@ -320,20 +321,15 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
           : null,
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: AppColors.primaryLight.withValues(alpha: 0.5),
-            child: Text(
-              _draft != null
-                  ? 'parcel_screen.draw_hint'.tr()
-                  : selected != null
-                  ? 'parcel_screen.hint_selected'.tr()
-                  : zones.isEmpty
-                  ? 'parcel_screen.empty_hint'.tr()
-                  : 'parcel_screen.hint'.tr(),
-              style: const TextStyle(fontSize: 13, color: AppColors.primaryDark),
-            ),
+          HelpBanner(
+            screen: 'parcel',
+            text: _draft != null
+                ? 'parcel_screen.draw_hint'.tr()
+                : selected != null
+                ? 'parcel_screen.hint_selected'.tr()
+                : zones.isEmpty
+                ? 'parcel_screen.empty_hint'.tr()
+                : 'parcel_screen.hint'.tr(),
           ),
           Expanded(
             child: Stack(
@@ -342,6 +338,8 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
                   child: ShapeCanvas(
                     snapCm: ref.watch(snapProvider).effectiveCm,
                     world: PlanGeometry.parcelWorld(current.shape),
+                    // the corners of the zones stay in the parcel and stick to its sides
+                    area: current.shape,
                     background: [
                       CanvasShape(
                         id: -1,
@@ -364,6 +362,11 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
                     draft: _draft,
                     onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
                     onDraftClose: _finishDrawing,
+                    onDraftRefused: (refusal) => _showError(
+                      refusal == DraftRefusal.outside
+                          ? 'parcel_screen.point_outside'.tr()
+                          : 'parcel_screen.point_on_zone'.tr(),
+                    ),
                     onSelect: (id) => setState(() => _selectedZoneId = id),
                     onOpen: _openZone,
                     onMoved: (id, delta) {
@@ -374,6 +377,7 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
                   ),
                 ),
                 const Positioned(top: 8, right: 8, child: SnapButton()),
+                const Positioned(top: 8, left: 8, child: HelpButton(screen: 'parcel')),
               ],
             ),
           ),

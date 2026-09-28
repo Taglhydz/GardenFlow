@@ -25,6 +25,15 @@ class CanvasShape {
   final List<String> labels;
 }
 
+/// Why a point touched while drawing is not added.
+enum DraftRefusal {
+  /// outside the [ShapeCanvas.area]
+  outside,
+
+  /// inside one of the [ShapeCanvas.shapes]
+  onShape,
+}
+
 enum _DragMode { move, vertex }
 
 class _Drag {
@@ -43,7 +52,9 @@ class _Drag {
 /// Plan in meters where free shapes (polygons) are drawn and edited with the finger.
 ///
 /// - drawing mode ([draft] not null) : each tap adds a point (snapped to the magnet grid [snapCm]),
-///   tapping the first point closes the shape ([onDraftClose])
+///   tapping the first point closes the shape ([onDraftClose]). With the magnet on, a point near a side
+///   of the plan's shapes sticks to it (drawn in orange). A point inside an existing shape or outside
+///   the [area] is refused ([onDraftRefused]).
 /// - no shape selected : tap a shape to select it, pan and pinch to move / zoom the plan
 /// - a shape selected : drag it to move it, drag a corner to move the corner, drag a "+" (middle
 ///   of a side) to add a corner, long press a corner to remove it. Tap it again to open it,
@@ -58,6 +69,8 @@ class ShapeCanvas extends StatefulWidget {
   const ShapeCanvas({
     super.key,
     required this.world,
+    this.view,
+    this.area,
     required this.shapes,
     this.background = const [],
     this.overlay = const [],
@@ -65,6 +78,7 @@ class ShapeCanvas extends StatefulWidget {
     this.draft,
     this.onDraftPoint,
     this.onDraftClose,
+    this.onDraftRefused,
     required this.onSelect,
     required this.onOpen,
     required this.onMoved,
@@ -73,8 +87,15 @@ class ShapeCanvas extends StatefulWidget {
     this.snapCm = PlanGeometry.defaultSnapCm,
   });
 
-  /// Part of the plan to show (meters)
+  /// The whole plan (meters), can be much bigger than the screen
   final Rect world;
+
+  /// Part of the plan that fills the screen when it opens (default : [world]). Its zoom is kept
+  /// afterwards, so the plan doesn't jump when shapes are added far away.
+  final Rect? view;
+
+  /// The points drawn or dragged must stay inside (e.g. the parcel, for its zones)
+  final List<Offset>? area;
 
   /// Interactive shapes, the last one is on top
   final List<CanvasShape> shapes;
@@ -91,6 +112,7 @@ class ShapeCanvas extends StatefulWidget {
   final List<Offset>? draft;
   final ValueChanged<Offset>? onDraftPoint;
   final VoidCallback? onDraftClose;
+  final ValueChanged<DraftRefusal>? onDraftRefused;
 
   final ValueChanged<int?> onSelect;
   final ValueChanged<int> onOpen;
@@ -104,7 +126,7 @@ class ShapeCanvas extends StatefulWidget {
   /// Points can't go below 0 (the garden plan starts at its top-left corner)
   final bool nonNegative;
 
-  /// Magnet grid (cm) of the points drawn or dragged, 1 = no magnet
+  /// Magnet grid (cm) of the points drawn or dragged, 1 = no magnet (neither the grid nor the sides)
   final int snapCm;
 
   @override
@@ -121,6 +143,60 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
 
   /// The plan keeps its size during a drag, so it doesn't move under the finger
   (Rect, double)? _frozen;
+
+  /// Zoom of the plan (pinch), the grid is drawn for the part on the screen
+  final _viewer = TransformationController();
+
+  /// Pixels per meter computed for this screen size, kept when [ShapeCanvas.view] is given
+  (Size, double)? _ppm;
+
+  @override
+  void dispose() {
+    _viewer.dispose();
+    super.dispose();
+  }
+
+  double _pixelsPerMeter(Size screen) {
+    final cached = _ppm;
+    if (widget.view != null && cached != null && cached.$1 == screen) return cached.$2;
+    final view = widget.view ?? widget.world;
+    final ppm = math.min(screen.width / view.width, screen.height / view.height);
+    _ppm = (screen, ppm);
+    return ppm;
+  }
+
+  /// Sides a point sticks to : the area, the background and the shapes (except the one being edited)
+  List<List<Offset>> _borders({int? except}) => [
+    if (widget.area != null) widget.area!,
+    for (final s in widget.background) s.points,
+    for (final s in widget.shapes)
+      if (s.id != except) s.points,
+  ];
+
+  /// Where a point touched at [point] goes, or why it is refused : on a side near the finger
+  /// (magnet on), else on the grid ; it must stay in the area and out of the other shapes.
+  (Offset?, DraftRefusal?) _place(Offset point, double ppm, {int? except}) {
+    final magnet = widget.snapCm > 1;
+    final pixels = ppm * _viewer.value.getMaxScaleOnAxis();
+    var placed = (magnet
+            ? PlanGeometry.stickToBorder(_borders(except: except), point, PlanGeometry.borderMagnetPx / pixels, widget.snapCm)
+            : null) ??
+        PlanGeometry.snapPoint(point, widget.snapCm);
+    placed = _clamp(placed);
+
+    final area = widget.area;
+    if (area != null) {
+      final inside = PlanGeometry.keepInside(area, placed);
+      if (inside == null) return (null, DraftRefusal.outside);
+      placed = inside;
+    }
+    final others = [
+      for (final s in widget.shapes)
+        if (s.id != except) s.points,
+    ];
+    if (PlanGeometry.isInsideAny(others, placed)) return (null, DraftRefusal.onShape);
+    return (placed, null);
+  }
 
   bool get _isDrawing => widget.draft != null;
 
@@ -152,7 +228,12 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
       if (draft.length >= 3 && first != null && (first - local).distance <= _closeTouch) {
         widget.onDraftClose?.call();
       } else {
-        widget.onDraftPoint?.call(_clamp(PlanGeometry.snapPoint(point, widget.snapCm)));
+        final (placed, refusal) = _place(point, ppm);
+        if (placed != null) {
+          widget.onDraftPoint?.call(placed);
+        } else {
+          widget.onDraftRefused?.call(refusal!);
+        }
       }
       return;
     }
@@ -227,8 +308,9 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
     final delta = world.topLeft + local / ppm - drag.startPoint;
     setState(() {
       if (drag.mode == _DragMode.vertex) {
-        final moved = _clamp(PlanGeometry.snapPoint(drag.original[drag.vertex] + delta, widget.snapCm));
-        drag.current = [...drag.original]..[drag.vertex] = moved;
+        // a refused place (outside the area, in another shape) : the corner stays at its last place
+        final (moved, _) = _place(drag.original[drag.vertex] + delta, ppm, except: drag.shapeId);
+        if (moved != null) drag.current = [...drag.original]..[drag.vertex] = moved;
       } else {
         var snapped = PlanGeometry.snapPoint(delta, widget.snapCm);
         if (widget.nonNegative) {
@@ -266,13 +348,15 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final (world, ppm) = _frozen ??
-            (widget.world, math.min(constraints.maxWidth / widget.world.width, constraints.maxHeight / widget.world.height));
+        final screen = constraints.biggest;
+        final (world, ppm) = _frozen ?? (widget.world, _pixelsPerMeter(screen));
         final editing = widget.selectedId != null && !_isDrawing;
 
         return InteractiveViewer(
+          transformationController: _viewer,
           constrained: false,
-          minScale: 0.5,
+          // a big plan can be zoomed out much more to see it
+          minScale: widget.view == null ? 0.5 : 0.05,
           maxScale: 6,
           boundaryMargin: const EdgeInsets.all(80),
           // while a shape is selected, the finger edits the shape, not the plan
@@ -291,9 +375,12 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
             child: CustomPaint(
               size: world.size * ppm,
               painter: _PlanPainter(
+                viewer: _viewer,
+                screen: screen,
                 world: world,
                 ppm: ppm,
                 snapCm: widget.snapCm,
+                borders: _isDrawing ? _borders() : const [],
                 background: widget.background,
                 shapes: [
                   for (final s in widget.shapes)
@@ -330,20 +417,29 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
 
 class _PlanPainter extends CustomPainter {
   _PlanPainter({
+    required this.viewer,
+    required this.screen,
     required this.world,
     required this.ppm,
     required this.snapCm,
+    required this.borders,
     required this.background,
     required this.shapes,
     required this.overlay,
     required this.selectedId,
     required this.selectedPoints,
     required this.draft,
-  });
+  }) : super(repaint: viewer);
 
+  /// Zoom and position of the plan : repainted when they change, only the part on the screen is drawn
+  final TransformationController viewer;
+  final Size screen;
   final Rect world;
   final double ppm;
   final int snapCm;
+
+  /// Sides the drawn points stick to : a point on one of them is drawn in orange
+  final List<List<Offset>> borders;
   final List<CanvasShape> background;
   final List<CanvasShape> shapes;
   final List<CanvasShape> overlay;
@@ -386,39 +482,40 @@ class _PlanPainter extends CustomPainter {
     }
   }
 
+  /// Meters between the numbered lines, depending on the zoom
+  static const _majorSteps = [1, 5, 10, 50, 100];
+
   void _paintGrid(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFF1F8E9));
+    // part of the plan on the screen (px of the canvas) : the plan can be hundreds of meters wide
+    final zoom = viewer.value.getMaxScaleOnAxis();
+    final visible = MatrixUtils.inverseTransformRect(viewer.value, Offset.zero & screen).intersect(Offset.zero & size);
+    if (visible.isEmpty) return;
+    final area = Rect.fromPoints(world.topLeft + visible.topLeft / ppm, world.topLeft + visible.bottomRight / ppm);
+    final pixelsPerMeter = ppm * zoom;
+
+    canvas.drawRect(visible, Paint()..color = const Color(0xFFF1F8E9));
+
+    void lines(double step, Paint paint, {bool numbered = false}) {
+      for (var i = (area.left / step).ceil(); i * step <= area.right; i++) {
+        final px = _px(Offset(i * step, 0)).dx;
+        canvas.drawLine(Offset(px, visible.top), Offset(px, visible.bottom), paint);
+        if (numbered) _text(canvas, '${(i * step).round()}', Offset(px + 2 / zoom, visible.top + 2 / zoom), 9 / zoom, const Color(0x9966BB6A));
+      }
+      for (var i = (area.top / step).ceil(); i * step <= area.bottom; i++) {
+        final py = _px(Offset(0, i * step)).dy;
+        canvas.drawLine(Offset(visible.left, py), Offset(visible.right, py), paint);
+        if (numbered) _text(canvas, '${(i * step).round()}', Offset(visible.left + 2 / zoom, py + 2 / zoom), 9 / zoom, const Color(0x9966BB6A));
+      }
+    }
 
     // magnet grid, only when its lines are far enough apart to be seen
     final step = snapCm / 100;
-    if (snapCm > 1 && snapCm < 100 && step * ppm >= 8) {
-      final minor = Paint()
-        ..color = const Color(0x1A66BB6A)
-        ..strokeWidth = 1;
-      for (var i = (world.left / step).ceil(); i * step <= world.right; i++) {
-        final px = _px(Offset(i * step, 0)).dx;
-        canvas.drawLine(Offset(px, 0), Offset(px, size.height), minor);
-      }
-      for (var i = (world.top / step).ceil(); i * step <= world.bottom; i++) {
-        final py = _px(Offset(0, i * step)).dy;
-        canvas.drawLine(Offset(0, py), Offset(size.width, py), minor);
-      }
+    if (snapCm > 1 && snapCm < 100 && step * pixelsPerMeter >= 8) {
+      lines(step, Paint()..color = const Color(0x1A66BB6A)..strokeWidth = 1 / zoom);
     }
 
-    final line = Paint()
-      ..color = const Color(0x3366BB6A)
-      ..strokeWidth = 1;
-
-    for (var x = world.left.ceil(); x <= world.right; x++) {
-      final px = _px(Offset(x.toDouble(), 0)).dx;
-      canvas.drawLine(Offset(px, 0), Offset(px, size.height), line);
-      _text(canvas, '$x', Offset(px + 2, 2), 9, const Color(0x9966BB6A));
-    }
-    for (var y = world.top.ceil(); y <= world.bottom; y++) {
-      final py = _px(Offset(0, y.toDouble())).dy;
-      canvas.drawLine(Offset(0, py), Offset(size.width, py), line);
-      _text(canvas, '$y', Offset(2, py + 2), 9, const Color(0x9966BB6A));
-    }
+    final major = _majorSteps.firstWhere((m) => m * pixelsPerMeter >= 24, orElse: () => _majorSteps.last);
+    lines(major.toDouble(), Paint()..color = const Color(0x3366BB6A)..strokeWidth = 1 / zoom, numbered: true);
   }
 
   void _paintShape(Canvas canvas, CanvasShape s, {required double strokeWidth, Color? borderColor}) {
@@ -544,10 +641,18 @@ class _PlanPainter extends CustomPainter {
     canvas.drawPath(path, line);
 
     for (var i = 0; i < points.length; i++) {
+      final center = _px(points[i]);
       // the first point is bigger : tap it to close the shape
       final isFirst = i == 0 && points.length >= 3;
-      canvas.drawCircle(_px(points[i]), isFirst ? 11 : 6, Paint()..color = color);
-      if (isFirst) canvas.drawCircle(_px(points[i]), 5, Paint()..color = AppColors.white);
+      // a point stuck on a side : orange with a white ring
+      final onBorder = PlanGeometry.isOnBorder(borders, points[i]);
+      final pointColor = onBorder ? AppColors.warning : color;
+      canvas.drawCircle(center, isFirst ? 11 : (onBorder ? 8 : 6), Paint()..color = pointColor);
+      if (isFirst) {
+        canvas.drawCircle(center, 5, Paint()..color = AppColors.white);
+      } else if (onBorder) {
+        canvas.drawCircle(center, 8, Paint()..color = AppColors.white..style = PaintingStyle.stroke..strokeWidth = 2);
+      }
     }
   }
 

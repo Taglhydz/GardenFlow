@@ -20,6 +20,7 @@ class AppConstants {
   static const String tokenKey        = 'auth_token'    ; // secure storage
   static const String lastGardenIdKey = 'last_garden_id'; // shared preferences
   static const String snapKey         = 'snap_cm'       ; // shared preferences (0 = magnet off)
+  static const String hiddenHelpKey   = 'hidden_help'   ; // shared preferences (help banners closed)
 
   // Validation rules (must match the backend validators)
   static const int passwordMinLength = 8;

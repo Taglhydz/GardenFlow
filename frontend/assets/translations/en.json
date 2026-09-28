@@ -222,6 +222,8 @@
     "hint": "Tap a parcel to select it. Pinch to zoom.",
     "hint_selected": "Drag the parcel or its corners, tap a + to add a corner, long press a corner to remove it. The ruler lets you type the dimensions. Tap it again to go inside.",
     "invalid_shape": "Invalid shape: the sides must not cross each other.",
+    "point_on_parcel": "This point is on an existing parcel.",
+    "parcels_overlap": "The parcel overlaps another parcel.",
     "open_parcel": "Open",
     "rename_garden": "Rename the garden",
     "delete_garden_confirm": "Delete \"{}\" and all its parcels and crops?",
@@ -268,7 +270,9 @@
   },
   "parcel_screen": {
     "draw_zone": "Draw a zone",
-    "draw_hint": "Tap the parcel to place each corner of the zone, then tap the first point or \"Finish\".",
+    "draw_hint": "Tap the parcel to place each corner of the zone, then tap the first point or \"Finish\". Near a border, the point sticks to it (in orange).",
+    "point_outside": "Place the points inside the parcel.",
+    "point_on_zone": "This point is on an existing zone.",
     "empty_hint": "Draw zones (rows, beds, corners) to place your plants.",
     "hint": "Tap a zone to select it.",
     "hint_selected": "Drag the zone or its corners, tap a + to add a corner, long press a corner to remove it. The ruler lets you type the dimensions. Tap it again to open it.",
@@ -283,8 +287,12 @@
     "undo": "Undo point",
     "finish": "Finish"
   },
+  "help": {
+    "hide": "Hide help",
+    "show": "Show help"
+  },
   "snap": {
-    "title": "Snap to grid",
+    "title": "Snap (grid and borders)",
     "step_cm": "{} cm",
     "step_m": "{} m",
     "off": "Off (to the cm)",

@@ -15,6 +15,7 @@ import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
 import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
+import '../widgets/help_banner.dart';
 import '../widgets/parcel_form_sheet.dart';
 import '../widgets/shape_canvas.dart';
 import '../widgets/snap_button.dart';
@@ -80,12 +81,17 @@ class _GardenViewState extends ConsumerState<GardenView> {
       _showError('garden_view.invalid_shape'.tr());
       return;
     }
+    final existing = ref.read(parcelsProvider(_gardenId)).value ?? const <Parcel>[];
+    // the corners can't be on a parcel, but the shape could still go around one
+    if (existing.any((p) => Geometry.overlap(points, p.absoluteShape))) {
+      _showError('garden_view.parcels_overlap'.tr());
+      return;
+    }
 
     setState(() => _isSaving = true);
     try {
       // the position is the top-left corner of the drawing, the shape is relative to it
       final origin = Geometry.bounds(points).topLeft;
-      final existing = ref.read(parcelsProvider(_gardenId)).value ?? const <Parcel>[];
       final parcel = await ref.read(parcelsProvider(_gardenId).notifier).create({
         'name': PlanGeometry.nextName('parcel'.tr(), existing.map((p) => p.name)),
         'pos_x': origin.dx,
@@ -283,7 +289,8 @@ class _GardenViewState extends ConsumerState<GardenView> {
           ? (parcelsAsync.hasError ? _buildError() : const Center(child: CircularProgressIndicator()))
           : Column(
               children: [
-                _Hint(
+                HelpBanner(
+                  screen: 'garden',
                   text: _draft != null
                       ? 'garden_view.draw_hint'.tr()
                       : selected != null
@@ -302,6 +309,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
                             for (final p in parcels) p.absoluteShape,
                             if (_draft != null) _draft!,
                           ]),
+                          view: PlanGeometry.gardenView([for (final p in parcels) p.absoluteShape]),
                           nonNegative: true,
                           shapes: [
                             for (final p in parcels)
@@ -317,6 +325,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
                           draft: _draft,
                           onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
                           onDraftClose: _finishDrawing,
+                          onDraftRefused: (_) => _showError('garden_view.point_on_parcel'.tr()),
                           onSelect: (id) => setState(() => _selectedParcelId = id),
                           onOpen: _openParcel,
                           onMoved: _onMoved,
@@ -324,6 +333,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
                         ),
                       ),
                       const Positioned(top: 8, right: 8, child: SnapButton()),
+                      const Positioned(top: 8, left: 8, child: HelpButton(screen: 'garden')),
                     ],
                   ),
                 ),
@@ -470,27 +480,3 @@ Color soilColor(String soilType) =>
       'chalky': Color(0xD9E0E0E0),
     }[soilType] ??
     const Color(0xD9D7CCC8);
-
-class _Hint extends StatelessWidget {
-  const _Hint({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: AppColors.primaryLight.withValues(alpha: 0.5),
-      child: Row(
-        children: [
-          const Icon(Icons.touch_app, size: 18, color: AppColors.primaryDark),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.primaryDark)),
-          ),
-        ],
-      ),
-    );
-  }
-}

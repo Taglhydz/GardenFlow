@@ -33,12 +33,20 @@ void main() {
     final canvas = tester.widget<ShapeCanvas>(find.byType(ShapeCanvas));
     final box = tester.getRect(find.byType(ShapeCanvas));
     final world = canvas.world;
-    final ppm = math.min(box.width / world.width, box.height / world.height);
+    final view = canvas.view ?? world;
+    final ppm = math.min(box.width / view.width, box.height / view.height);
     return box.topLeft + (meters - world.topLeft) * ppm;
   }
 
   Future<void> tapAt(WidgetTester tester, Offset meters) async {
     await tester.tapAt(toScreen(tester, meters));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> chooseSnap(WidgetTester tester, String label) async {
+    await tester.tap(find.byType(SnapButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CheckedPopupMenuItem<int>, label));
     await tester.pumpAndSettle();
   }
 
@@ -83,6 +91,58 @@ void main() {
 
       expect(find.text('Forme invalide : les côtés ne doivent pas se croiser.'), findsOneWidget);
       expect(services.parcels.created, isEmpty);
+    });
+
+    testWidgets('no corner on an existing parcel, no parcel around another one', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+
+      await tester.tap(find.text('Dessiner une parcelle'));
+      await tester.pumpAndSettle();
+      await tapAt(tester, const Offset(2, 2)); // inside "Carré A"
+      expect(find.text('Ce point est sur une parcelle existante.'), findsOneWidget);
+      expect(find.text('Terminer'), findsOneWidget);
+
+      // around "Carré A" : every corner is outside, but the shape covers it
+      for (final corner in const [Offset(0.5, 0.5), Offset(4, 0.5), Offset(4, 4), Offset(0.5, 4)]) {
+        await tapAt(tester, corner);
+      }
+      await tester.tap(find.text('Terminer'));
+      await tester.pumpAndSettle();
+      expect(find.text('La parcelle chevauche une autre parcelle.'), findsOneWidget);
+      expect(services.parcels.created, isEmpty);
+    });
+
+    testWidgets('a parcel drawn next to another one shares its side', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+
+      await chooseSnap(tester, '5 cm'); // the grid alone would put the corners at x = 3.05
+      await tester.tap(find.text('Dessiner une parcelle'));
+      await tester.pumpAndSettle();
+      // a few cm from the right side of "Carré A" (x = 3) : the corners stick to it
+      for (final corner in const [Offset(3.04, 1), Offset(4, 1), Offset(4, 2), Offset(3.04, 2)]) {
+        await tapAt(tester, corner);
+      }
+      await tester.tap(find.text('Terminer'));
+      await tester.pumpAndSettle();
+
+      expect(services.parcels.created.single['pos_x'], 3);
+    });
+
+    testWidgets('the help can be closed and shown again with the "i"', (tester) async {
+      await pumpApp(tester, services);
+      expect(find.textContaining('Dessiner une parcelle »'), findsOneWidget);
+
+      await tester.tap(find.byTooltip("Masquer l'aide"));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Dessiner une parcelle »'), findsNothing);
+      expect((await SharedPreferences.getInstance()).getStringList('hidden_help'), ['garden']);
+
+      await tester.tap(find.byTooltip("Afficher l'aide"));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Dessiner une parcelle »'), findsOneWidget);
+      expect(find.byTooltip("Afficher l'aide"), findsNothing);
     });
 
     testWidgets('move a parcel : only its position changes (its zones follow)', (tester) async {
@@ -158,25 +218,35 @@ void main() {
 
       await tester.tap(find.text('Dessiner une zone'));
       await tester.pumpAndSettle();
-      for (final corner in const [Offset(1.5, 0), Offset(2.4, 0), Offset(2.4, 1), Offset(1.5, 1)]) {
-        await tapAt(tester, corner);
-      }
-      await tester.tap(find.text('Terminer'));
-      await tester.pumpAndSettle();
-      expect(find.text("La zone doit être à l'intérieur de la parcelle."), findsOneWidget);
+      // the parcel goes from (0, 0) to (2, 2) : a point outside is refused
+      await tapAt(tester, const Offset(2.4, 0.5));
+      expect(find.text("Placez les points à l'intérieur de la parcelle."), findsOneWidget);
+      expect(tester.widget<ShapeCanvas>(find.byType(ShapeCanvas)).draft, isEmpty);
 
-      await tester.tap(find.text('Annuler'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Dessiner une zone'));
-      await tester.pumpAndSettle();
+      // (0.5, 1) is inside "Rang 1" : refused, the 3 other corners make a triangle over "Rang 1"
       for (final corner in const [Offset(0.5, 0), Offset(1.5, 0), Offset(1.5, 1), Offset(0.5, 1)]) {
         await tapAt(tester, corner);
       }
+      expect(tester.widget<ShapeCanvas>(find.byType(ShapeCanvas)).draft, hasLength(3));
       await tester.tap(find.text('Terminer'));
       await tester.pumpAndSettle();
       expect(find.text('La zone chevauche une autre zone.'), findsOneWidget);
 
       expect(services.zones.zones, hasLength(1));
+    });
+
+    testWidgets('near a side of the parcel, a corner of the zone sticks to it ; not with the magnet off', (tester) async {
+      await openParcel(tester);
+
+      await chooseSnap(tester, '5 cm'); // the grid alone would give (1.85, 0.05)
+      await tester.tap(find.text('Dessiner une zone'));
+      await tester.pumpAndSettle();
+      await tapAt(tester, const Offset(1.83, 0.03)); // 3 cm from the top side
+      expect(tester.widget<ShapeCanvas>(find.byType(ShapeCanvas)).draft, const [Offset(1.85, 0)]);
+
+      await chooseSnap(tester, 'Désactivé (au cm près)');
+      await tapAt(tester, const Offset(1.97, 1.03));
+      expect(tester.widget<ShapeCanvas>(find.byType(ShapeCanvas)).draft, const [Offset(1.85, 0), Offset(1.97, 1.03)]);
     });
 
     testWidgets('open a zone : its crops and its own suggestions, planting goes into the zone', (tester) async {
@@ -244,13 +314,6 @@ void main() {
   });
 
   group('magnet and dimensions', () {
-    Future<void> chooseSnap(WidgetTester tester, String label) async {
-      await tester.tap(find.byType(SnapButton));
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(CheckedPopupMenuItem<int>, label));
-      await tester.pumpAndSettle();
-    }
-
     Future<void> drawRectangle(WidgetTester tester, List<Offset> corners) async {
       await tester.tap(find.text('Dessiner une parcelle'));
       await tester.pumpAndSettle();
@@ -277,7 +340,7 @@ void main() {
 
     testWidgets('magnet off : the corners go where the finger is (to the cm), the choice is remembered', (tester) async {
       await pumpApp(tester, services);
-      expect(find.text('10 cm'), findsOneWidget); // default grid
+      expect(find.text('50 cm'), findsOneWidget); // default grid
 
       await chooseSnap(tester, 'Désactivé (au cm près)');
       expect(find.text('Libre'), findsOneWidget);
@@ -287,7 +350,7 @@ void main() {
       expect(fields['pos_x'], 1.03);
       expect(fields['pos_y'], 1.07);
       expect(shapeFromJson(fields['shape']), rect(1.99, 0.97));
-      expect((await SharedPreferences.getInstance()).getInt('snap_cm'), -10); // off, the 10 cm step is kept
+      expect((await SharedPreferences.getInstance()).getInt('snap_cm'), -50); // off, the 50 cm step is kept
     });
 
     testWidgets('50 cm grid : the corners go to the nearest 50 cm', (tester) async {
@@ -358,5 +421,5 @@ void main() {
     });
   });
 
-  test('the plan starts at 6 x 6 m', () => expect(PlanGeometry.gardenWorld(const []).size, const Size(6, 6)));
+  test('the plan opens on 6 x 6 m', () => expect(PlanGeometry.gardenView(const []).size, const Size(6, 6)));
 }

@@ -65,7 +65,8 @@ class Geometry {
     return inside;
   }
 
-  static bool _containsStrictly(List<Offset> points, Offset p) =>
+  /// Point inside, not on the border.
+  static bool containsStrictly(List<Offset> points, Offset p) =>
       contains(points, p) && !_edges(points).any((e) => _onSegment(e.$1, e.$2, p));
 
   /// Simple polygon : at least 3 points, a real area, no edge crossing another one.
@@ -116,8 +117,8 @@ class Geometry {
   /// The polygons share some area (only touching borders is NOT overlapping).
   static bool overlap(List<Offset> p1, List<Offset> p2) =>
       _edges(p1).any((e) => _edges(p2).any((f) => _segmentsCross(e.$1, e.$2, f.$1, f.$2))) ||
-      _containsStrictly(p2, interiorPoint(p1)) ||
-      _containsStrictly(p1, interiorPoint(p2));
+      containsStrictly(p2, interiorPoint(p1)) ||
+      containsStrictly(p1, interiorPoint(p2));
 
   /// Where to write the name of a shape : its centroid, or a point inside for odd shapes (L, U...).
   static Offset labelPoint(List<Offset> points) {
@@ -135,10 +136,17 @@ class Geometry {
     return contains(points, centroid) ? centroid : interiorPoint(points);
   }
 
-  static double distanceToSegment(Offset p, Offset a, Offset b) {
+  static double distanceToSegment(Offset p, Offset a, Offset b) => (p - closestOnSegment(p, a, b)).distance;
+
+  /// Point of the segment [a]-[b] nearest to [p].
+  static Offset closestOnSegment(Offset p, Offset a, Offset b) {
     final lengthSquared = (b - a).distanceSquared;
-    if (lengthSquared < _eps) return (p - a).distance;
+    if (lengthSquared < _eps) return a;
     final t = (((p.dx - a.dx) * (b.dx - a.dx) + (p.dy - a.dy) * (b.dy - a.dy)) / lengthSquared).clamp(0.0, 1.0);
-    return (p - Offset(a.dx + t * (b.dx - a.dx), a.dy + t * (b.dy - a.dy))).distance;
+    return Offset(a.dx + t * (b.dx - a.dx), a.dy + t * (b.dy - a.dy));
   }
+
+  /// Distance from [p] to the nearest side of the polygon.
+  static double distanceToBorder(List<Offset> points, Offset p) =>
+      _edges(points).fold(double.infinity, (d, e) => math.min(d, distanceToSegment(p, e.$1, e.$2)));
 }

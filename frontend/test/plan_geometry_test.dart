@@ -42,10 +42,15 @@ void main() {
 
   group('plan rules', () {
     test('snap to 10 cm without floating point noise', () {
-      expect(PlanGeometry.snap(0.34), 0.3);
-      expect(PlanGeometry.snap(1.25), 1.3);
-      expect(PlanGeometry.snap(0.1 + 0.2), 0.3);
-      expect(PlanGeometry.snapPoint(const Offset(1.04, 2.96)), const Offset(1, 3));
+      expect(PlanGeometry.snap(0.34, 10), 0.3);
+      expect(PlanGeometry.snap(1.25, 10), 1.3);
+      expect(PlanGeometry.snap(0.1 + 0.2, 10), 0.3);
+      expect(PlanGeometry.snapPoint(const Offset(1.04, 2.96), 10), const Offset(1, 3));
+    });
+
+    test('the magnet grid is 50 cm by default', () {
+      expect(PlanGeometry.defaultSnapCm, 50);
+      expect(PlanGeometry.snapPoint(const Offset(1.2, 1.3)), const Offset(1, 1.5));
     });
 
     test('snap to the chosen step, 1 cm = no magnet', () {
@@ -93,9 +98,44 @@ void main() {
       });
     });
 
-    test('the garden plan fits the parcels plus a margin, with a minimum size', () {
-      expect(PlanGeometry.gardenWorld(const []), const Rect.fromLTWH(0, 0, 6, 6));
-      expect(PlanGeometry.gardenWorld([rect(2, 1, 7, 3)]), const Rect.fromLTWH(0, 0, 9 + PlanGeometry.margin, 6));
+    test('the garden plan opens on the parcels plus a margin, with a minimum size', () {
+      expect(PlanGeometry.gardenView(const []), const Rect.fromLTWH(0, 0, 6, 6));
+      expect(PlanGeometry.gardenView([rect(2, 1, 7, 3)]), const Rect.fromLTWH(0, 0, 9 + PlanGeometry.margin, 6));
+    });
+
+    test('the garden plan goes on for hundreds of meters beyond the farthest parcel', () {
+      expect(PlanGeometry.gardenWorld(const []).size, const Size(6 + PlanGeometry.gardenExtent, 6 + PlanGeometry.gardenExtent));
+      expect(PlanGeometry.gardenWorld([rect(2, 1, 300, 3)]).right, 302 + PlanGeometry.margin + PlanGeometry.gardenExtent);
+    });
+
+    group('sides', () {
+      test('a point near a side sticks to it, on the grid when the side goes through it', () {
+        // 0.1 m from the top side : goes on it, at the 50 cm of the grid
+        expect(PlanGeometry.stickToBorder([rect(2, 2)], const Offset(0.6, 0.1), 0.2, 50), const Offset(0.5, 0));
+        // near a corner : the corner
+        expect(PlanGeometry.stickToBorder([rect(2, 2)], const Offset(1.9, 0.15), 0.2, 50), const Offset(2, 0));
+        // too far from every side
+        expect(PlanGeometry.stickToBorder([rect(2, 2)], const Offset(1, 1), 0.2, 50), isNull);
+        // slanted side : the nearest point, to the cm
+        const triangle = [Offset(0, 0), Offset(3, 0), Offset(0, 3)];
+        final onSlant = PlanGeometry.stickToBorder([triangle], const Offset(1.3, 1.6), 0.2, 50)!;
+        expect(PlanGeometry.isOnBorder([triangle], onSlant), isTrue);
+      });
+
+      test('keep inside : rounding just outside a slanted side is fixed, far outside is refused', () {
+        const triangle = [Offset(0, 0), Offset(3, 0), Offset(0, 3)];
+        final kept = PlanGeometry.keepInside(triangle, const Offset(1.51, 1.5))!;
+        expect(Geometry.contains(triangle, kept), isTrue);
+        expect((kept - const Offset(1.51, 1.5)).distance, lessThan(0.02));
+        expect(PlanGeometry.keepInside(triangle, const Offset(2, 2)), isNull);
+        expect(PlanGeometry.keepInside(rect(2, 2), const Offset(1, 1)), const Offset(1, 1));
+      });
+
+      test('inside a shape, not on its border', () {
+        expect(PlanGeometry.isInsideAny([rect(2, 2)], const Offset(1, 1)), isTrue);
+        expect(PlanGeometry.isInsideAny([rect(2, 2)], const Offset(1, 0)), isFalse);
+        expect(PlanGeometry.isInsideAny([rect(2, 2)], const Offset(3, 1)), isFalse);
+      });
     });
 
     test('valid shapes', () {

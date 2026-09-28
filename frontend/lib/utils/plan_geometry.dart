@@ -7,7 +7,7 @@ class PlanGeometry {
   PlanGeometry._();
 
   /// Default grid of the magnet, in cm.
-  static const int defaultSnapCm = 10;
+  static const int defaultSnapCm = 50;
 
   /// Grid steps offered to the user (cm). Without magnet, points are rounded to 1 cm (like the server).
   static const List<int> snapSteps = [5, 10, 25, 50, 100];
@@ -18,8 +18,17 @@ class PlanGeometry {
   /// Free space around a parcel on its own plan.
   static const double parcelMargin = 0.5;
 
-  /// Smallest garden plan (empty garden).
+  /// Smallest part of the garden plan shown when it opens (empty garden).
   static const double minWorldSize = 6;
+
+  /// Free space of the garden plan beyond the farthest parcel : the plan is "infinite" to the right and to the bottom.
+  static const double gardenExtent = 500;
+
+  /// Distance (px on the screen) under which a point sticks to a nearby side.
+  static const double borderMagnetPx = 16;
+
+  /// Points closer than that (m) to a side are on it (the cm rounding moves the points of slanted sides a bit).
+  static const double onBorderTolerance = 0.01;
 
   /// Smallest shape accepted (same as the backend).
   static const double minShapeArea = 0.01;
@@ -59,8 +68,9 @@ class PlanGeometry {
     return [for (final p in points) roundCm(along(p) >= current - tolerance ? p + shift : p)];
   }
 
-  /// The garden plan : from (0, 0) to the farthest parcel + [margin], at least [minWorldSize].
-  static Rect gardenWorld(Iterable<List<Offset>> shapes) {
+  /// Part of the garden plan shown when it opens : from (0, 0) to the farthest parcel + [margin],
+  /// at least [minWorldSize].
+  static Rect gardenView(Iterable<List<Offset>> shapes) {
     var maxX = 0.0;
     var maxY = 0.0;
     for (final shape in shapes) {
@@ -71,6 +81,60 @@ class PlanGeometry {
     }
     return Rect.fromLTWH(0, 0, math.max(minWorldSize, maxX + margin), math.max(minWorldSize, maxY + margin));
   }
+
+  /// The whole garden plan : from (0, 0) to [gardenExtent] meters beyond the farthest parcel.
+  static Rect gardenWorld(Iterable<List<Offset>> shapes) {
+    final view = gardenView(shapes);
+    return Rect.fromLTWH(0, 0, view.width + gardenExtent, view.height + gardenExtent);
+  }
+
+  /// Point of a side of [shapes] near [point] (closer than [maxDistance] m), or null : a corner when one is
+  /// close enough, else the nearest point of the side, on the magnet grid [stepCm] when the side goes through it.
+  static Offset? stickToBorder(Iterable<List<Offset>> shapes, Offset point, double maxDistance, int stepCm) {
+    Offset? corner;
+    Offset? onSide;
+    var cornerDistance = maxDistance;
+    var sideDistance = maxDistance;
+    for (final shape in shapes) {
+      for (var i = 0; i < shape.length; i++) {
+        final a = shape[i];
+        final b = shape[(i + 1) % shape.length];
+        if ((a - point).distance <= cornerDistance) {
+          corner = a;
+          cornerDistance = (a - point).distance;
+        }
+        final closest = Geometry.closestOnSegment(point, a, b);
+        if ((closest - point).distance <= sideDistance) {
+          final onGrid = snapPoint(closest, stepCm);
+          onSide = Geometry.distanceToSegment(onGrid, a, b) < 1e-6 ? onGrid : roundCm(closest);
+          sideDistance = (closest - point).distance;
+        }
+      }
+    }
+    return corner ?? onSide;
+  }
+
+  /// [point] is on a side of one of the [shapes].
+  static bool isOnBorder(Iterable<List<Offset>> shapes, Offset point) =>
+      shapes.any((s) => s.length >= 2 && Geometry.distanceToBorder(s, point) <= onBorderTolerance);
+
+  /// [point] (rounded to the cm) inside or on the border of [area] : the point itself, or the nearest
+  /// cm around it when the rounding put it just outside a slanted side. Null when it is really outside.
+  static Offset? keepInside(List<Offset> area, Offset point) {
+    if (Geometry.contains(area, point)) return point;
+    if (Geometry.distanceToBorder(area, point) > onBorderTolerance) return null;
+    final candidates = [
+      for (final dx in const [-0.01, 0.0, 0.01])
+        for (final dy in const [-0.01, 0.0, 0.01]) roundCm(point + Offset(dx, dy)),
+    ].where((p) => Geometry.contains(area, p)).toList()
+      ..sort((p, q) => (p - point).distance.compareTo((q - point).distance));
+    return candidates.firstOrNull;
+  }
+
+  /// [point] is inside one of the [shapes], not only on its border (within [onBorderTolerance]).
+  static bool isInsideAny(Iterable<List<Offset>> shapes, Offset point) => shapes.any(
+    (s) => Geometry.containsStrictly(s, point) && Geometry.distanceToBorder(s, point) > onBorderTolerance,
+  );
 
   /// The plan of a parcel : its shape + [parcelMargin] around.
   static Rect parcelWorld(List<Offset> shape) => Geometry.bounds(shape).inflate(parcelMargin);

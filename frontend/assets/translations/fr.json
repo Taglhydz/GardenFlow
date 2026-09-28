@@ -222,6 +222,8 @@
     "hint": "Touchez une parcelle pour la sélectionner. Pincez pour zoomer.",
     "hint_selected": "Glissez la parcelle ou ses coins, touchez un + pour ajouter un coin, appui long sur un coin pour le supprimer. La règle permet de saisir les mesures. Touchez-la à nouveau pour entrer dedans.",
     "invalid_shape": "Forme invalide : les côtés ne doivent pas se croiser.",
+    "point_on_parcel": "Ce point est sur une parcelle existante.",
+    "parcels_overlap": "La parcelle chevauche une autre parcelle.",
     "open_parcel": "Ouvrir",
     "rename_garden": "Renommer le jardin",
     "delete_garden_confirm": "Supprimer « {} » ainsi que toutes ses parcelles et cultures ?",
@@ -268,7 +270,9 @@
   },
   "parcel_screen": {
     "draw_zone": "Dessiner une zone",
-    "draw_hint": "Touchez la parcelle pour poser chaque coin de la zone, puis touchez le premier point ou « Terminer ».",
+    "draw_hint": "Touchez la parcelle pour poser chaque coin de la zone, puis touchez le premier point ou « Terminer ». Près d'un bord, le point s'y colle (en orange).",
+    "point_outside": "Placez les points à l'intérieur de la parcelle.",
+    "point_on_zone": "Ce point est sur une zone existante.",
     "empty_hint": "Délimitez des zones (rangs, planches, coins) pour y placer vos plantes.",
     "hint": "Touchez une zone pour la sélectionner.",
     "hint_selected": "Glissez la zone ou ses coins, touchez un + pour ajouter un coin, appui long sur un coin pour le supprimer. La règle permet de saisir les mesures. Touchez-la à nouveau pour l'ouvrir.",
@@ -283,8 +287,12 @@
     "undo": "Annuler le point",
     "finish": "Terminer"
   },
+  "help": {
+    "hide": "Masquer l'aide",
+    "show": "Afficher l'aide"
+  },
   "snap": {
-    "title": "Aimantage à la grille",
+    "title": "Aimantage (grille et bords)",
     "step_cm": "{} cm",
     "step_m": "{} m",
     "off": "Désactivé (au cm près)",
