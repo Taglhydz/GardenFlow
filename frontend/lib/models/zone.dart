@@ -8,14 +8,16 @@ import 'parcel.dart';
 class Zone {
   final int id;
   final int parcelId;
-  final String name;
+
+  /// Name given by the user, null = automatic name from its plants (see ZoneNames)
+  final String? name;
   final List<Offset> shape;
   final double areaM2;
 
   const Zone({
     required this.id,
     required this.parcelId,
-    required this.name,
+    this.name,
     required this.shape,
     this.areaM2 = 0,
   });
@@ -30,7 +32,7 @@ class Zone {
     return Zone(
       id: JsonUtils.toInt(json['id'])!,
       parcelId: JsonUtils.toInt(json['parcel_id'])!,
-      name: json['name'] as String,
+      name: json['name'] as String?,
       shape: shapeFromJson(json['shape']),
       areaM2: JsonUtils.toDouble(json['area_m2']) ?? 0,
     );

@@ -14,6 +14,7 @@ import '../providers/snap_provider.dart';
 import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
 import '../utils/plant_colors.dart';
+import '../utils/zone_names.dart';
 import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
 import '../widgets/help_banner.dart';
@@ -355,10 +356,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
 
   /// A zone in the color of its plant, the name of each plant in its dark shade.
   CanvasShape _zoneShape(Zone zone, Parcel parcel, List<Crop> crops, Map<int, Plant> plantsById) {
-    final plants = {
-      for (final crop in crops)
-        if (crop.zoneId == zone.id && crop.isInGround && plantsById[crop.plantId] != null) plantsById[crop.plantId]!,
-    }.toList();
+    final plants = ZoneNames.plantsIn(zone.id, crops, plantsById);
     final (fill, border) = PlantColors.zone(plants);
     return CanvasShape(
       id: zone.id,

@@ -79,12 +79,14 @@ CREATE TABLE parcel (
 -- =====
 -- Permanent delimitation drawn inside a parcel (a row, a bed, a corner...), where crops are planted
 -- season after season : it keeps the history of its crops (crop rotation per zone).
+--   name  : NULL = automatic name, computed by the app from the plants of the zone
+--           ("Zone Basilic", "Ajouter une plante" when empty), kept until the user renames the zone
 --   shape : points RELATIVE to the parcel position (pos_x, pos_y), so the zones follow the parcel when it moves.
 -- The API checks that a zone is inside its parcel and doesn't overlap another zone.
 CREATE TABLE zone (
     id         INT AUTO_INCREMENT PRIMARY KEY,
     parcel_id  INT NOT NULL,
-    name       VARCHAR(100) NOT NULL,
+    name       VARCHAR(100) NULL,
     shape      JSON NOT NULL,
     area_m2    DECIMAL(10,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

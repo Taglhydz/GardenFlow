@@ -227,7 +227,8 @@ void main() {
       await tester.pumpAndSettle();
 
       final zone = services.zones.zones.single;
-      expect(zone.name, 'Zone 1');
+      expect(zone.name, isNull); // automatic name
+      expect(find.text('Ajouter une plante'), findsOneWidget); // no plant yet (bar of the selected zone)
       expect(zone.parcelId, 1);
       expect(zone.shape, rect(1, 1));
     });
@@ -311,6 +312,42 @@ void main() {
       final planted = services.crops.crops.last;
       expect(planted.plantId, 2);
       expect(planted.zoneId, 71);
+    });
+
+    testWidgets('automatic zone names from their plant, numbered ; a name typed is kept, an empty one brings it back', (tester) async {
+      services.zones.zones = [
+        Zone(id: 70, parcelId: 1, shape: rect(1, 2)),
+        Zone(id: 71, parcelId: 1, shape: rect(1, 1, 1, 0)),
+        Zone(id: 72, parcelId: 1, shape: rect(1, 1, 1, 1)),
+      ];
+      services.crops.crops = [
+        const Crop(id: 10, parcelId: 1, zoneId: 70, plantId: 1),
+        const Crop(id: 11, parcelId: 1, zoneId: 71, plantId: 1),
+      ];
+      await openParcel(tester);
+
+      await tapAt(tester, const Offset(0.5, 1));
+      expect(find.text('Zone Tomate'), findsOneWidget);
+      await tapAt(tester, const Offset(1.5, 0.5));
+      expect(find.text('Zone Tomate 2'), findsOneWidget);
+      await tapAt(tester, const Offset(1.5, 1.5));
+      expect(find.text('Ajouter une plante'), findsOneWidget);
+
+      Future<void> rename(String name) async {
+        await tester.tap(find.byTooltip('Renommer la zone'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), name);
+        await tester.tap(find.text('Enregistrer'));
+        await tester.pumpAndSettle();
+      }
+
+      await rename('Carottes');
+      expect(services.zones.zones.last.name, 'Carottes');
+      expect(find.text('Carottes'), findsOneWidget);
+
+      await rename('');
+      expect(services.zones.zones.last.name, isNull);
+      expect(find.text('Ajouter une plante'), findsOneWidget);
     });
 
     testWidgets('the red bin deletes the parcel after a confirmation', (tester) async {

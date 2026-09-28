@@ -10,6 +10,7 @@ import '../models/suggestion.dart';
 import '../models/zone.dart';
 import '../providers/garden_providers.dart';
 import '../providers/plant_providers.dart';
+import '../utils/zone_names.dart';
 import '../widgets/crop_form_sheet.dart';
 
 /// A zone of a parcel (or the whole parcel when [zoneId] is null) : its crops and the plants suggested for it.
@@ -36,6 +37,12 @@ class ZoneScreen extends ConsumerWidget {
     if (parcel == null || (zoneId != null && zone == null)) {
       return Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator()));
     }
+    // given by the user or automatic from the plants : follows the crops planted here
+    final zoneNames = ZoneNames.of(
+      zones,
+      ref.watch(gardenCropsProvider(gardenId)).value ?? const <Crop>[],
+      ref.watch(plantsByIdProvider),
+    );
 
     return DefaultTabController(
       length: 2,
@@ -47,7 +54,7 @@ class ZoneScreen extends ConsumerWidget {
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(zone?.name ?? 'zone_screen.whole_parcel'.tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(zoneNames[zoneId] ?? 'zone_screen.whole_parcel'.tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
               Text(
                 '${parcel.name} · ${AppLocalizations.area(zone?.areaM2 ?? parcel.areaM2)}',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
@@ -65,7 +72,7 @@ class ZoneScreen extends ConsumerWidget {
         ),
         body: TabBarView(
           children: [
-            _CropsTab(gardenId: gardenId, parcelId: parcelId, zoneId: zoneId, zoneNames: {for (final z in zones) z.id: z.name}),
+            _CropsTab(gardenId: gardenId, parcelId: parcelId, zoneId: zoneId, zoneNames: zoneNames),
             _SuggestionsTab(gardenId: gardenId, parcelId: parcelId, zoneId: zoneId),
           ],
         ),

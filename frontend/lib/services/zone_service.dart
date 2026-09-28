@@ -17,19 +17,22 @@ class ZoneService {
     return response.map((json) => Zone.fromJson(json)).toList();
   }
 
-  Future<Zone> createZone(int parcelId, {required String name, required List<Offset> shape}) async {
+  /// A new zone has no name : its name is automatic (see ZoneNames).
+  Future<Zone> createZone(int parcelId, {required List<Offset> shape}) async {
     final response = await _api.post('${AppConstants.parcelsEndpoint}/$parcelId/zones', {
-      'name': name,
       'shape': shapeToJson(shape),
     });
     return Zone.fromJson(response);
   }
 
-  /// Only the given fields are modified.
-  Future<Zone> updateZone(int id, {String? name, List<Offset>? shape}) async {
+  /// [name] null : back to the automatic name.
+  Future<Zone> renameZone(int id, String? name) async {
+    return Zone.fromJson(await _api.patch('${AppConstants.zonesEndpoint}/$id', {'name': name}));
+  }
+
+  Future<Zone> updateZone(int id, {required List<Offset> shape}) async {
     final response = await _api.patch('${AppConstants.zonesEndpoint}/$id', {
-      if (name != null) 'name': name,
-      if (shape != null) 'shape': shapeToJson(shape),
+      'shape': shapeToJson(shape),
     });
     return Zone.fromJson(response);
   }

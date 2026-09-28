@@ -262,16 +262,17 @@ class ZonesNotifier extends AsyncNotifier<List<Zone>> {
 
   void _replace(Zone zone) => state = AsyncData([for (final z in _zones) z.id == zone.id ? zone : z]);
 
-  /// The server refuses a zone outside its parcel or overlapping another zone.
-  Future<Zone> create(int parcelId, {required String name, required List<Offset> shape}) async {
-    final zone = await ref.read(zoneServiceProvider).createZone(parcelId, name: name, shape: shape);
+  /// With an automatic name. The server refuses a zone outside its parcel or overlapping another zone.
+  Future<Zone> create(int parcelId, {required List<Offset> shape}) async {
+    final zone = await ref.read(zoneServiceProvider).createZone(parcelId, shape: shape);
     state = AsyncData([..._zones, zone]);
     ref.invalidate(suggestionsProvider);
     return zone;
   }
 
-  Future<Zone> rename(int id, String name) async {
-    final zone = await ref.read(zoneServiceProvider).updateZone(id, name: name);
+  /// [name] null : back to the automatic name.
+  Future<Zone> rename(int id, String? name) async {
+    final zone = await ref.read(zoneServiceProvider).renameZone(id, name);
     _replace(zone);
     return zone;
   }

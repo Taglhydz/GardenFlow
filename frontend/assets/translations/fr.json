@@ -277,6 +277,7 @@
     "hint": "Touchez une zone pour la sélectionner.",
     "hint_selected": "Glissez la zone ou ses coins, touchez un + pour ajouter un coin, appui long sur un coin pour le supprimer. La règle permet de saisir les mesures. Touchez-la à nouveau pour l'ouvrir.",
     "zone_name": "Nom de la zone",
+    "zone_name_helper": "Laissez vide pour le nom automatique (d'après sa plante)",
     "rename_zone": "Renommer la zone",
     "delete_zone": "Supprimer la zone",
     "delete_zone_confirm": "Supprimer la zone « {} » ? Ses cultures restent dans la parcelle.",
@@ -286,6 +287,10 @@
   "drawing": {
     "undo": "Annuler le point",
     "finish": "Terminer"
+  },
+  "zone_name": {
+    "empty": "Ajouter une plante",
+    "of_plant": "Zone {}"
   },
   "plan": {
     "recenter": "Recentrer le plan"

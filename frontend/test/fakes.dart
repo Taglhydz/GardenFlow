@@ -136,16 +136,24 @@ class FakeZoneService implements ZoneService {
   Future<List<Zone>> getZonesByGarden(int gardenId) async => zones;
 
   @override
-  Future<Zone> createZone(int parcelId, {required String name, required List<Offset> shape}) async {
-    final zone = Zone(id: 700 + zones.length, parcelId: parcelId, name: name, shape: shape, areaM2: Geometry.area(shape));
+  Future<Zone> createZone(int parcelId, {required List<Offset> shape}) async {
+    final zone = Zone(id: 700 + zones.length, parcelId: parcelId, shape: shape, areaM2: Geometry.area(shape));
     zones = [...zones, zone];
     return zone;
   }
 
   @override
-  Future<Zone> updateZone(int id, {String? name, List<Offset>? shape}) async {
+  Future<Zone> renameZone(int id, String? name) async {
     final current = zones.firstWhere((z) => z.id == id);
-    final updated = Zone(id: id, parcelId: current.parcelId, name: name ?? current.name, shape: shape ?? current.shape);
+    final updated = Zone(id: id, parcelId: current.parcelId, name: name, shape: current.shape);
+    zones = [for (final z in zones) z.id == id ? updated : z];
+    return updated;
+  }
+
+  @override
+  Future<Zone> updateZone(int id, {required List<Offset> shape}) async {
+    final current = zones.firstWhere((z) => z.id == id);
+    final updated = Zone(id: id, parcelId: current.parcelId, name: current.name, shape: shape);
     zones = [for (final z in zones) z.id == id ? updated : z];
     return updated;
   }

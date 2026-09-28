@@ -16,7 +16,7 @@ const checkShape = async (shape, parcel, zoneId = null) => {
   const others = (await Zone.findAllByParcel(parcel.id)).filter((z) => z.id !== zoneId);
   const overlapped = others.filter((z) => overlap(shape, z.shape));
   if (overlapped.length) {
-    throw AppError.badRequest('ZONES_OVERLAP', `The zone overlaps: ${overlapped.map((z) => z.name).join(', ')}`);
+    throw AppError.badRequest('ZONES_OVERLAP', `The zone overlaps: ${overlapped.map((z) => z.name ?? `#${z.id}`).join(', ')}`);
   }
 };
 

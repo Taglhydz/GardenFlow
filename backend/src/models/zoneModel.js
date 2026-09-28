@@ -41,7 +41,7 @@ const Zone = {
   create: async (parcelId, { name, shape, area_m2 }) => {
     const [result] = await db.query(
       'INSERT INTO zone (parcel_id, name, shape, area_m2) VALUES (?, ?, ?, ?)',
-      [parcelId, name, JSON.stringify(shape), area_m2]
+      [parcelId, name ?? null, JSON.stringify(shape), area_m2]
     );
     const [rows] = await db.query('SELECT * FROM zone WHERE id = ?', [result.insertId]);
     return rows[0];

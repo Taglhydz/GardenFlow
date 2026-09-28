@@ -13,6 +13,7 @@ import '../providers/snap_provider.dart';
 import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
 import '../utils/plant_colors.dart';
+import '../utils/zone_names.dart';
 import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
 import '../widgets/help_banner.dart';
@@ -53,6 +54,10 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
 
   List<Zone> get _zones =>
       (ref.read(zonesProvider(_gardenId)).value ?? const <Zone>[]).where((z) => z.parcelId == widget.parcelId).toList();
+
+  /// Name shown for the zone : given by the user, or automatic from its plants
+  String _nameOf(Zone zone) =>
+      ZoneNames.of(_zones, ref.read(gardenCropsProvider(_gardenId)).value ?? const [], ref.read(plantsByIdProvider))[zone.id] ?? '';
 
   void _showError(Object error) {
     if (!mounted) return;
@@ -99,7 +104,7 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
     try {
       final zone = await ref
           .read(zonesProvider(_gardenId).notifier)
-          .create(widget.parcelId, name: PlanGeometry.nextName('zone'.tr(), _zones.map((z) => z.name)), shape: points);
+          .create(widget.parcelId, shape: points); // automatic name : "Add a plant" until a plant goes in
       if (mounted) {
         setState(() {
           _draft = null;
@@ -135,7 +140,7 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
   Future<void> _editZoneDimensions(Zone zone) async {
     final result = await DimensionsSheet.show(
       context,
-      title: 'dimensions.title_of'.tr(args: [zone.name]),
+      title: 'dimensions.title_of'.tr(args: [_nameOf(zone)]),
       shape: zone.shape,
       positionLabel: 'dimensions.position_in_parcel'.tr(),
       validate: (result) => _zoneShapeError(result.finalShape, zoneId: zone.id),
@@ -161,17 +166,21 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
     );
   }
 
+  /// A name typed by the user is kept as it is ; an empty name brings the automatic one back.
   Future<void> _renameZone(Zone zone) async {
+    final shown = _nameOf(zone);
     final name = await showRenameDialog(
       context,
       title: 'parcel_screen.rename_zone'.tr(),
       label: 'parcel_screen.zone_name'.tr(),
-      name: zone.name,
+      helper: 'parcel_screen.zone_name_helper'.tr(),
+      name: shown,
     );
 
-    if (name == null || name.isEmpty || name == zone.name) return;
+    // cancelled, or not changed (an automatic name stays automatic)
+    if (name == null || name == shown || (name.isEmpty && zone.name == null)) return;
     try {
-      await ref.read(zonesProvider(_gardenId).notifier).rename(zone.id, name);
+      await ref.read(zonesProvider(_gardenId).notifier).rename(zone.id, name.isEmpty ? null : name);
     } catch (e) {
       _showError(e);
     }
@@ -180,7 +189,7 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
   Future<void> _deleteZone(Zone zone) async {
     final confirm = await _confirm(
       'parcel_screen.delete_zone'.tr(),
-      'parcel_screen.delete_zone_confirm'.tr(args: [zone.name]),
+      'parcel_screen.delete_zone_confirm'.tr(args: [_nameOf(zone)]),
     );
     if (!confirm) return;
     try {
@@ -246,11 +255,8 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
     final crops = ref.watch(gardenCropsProvider(_gardenId)).value ?? const <Crop>[];
     final plantsById = ref.watch(plantsByIdProvider);
 
-    /// Plants in the ground in the zone, each one once
-    List<Plant> plantsIn(Zone zone) => {
-      for (final crop in crops)
-        if (crop.zoneId == zone.id && crop.isInGround && plantsById[crop.plantId] != null) plantsById[crop.plantId]!,
-    }.toList();
+    List<Plant> plantsIn(Zone zone) => ZoneNames.plantsIn(zone.id, crops, plantsById);
+    final names = ZoneNames.of(zones, crops, plantsById);
 
     Zone? selected;
     for (final z in zones) {
@@ -350,7 +356,7 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
                       ),
                     ],
                     shapes: [
-                      for (final zone in zones) _zoneShape(zone, plantsIn(zone)),
+                      for (final zone in zones) _zoneShape(zone, names[zone.id] ?? '', plantsIn(zone)),
                     ],
                     selectedId: selected?.id,
                     draft: _draft,
@@ -387,25 +393,25 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
               onFinish: _finishDrawing,
             )
           : selected != null
-          ? _buildSelectedBar(selected, [for (final p in plantsIn(selected)) AppLocalizations.plantName(p)])
+          ? _buildSelectedBar(selected, names[selected.id] ?? '', [for (final p in plantsIn(selected)) AppLocalizations.plantName(p)])
           : null,
     );
   }
 
   /// The zone in the color of its plant, the name of each plant in its dark shade.
-  CanvasShape _zoneShape(Zone zone, List<Plant> plants) {
+  CanvasShape _zoneShape(Zone zone, String name, List<Plant> plants) {
     final (fill, border) = PlantColors.zone(plants);
     return CanvasShape(
       id: zone.id,
       points: zone.shape,
       fill: fill.withValues(alpha: 0.75),
       border: border,
-      labels: [zone.name, for (final p in plants) AppLocalizations.plantName(p)],
+      labels: [name, for (final p in plants) AppLocalizations.plantName(p)],
       labelColors: [border, for (final p in plants) PlantColors.dark(p)],
     );
   }
 
-  Widget _buildSelectedBar(Zone zone, List<String> plants) {
+  Widget _buildSelectedBar(Zone zone, String name, List<String> plants) {
     return Material(
       elevation: 8,
       child: SafeArea(
@@ -419,7 +425,7 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(zone.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     Text(
                       [AppLocalizations.area(zone.areaM2), ...plants].join(' · '),
                       maxLines: 1,

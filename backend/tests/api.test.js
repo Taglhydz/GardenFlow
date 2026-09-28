@@ -538,6 +538,18 @@ describe('free shapes and zones', () => {
     zoneB = b.body;
   });
 
+  test('the name of a zone is optional : no name = automatic name (null), clearing it brings it back', async () => {
+    // accepted without name : only its place is refused (the L is full)
+    const unnamed = await createZone({ shape: rect(1, 1, 1.5, 0.5) });
+    expect(unnamed.body.code).toBe('ZONE_OUTSIDE_PARCEL');
+
+    const renamed = await api.patch(`/api/zones/${zoneB.id}`).set(auth(alice.token)).send({ name: 'Mes tomates' });
+    expect(renamed.body.name).toBe('Mes tomates');
+    const cleared = await api.patch(`/api/zones/${zoneB.id}`).set(auth(alice.token)).send({ name: '  ' });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.name).toBeNull();
+  });
+
   test('a zone outside the parcel (in the missing corner of the L) is refused', async () => {
     const res = await createZone({ name: 'Dehors', shape: rect(1, 1, 1.5, 0.5) });
     expect(res.status).toBe(400);

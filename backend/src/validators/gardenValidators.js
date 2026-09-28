@@ -39,8 +39,10 @@ const updateParcelSchema = nonEmpty(z.object(parcelFields).partial());
 // ====
 // parcel_id is taken from the URL (POST /parcels/:parcelId/zones) and can't be changed.
 // The shape points are relative to the parcel position, like the parcel shape.
+// No name (null, '') = automatic name, computed by the app from the plants of the zone
+// ("Zone Basilic", or "Add a plant" when it is empty). Sending null again brings it back.
 const zoneFields = {
-  name : requiredText(100),
+  name : optionalText(100),
   shape,
 };
 

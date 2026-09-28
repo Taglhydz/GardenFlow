@@ -5,18 +5,27 @@ import 'package:flutter/material.dart';
 ///
 /// The text controller belongs to the dialog and is disposed with it, after its closing
 /// animation (disposing it as soon as showDialog returns crashes while the dialog fades out).
-Future<String?> showRenameDialog(BuildContext context, {required String title, required String label, required String name}) =>
+Future<String?> showRenameDialog(
+  BuildContext context, {
+  required String title,
+  required String label,
+  required String name,
+  String? helper,
+}) =>
     showDialog<String>(
       context: context,
-      builder: (context) => _RenameDialog(title: title, label: label, name: name),
+      builder: (context) => _RenameDialog(title: title, label: label, name: name, helper: helper),
     );
 
 class _RenameDialog extends StatefulWidget {
-  const _RenameDialog({required this.title, required this.label, required this.name});
+  const _RenameDialog({required this.title, required this.label, required this.name, this.helper});
 
   final String title;
   final String label;
   final String name;
+
+  /// Small text under the field
+  final String? helper;
 
   @override
   State<_RenameDialog> createState() => _RenameDialogState();
@@ -39,7 +48,12 @@ class _RenameDialogState extends State<_RenameDialog> {
         controller: _controller,
         autofocus: true,
         maxLength: 100,
-        decoration: InputDecoration(labelText: widget.label, border: const OutlineInputBorder()),
+        decoration: InputDecoration(
+          labelText: widget.label,
+          helperText: widget.helper,
+          helperMaxLines: 2,
+          border: const OutlineInputBorder(),
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),

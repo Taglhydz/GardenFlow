@@ -277,6 +277,7 @@
     "hint": "Tap a zone to select it.",
     "hint_selected": "Drag the zone or its corners, tap a + to add a corner, long press a corner to remove it. The ruler lets you type the dimensions. Tap it again to open it.",
     "zone_name": "Zone name",
+    "zone_name_helper": "Leave empty for the automatic name (from its plant)",
     "rename_zone": "Rename the zone",
     "delete_zone": "Delete the zone",
     "delete_zone_confirm": "Delete the zone \"{}\"? Its crops stay in the parcel.",
@@ -286,6 +287,10 @@
   "drawing": {
     "undo": "Undo point",
     "finish": "Finish"
+  },
+  "zone_name": {
+    "empty": "Add a plant",
+    "of_plant": "{} zone"
   },
   "plan": {
     "recenter": "Recenter the plan"
