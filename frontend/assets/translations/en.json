@@ -83,6 +83,7 @@
     "create_garden": "Create a garden",
     "create_new_garden": "Create a new garden",
     "select_garden": "Select a garden",
+    "no_description": "No description",
     "garden_created": "Garden created!",
     "garden_name_required": "Garden name *",
     "garden_name_hint": "My vegetable garden",

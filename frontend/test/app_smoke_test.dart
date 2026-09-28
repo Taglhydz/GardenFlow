@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:GardenFlow/models/garden.dart';
 import 'package:GardenFlow/services/api_service.dart';
+import 'package:GardenFlow/widgets/garden_mini_map.dart';
 import 'app_harness.dart';
 import 'fakes.dart';
 
@@ -48,6 +49,27 @@ void main() {
     await pumpApp(tester, services);
 
     expect(find.text('Mon potager'), findsOneWidget);
+    expect(find.text('Dessiner une parcelle'), findsOneWidget);
+  });
+
+  testWidgets('several gardens : the list under the GardenFlow title, a card with its mini plan and description', (tester) async {
+    services.auth.restoreResult = alice;
+    services.gardens.gardens = [
+      const Garden(id: 7, userId: 1, name: 'Mon potager', description: 'Derrière la maison'),
+      const Garden(id: 8, userId: 1, name: 'Balcon'),
+    ];
+
+    await pumpApp(tester, services);
+
+    expect(find.text('GardenFlow'), findsOneWidget);
+    expect(find.text('Derrière la maison'), findsOneWidget);
+    expect(find.text('Pas de description'), findsOneWidget);
+    expect(find.byType(GardenMiniMap), findsNWidgets(2));
+    // the gardens start below the title, not behind the home and profile buttons
+    expect(tester.getRect(find.text('Mon potager')).top, greaterThan(tester.getRect(find.text('GardenFlow')).bottom));
+
+    await tester.tap(find.text('Balcon'));
+    await tester.pumpAndSettle();
     expect(find.text('Dessiner une parcelle'), findsOneWidget);
   });
 

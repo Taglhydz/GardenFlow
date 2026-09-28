@@ -6,6 +6,7 @@ import '../models/garden.dart';
 import '../providers/auth_provider.dart';
 import '../providers/garden_providers.dart';
 import '../widgets/create_garden_dialog.dart';
+import '../widgets/garden_mini_map.dart';
 import '../widgets/welcome_dialog.dart';
 import 'garden_view.dart';
 import 'profile_screen.dart';
@@ -94,113 +95,94 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return _buildGardenSelectionView(gardensAsync.value!);
   }
 
-  Widget _buildErrorView() {
+  /// Page with the header on top : nothing is hidden behind the buttons.
+  Widget _buildPage(Widget content) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(child: content),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// House icon on the left (already on the home page : does nothing), "GardenFlow" in the middle,
+  /// profile on the right.
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+      child: Row(
         children: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.cloud_off, size: 80, color: Colors.grey[400]),
-                  const SizedBox(height: 24),
-                  Text(
-                    'home.load_error'.tr(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () => ref.invalidate(gardensProvider),
-                    icon: const Icon(Icons.refresh),
-                    label: Text('retry'.tr()),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.white,
-                    ),
-                  ),
-                ],
-              ),
+          IconButton(
+            icon: const Icon(Icons.home_outlined, color: AppColors.primary, size: 28),
+            onPressed: () {},
+            tooltip: 'home.title'.tr(),
+          ),
+          Expanded(
+            child: Text(
+              'app_name'.tr(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary),
             ),
           ),
-          ..._buildTopButtons(onHome: null),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.primary, width: 2),
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.person_outline, color: AppColors.primary, size: 20),
+              onPressed: _openProfile,
+              tooltip: 'profile.title'.tr(),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return _buildPage(
+      Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off, size: 80, color: Colors.grey[400]),
+              const SizedBox(height: 24),
+              Text(
+                'home.load_error'.tr(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => ref.invalidate(gardensProvider),
+                icon: const Icon(Icons.refresh),
+                label: Text('retry'.tr()),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildGardenSelectionView(List<Garden> gardens) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          _buildTitle(),
-          // Contenu principal
-          gardens.isEmpty ? _buildNoGardenView() : _buildGardenListView(gardens),
-          // Déjà sur la page d'accueil : le bouton maison ne fait rien
-          ..._buildTopButtons(onHome: null),
-        ],
-      ),
-    );
-  }
-
-  /// Titre "GardenFlow" au quart de la hauteur
-  Widget _buildTitle() {
-    return Positioned(
-      top: MediaQuery.of(context).size.height * 0.25 - 30,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: Text(
-          'app_name'.tr(),
-          style: const TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Icône maison en haut à gauche, icône profil en haut à droite.
-  List<Widget> _buildTopButtons({required VoidCallback? onHome}) {
-    return [
-      Positioned(
-        top: 40,
-        left: 16,
-        child: IconButton(
-          icon: const Icon(Icons.home_outlined, color: AppColors.primary, size: 28),
-          onPressed: onHome ?? () {},
-          tooltip: onHome != null ? 'my_gardens'.tr() : 'home.title'.tr(),
-        ),
-      ),
-      Positioned(
-        top: 47,
-        right: 16,
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.primary,
-              width: 2,
-            ),
-          ),
-          child: IconButton(
-            padding: EdgeInsets.zero,
-            icon: const Icon(Icons.person_outline, color: AppColors.primary, size: 20),
-            onPressed: _openProfile,
-            tooltip: 'profile.title'.tr(),
-          ),
-        ),
-      ),
-    ];
+    return _buildPage(gardens.isEmpty ? _buildNoGardenView() : _buildGardenListView(gardens));
   }
 
   Widget _buildNoGardenView() {
@@ -274,44 +256,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: gardens.length,
               itemBuilder: (context, index) {
-                final garden = gardens[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    leading: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.yard,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    title: Text(
-                      garden.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    subtitle: garden.description != null
-                        ? Text(
-                            garden.description!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                        : null,
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () => ref.read(selectedGardenIdProvider.notifier).select(garden.id),
-                  ),
+                return _GardenCard(
+                  garden: gardens[index],
+                  onTap: () => ref.read(selectedGardenIdProvider.notifier).select(gardens[index].id),
                 );
               },
             ),
@@ -337,6 +284,89 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A garden of the list : its name at the top, its mini plan (~3 cm) on the left,
+/// its place and description on the right.
+class _GardenCard extends StatelessWidget {
+  const _GardenCard({required this.garden, required this.onTap});
+
+  final Garden garden;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      garden.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.grey),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GardenMiniMap(gardenId: garden.id),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (garden.location != null) ...[
+                          Row(
+                            children: [
+                              Icon(Icons.place_outlined, size: 16, color: Colors.grey[600]),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  garden.location!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        Text(
+                          garden.description ?? 'home.no_description'.tr(),
+                          maxLines: 8,
+                          overflow: TextOverflow.ellipsis,
+                          style: garden.description != null
+                              ? const TextStyle(fontSize: 14)
+                              : TextStyle(fontSize: 14, color: Colors.grey[500], fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
