@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:easy_localization/easy_localization.dart' show StringTranslateExtension;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../config/app_localizations.dart';
@@ -14,6 +15,7 @@ class CanvasShape {
     required this.fill,
     this.border = AppColors.parcels,
     this.labels = const [],
+    this.labelColors = const [],
   });
 
   final int id;
@@ -23,6 +25,13 @@ class CanvasShape {
 
   /// First line in bold (the name), then smaller lines (e.g. the plants)
   final List<String> labels;
+
+  /// Color of each label (same order), dark brown when missing
+  final List<Color> labelColors;
+
+  /// Same shape somewhere else (moved, reshaped)
+  CanvasShape withPoints(List<Offset> points) =>
+      CanvasShape(id: id, points: points, fill: fill, border: border, labels: labels, labelColors: labelColors);
 }
 
 /// Why a point touched while drawing is not added.
@@ -85,6 +94,7 @@ class ShapeCanvas extends StatefulWidget {
     required this.onReshaped,
     this.nonNegative = false,
     this.snapCm = PlanGeometry.defaultSnapCm,
+    this.rulers = true,
   });
 
   /// The whole plan (meters), can be much bigger than the screen
@@ -128,6 +138,9 @@ class ShapeCanvas extends StatefulWidget {
 
   /// Magnet grid (cm) of the points drawn or dragged, 1 = no magnet (neither the grid nor the sides)
   final int snapCm;
+
+  /// Numbers of the meters along the edges of the screen
+  final bool rulers;
 
   @override
   State<ShapeCanvas> createState() => _ShapeCanvasState();
@@ -355,51 +368,90 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
         final (world, ppm) = _frozen ?? (widget.world, _pixelsPerMeter(screen));
         final editing = widget.selectedId != null && !_isDrawing;
 
-        return InteractiveViewer(
-          transformationController: _viewer,
-          constrained: false,
-          // a big plan can be zoomed out much more to see it
-          minScale: widget.view == null ? 0.5 : 0.05,
-          maxScale: 6,
-          boundaryMargin: const EdgeInsets.all(80),
-          // while a shape is selected, the finger edits the shape, not the plan
-          panEnabled: !editing,
-          scaleEnabled: !editing,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            // the drag starts where the finger touched : the shape follows the finger exactly
-            dragStartBehavior: DragStartBehavior.down,
-            onTapUp: (d) => _onTapUp(d.localPosition, world, ppm),
-            onLongPressStart: editing ? (d) => _onLongPress(d.localPosition, world, ppm) : null,
-            onPanStart: editing ? (d) => _onPanStart(d.localPosition, world, ppm) : null,
-            onPanUpdate: editing ? (d) => _onPanUpdate(d.localPosition, world, ppm) : null,
-            onPanEnd: editing ? (_) => _onPanEnd() : null,
-            onPanCancel: editing ? _onPanEnd : null,
-            child: CustomPaint(
-              size: world.size * ppm,
-              painter: _PlanPainter(
-                viewer: _viewer,
-                screen: screen,
-                world: world,
-                ppm: ppm,
-                snapCm: widget.snapCm,
-                borders: _isDrawing ? _borders() : const [],
-                background: widget.background,
-                shapes: [
-                  for (final s in widget.shapes)
-                    s.id == _drag?.shapeId
-                        ? CanvasShape(id: s.id, points: _drag!.current, fill: s.fill, border: s.border, labels: s.labels)
-                        : s,
-                ],
-                overlay: _drag?.mode == _DragMode.move || _drag == null ? _movedOverlay() : widget.overlay,
-                selectedId: widget.selectedId,
-                selectedPoints: editing ? _selectedPoints : null,
-                draft: widget.draft,
+        return Stack(
+          children: [
+            // the grid fills the whole screen wherever the plan is moved : the background is infinite
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _GridPainter(viewer: _viewer, world: world, ppm: ppm, snapCm: widget.snapCm, rulers: widget.rulers),
               ),
             ),
-          ),
+            Positioned.fill(child: _buildPlan(world, ppm, editing)),
+            Positioned(
+              top: 52,
+              right: 8,
+              child: Material(
+                color: AppColors.white,
+                elevation: 2,
+                shape: const CircleBorder(),
+                child: IconButton(
+                  icon: const Icon(Icons.center_focus_strong_outlined, color: AppColors.primaryDark),
+                  tooltip: 'plan.recenter'.tr(),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _recenter(screen, ppm),
+                ),
+              ),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  /// Smallest zoom : a big plan can be zoomed out much more to see it
+  double get _minScale => widget.view == null ? 0.5 : 0.05;
+
+  /// Shows the whole [ShapeCanvas.view] (or the whole plan), centered on the screen.
+  void _recenter(Size screen, double ppm) {
+    final view = widget.view ?? widget.world;
+    final width = view.width * ppm;
+    final height = view.height * ppm;
+    final scale = math.min(screen.width / width, screen.height / height).clamp(_minScale, 6.0);
+    final topLeft = (view.topLeft - widget.world.topLeft) * ppm * scale;
+    _viewer.value = Matrix4.diagonal3Values(scale, scale, 1)
+      ..setTranslationRaw((screen.width - width * scale) / 2 - topLeft.dx, (screen.height - height * scale) / 2 - topLeft.dy, 0);
+  }
+
+  Widget _buildPlan(Rect world, double ppm, bool editing) {
+    return InteractiveViewer(
+      transformationController: _viewer,
+      constrained: false,
+      minScale: _minScale,
+      maxScale: 6,
+      // the plan can be moved anywhere, the recenter button brings it back
+      boundaryMargin: const EdgeInsets.all(double.infinity),
+      // while a shape is selected, the finger edits the shape, not the plan
+      panEnabled: !editing,
+      scaleEnabled: !editing,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        // the drag starts where the finger touched : the shape follows the finger exactly
+        dragStartBehavior: DragStartBehavior.down,
+        onTapUp: (d) => _onTapUp(d.localPosition, world, ppm),
+        onLongPressStart: editing ? (d) => _onLongPress(d.localPosition, world, ppm) : null,
+        onPanStart: editing ? (d) => _onPanStart(d.localPosition, world, ppm) : null,
+        onPanUpdate: editing ? (d) => _onPanUpdate(d.localPosition, world, ppm) : null,
+        onPanEnd: editing ? (_) => _onPanEnd() : null,
+        onPanCancel: editing ? _onPanEnd : null,
+        child: CustomPaint(
+          size: world.size * ppm,
+          painter: _PlanPainter(
+            viewer: _viewer,
+            world: world,
+            ppm: ppm,
+            borders: _isDrawing ? _borders() : const [],
+            background: widget.background,
+            shapes: [
+              for (final s in widget.shapes)
+                s.id == _drag?.shapeId ? s.withPoints(_drag!.current) : s,
+            ],
+            overlay: _drag?.mode == _DragMode.move || _drag == null ? _movedOverlay() : widget.overlay,
+            selectedId: widget.selectedId,
+            selectedPoints: editing ? _selectedPoints : null,
+            draft: widget.draft,
+          ),
+        ),
+      ),
     );
   }
 
@@ -412,7 +464,7 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
     return [
       for (final o in widget.overlay)
         o.points.every((p) => Geometry.contains(moving.points, p))
-            ? CanvasShape(id: o.id, points: Geometry.translate(o.points, drag.delta), fill: o.fill, border: o.border, labels: o.labels)
+            ? o.withPoints(Geometry.translate(o.points, drag.delta))
             : o,
     ];
   }
@@ -421,10 +473,8 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
 class _PlanPainter extends CustomPainter {
   _PlanPainter({
     required this.viewer,
-    required this.screen,
     required this.world,
     required this.ppm,
-    required this.snapCm,
     required this.borders,
     required this.background,
     required this.shapes,
@@ -434,12 +484,10 @@ class _PlanPainter extends CustomPainter {
     required this.draft,
   }) : super(repaint: viewer);
 
-  /// Zoom and position of the plan : repainted when they change, only the part on the screen is drawn
+  /// Zoom of the plan : repainted when it changes, the lines and texts keep their size on the screen
   final TransformationController viewer;
-  final Size screen;
   final Rect world;
   final double ppm;
-  final int snapCm;
 
   /// Sides the drawn points stick to : a point on one of them is drawn in orange
   final List<List<Offset>> borders;
@@ -461,7 +509,6 @@ class _PlanPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     _u = 1 / viewer.value.getMaxScaleOnAxis();
-    _paintGrid(canvas, size);
 
     for (final s in background) {
       _paintShape(canvas, s, strokeWidth: 2);
@@ -490,40 +537,6 @@ class _PlanPainter extends CustomPainter {
     }
   }
 
-  /// Meters between the numbered lines, depending on the zoom
-  static const _majorSteps = [1, 5, 10, 50, 100];
-
-  void _paintGrid(Canvas canvas, Size size) {
-    // part of the plan on the screen (px of the canvas) : the plan can be hundreds of meters wide
-    final visible = MatrixUtils.inverseTransformRect(viewer.value, Offset.zero & screen).intersect(Offset.zero & size);
-    if (visible.isEmpty) return;
-    final area = Rect.fromPoints(world.topLeft + visible.topLeft / ppm, world.topLeft + visible.bottomRight / ppm);
-    final pixelsPerMeter = ppm / _u;
-
-    canvas.drawRect(visible, Paint()..color = const Color(0xFFF1F8E9));
-
-    void lines(double step, Paint paint, {bool numbered = false}) {
-      for (var i = (area.left / step).ceil(); i * step <= area.right; i++) {
-        final px = _px(Offset(i * step, 0)).dx;
-        canvas.drawLine(Offset(px, visible.top), Offset(px, visible.bottom), paint);
-        if (numbered) _text(canvas, '${(i * step).round()}', Offset(px + 2 * _u, visible.top + 2 * _u), 9 * _u, const Color(0x9966BB6A));
-      }
-      for (var i = (area.top / step).ceil(); i * step <= area.bottom; i++) {
-        final py = _px(Offset(0, i * step)).dy;
-        canvas.drawLine(Offset(visible.left, py), Offset(visible.right, py), paint);
-        if (numbered) _text(canvas, '${(i * step).round()}', Offset(visible.left + 2 * _u, py + 2 * _u), 9 * _u, const Color(0x9966BB6A));
-      }
-    }
-
-    // magnet grid, only when its lines are far enough apart to be seen
-    final step = snapCm / 100;
-    if (snapCm > 1 && snapCm < 100 && step * pixelsPerMeter >= 8) {
-      lines(step, Paint()..color = const Color(0x1A66BB6A)..strokeWidth = _u);
-    }
-
-    final major = _majorSteps.firstWhere((m) => m * pixelsPerMeter >= 24, orElse: () => _majorSteps.last);
-    lines(major.toDouble(), Paint()..color = const Color(0x3366BB6A)..strokeWidth = _u, numbered: true);
-  }
 
   void _paintShape(Canvas canvas, CanvasShape s, {required double strokeWidth, Color? borderColor}) {
     if (s.points.length < 3) return;
@@ -552,7 +565,7 @@ class _PlanPainter extends CustomPainter {
         TextPainter(
           text: TextSpan(
             text: s.labels[i],
-            style: TextStyle(fontSize: (i == 0 ? 12 : 11) * _u, fontWeight: i == 0 ? FontWeight.bold : FontWeight.normal, color: const Color(0xFF3E2723)),
+            style: TextStyle(fontSize: (i == 0 ? 12 : 11) * _u, fontWeight: i == 0 ? FontWeight.bold : FontWeight.normal, color: i < s.labelColors.length ? s.labelColors[i] : const Color(0xFF3E2723)),
           ),
           textDirection: TextDirection.ltr,
           maxLines: 1,
@@ -664,9 +677,65 @@ class _PlanPainter extends CustomPainter {
     }
   }
 
-  void _text(Canvas canvas, String text, Offset position, double size, Color color) {
+  @override
+  bool shouldRepaint(_PlanPainter old) => true;
+}
+
+/// Background of the plan, behind it and in screen pixels : the grid covers the whole screen
+/// wherever the plan is moved or zoomed.
+class _GridPainter extends CustomPainter {
+  _GridPainter({required this.viewer, required this.world, required this.ppm, required this.snapCm, required this.rulers})
+      : super(repaint: viewer);
+
+  final TransformationController viewer;
+  final Rect world;
+  final double ppm;
+  final int snapCm;
+
+  /// Numbers of the meters along the top and left edges, only on the plan itself (not around it)
+  final bool rulers;
+
+  /// Meters between the main lines, depending on the zoom
+  static const _majorSteps = [1, 5, 10, 50, 100];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFF1F8E9));
+
+    final matrix = viewer.value;
+    // part of the plan on the screen, in meters
+    final visible = MatrixUtils.inverseTransformRect(matrix, Offset.zero & size);
+    final area = Rect.fromPoints(world.topLeft + visible.topLeft / ppm, world.topLeft + visible.bottomRight / ppm);
+    final pixelsPerMeter = ppm * matrix.getMaxScaleOnAxis();
+    Offset screen(Offset meters) => MatrixUtils.transformPoint(matrix, (meters - world.topLeft) * ppm);
+
+    void lines(double step, Color color, {bool numbered = false}) {
+      final paint = Paint()
+        ..color = color
+        ..strokeWidth = 1;
+      for (var i = (area.left / step).ceil(); i * step <= area.right; i++) {
+        final x = screen(Offset(i * step, 0)).dx;
+        canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+        if (numbered && i * step >= world.left && i * step <= world.right) _text(canvas, '${(i * step).round()}', Offset(x + 2, 2));
+      }
+      for (var i = (area.top / step).ceil(); i * step <= area.bottom; i++) {
+        final y = screen(Offset(0, i * step)).dy;
+        canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+        if (numbered && i * step >= world.top && i * step <= world.bottom) _text(canvas, '${(i * step).round()}', Offset(2, y + 2));
+      }
+    }
+
+    // magnet grid, only when its lines are far enough apart to be seen
+    final step = snapCm / 100;
+    if (snapCm > 1 && snapCm < 100 && step * pixelsPerMeter >= 8) lines(step, const Color(0x1A66BB6A));
+
+    final major = _majorSteps.firstWhere((m) => m * pixelsPerMeter >= 24, orElse: () => _majorSteps.last);
+    lines(major.toDouble(), const Color(0x3366BB6A), numbered: rulers);
+  }
+
+  void _text(Canvas canvas, String text, Offset position) {
     TextPainter(
-      text: TextSpan(text: text, style: TextStyle(fontSize: size, color: color)),
+      text: TextSpan(text: text, style: const TextStyle(fontSize: 9, color: Color(0x9966BB6A))),
       textDirection: TextDirection.ltr,
     )
       ..layout()
@@ -674,5 +743,6 @@ class _PlanPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PlanPainter old) => true;
+  bool shouldRepaint(_GridPainter old) =>
+      old.world != world || old.ppm != ppm || old.snapCm != snapCm || old.rulers != rulers;
 }
