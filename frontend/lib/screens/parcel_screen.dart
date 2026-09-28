@@ -5,22 +5,23 @@ import '../config/app_localizations.dart';
 import '../config/constants.dart';
 import '../models/crop.dart';
 import '../models/parcel.dart';
+import '../models/plant.dart';
 import '../models/zone.dart';
 import '../providers/garden_providers.dart';
 import '../providers/plant_providers.dart';
 import '../providers/snap_provider.dart';
 import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
+import '../utils/plant_colors.dart';
 import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
 import '../widgets/help_banner.dart';
 import '../widgets/parcel_form_sheet.dart';
+import '../widgets/rename_dialog.dart';
 import '../widgets/shape_canvas.dart';
 import '../widgets/snap_button.dart';
 import 'garden_view.dart' show editParcelDimensions, soilColor;
 import 'zone_screen.dart';
-
-enum _ParcelAction { wholeParcel, delete }
 
 /// Zoom on a parcel : its zones are drawn with the finger, a zone is opened to plant in it.
 /// Coordinates are relative to the parcel position (like the parcel and zone shapes).
@@ -161,24 +162,12 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
   }
 
   Future<void> _renameZone(Zone zone) async {
-    final controller = TextEditingController(text: zone.name);
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('parcel_screen.rename_zone'.tr()),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 100,
-          decoration: InputDecoration(labelText: 'parcel_screen.zone_name'.tr(), border: const OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
-          TextButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: Text('save'.tr())),
-        ],
-      ),
+    final name = await showRenameDialog(
+      context,
+      title: 'parcel_screen.rename_zone'.tr(),
+      label: 'parcel_screen.zone_name'.tr(),
+      name: zone.name,
     );
-    controller.dispose();
 
     if (name == null || name.isEmpty || name == zone.name) return;
     try {
@@ -202,19 +191,15 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
     }
   }
 
-  Future<void> _onParcelAction(_ParcelAction action, Parcel parcel) async {
-    switch (action) {
-      case _ParcelAction.wholeParcel:
-        _openZone(null);
-      case _ParcelAction.delete:
-        final confirm = await _confirm('delete_parcel'.tr(), 'parcel_screen.delete_confirm'.tr(args: [parcel.name]));
-        if (!confirm) return;
-        try {
-          await ref.read(parcelsProvider(_gardenId).notifier).delete(parcel.id);
-          if (mounted) Navigator.pop(context);
-        } catch (e) {
-          _showError(e);
-        }
+  /// After a confirmation : the parcel, its zones and its crops are deleted, back to the garden plan.
+  Future<void> _deleteParcel(Parcel parcel) async {
+    final confirm = await _confirm('delete_parcel'.tr(), 'parcel_screen.delete_confirm'.tr(args: [parcel.name]));
+    if (!confirm) return;
+    try {
+      await ref.read(parcelsProvider(_gardenId).notifier).delete(parcel.id);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      _showError(e);
     }
   }
 
@@ -261,11 +246,11 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
     final crops = ref.watch(gardenCropsProvider(_gardenId)).value ?? const <Crop>[];
     final plantsById = ref.watch(plantsByIdProvider);
 
-    List<String> plantsIn(Zone zone) => [
+    /// Plants in the ground in the zone, each one once
+    List<Plant> plantsIn(Zone zone) => {
       for (final crop in crops)
-        if (crop.zoneId == zone.id && crop.isInGround && plantsById[crop.plantId] != null)
-          AppLocalizations.plantName(plantsById[crop.plantId]!),
-    ];
+        if (crop.zoneId == zone.id && crop.isInGround && plantsById[crop.plantId] != null) plantsById[crop.plantId]!,
+    }.toList();
 
     Zone? selected;
     for (final z in zones) {
@@ -298,25 +283,39 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
             tooltip: 'edit_parcel'.tr(),
             onPressed: () => ParcelFormSheet.show(context, gardenId: _gardenId, parcel: current),
           ),
-          PopupMenuButton<_ParcelAction>(
-            onSelected: (action) => _onParcelAction(action, current),
-            itemBuilder: (context) => [
-              PopupMenuItem(value: _ParcelAction.wholeParcel, child: Text('zone_screen.whole_parcel'.tr())),
-              PopupMenuItem(
-                value: _ParcelAction.delete,
-                child: Text('delete_parcel'.tr(), style: const TextStyle(color: AppColors.error)),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: AppColors.error),
+            tooltip: 'delete_parcel'.tr(),
+            onPressed: () => _deleteParcel(current),
           ),
         ],
       ),
+      // all the plants of the parcel at the bottom left, draw a zone at the bottom right
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _draft == null && selected == null
-          ? FloatingActionButton.extended(
-              onPressed: _startDrawing,
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.white,
-              icon: const Icon(Icons.draw_outlined),
-              label: Text('parcel_screen.draw_zone'.tr()),
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  FloatingActionButton.extended(
+                    heroTag: 'all_plants',
+                    onPressed: () => _openZone(null),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                    icon: const Icon(Icons.local_florist_outlined),
+                    label: Text('zone_screen.whole_parcel'.tr()),
+                  ),
+                  FloatingActionButton.extended(
+                    heroTag: 'draw_zone',
+                    onPressed: _startDrawing,
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                    icon: const Icon(Icons.draw_outlined),
+                    label: Text('parcel_screen.draw_zone'.tr()),
+                  ),
+                ],
+              ),
             )
           : null,
       body: Column(
@@ -338,6 +337,8 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
                   child: ShapeCanvas(
                     snapCm: ref.watch(snapProvider).effectiveCm,
                     world: PlanGeometry.parcelWorld(current.shape),
+                    // plain infinite grid : the meters are given by the lengths of the sides
+                    rulers: false,
                     // the corners of the zones stay in the parcel and stick to its sides
                     area: current.shape,
                     background: [
@@ -349,14 +350,7 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
                       ),
                     ],
                     shapes: [
-                      for (final zone in zones)
-                        CanvasShape(
-                          id: zone.id,
-                          points: zone.shape,
-                          fill: AppColors.primaryLight.withValues(alpha: 0.75),
-                          border: AppColors.primaryDark,
-                          labels: [zone.name, ...plantsIn(zone)],
-                        ),
+                      for (final zone in zones) _zoneShape(zone, plantsIn(zone)),
                     ],
                     selectedId: selected?.id,
                     draft: _draft,
@@ -393,8 +387,21 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
               onFinish: _finishDrawing,
             )
           : selected != null
-          ? _buildSelectedBar(selected, plantsIn(selected))
+          ? _buildSelectedBar(selected, [for (final p in plantsIn(selected)) AppLocalizations.plantName(p)])
           : null,
+    );
+  }
+
+  /// The zone in the color of its plant, the name of each plant in its dark shade.
+  CanvasShape _zoneShape(Zone zone, List<Plant> plants) {
+    final (fill, border) = PlantColors.zone(plants);
+    return CanvasShape(
+      id: zone.id,
+      points: zone.shape,
+      fill: fill.withValues(alpha: 0.75),
+      border: border,
+      labels: [zone.name, for (final p in plants) AppLocalizations.plantName(p)],
+      labelColors: [border, for (final p in plants) PlantColors.dark(p)],
     );
   }
 

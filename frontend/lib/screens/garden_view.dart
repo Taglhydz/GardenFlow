@@ -13,10 +13,12 @@ import '../providers/plant_providers.dart';
 import '../providers/snap_provider.dart';
 import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
+import '../utils/plant_colors.dart';
 import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
 import '../widgets/help_banner.dart';
 import '../widgets/parcel_form_sheet.dart';
+import '../widgets/rename_dialog.dart';
 import '../widgets/shape_canvas.dart';
 import '../widgets/snap_button.dart';
 import 'parcel_screen.dart';
@@ -171,24 +173,12 @@ class _GardenViewState extends ConsumerState<GardenView> {
   }
 
   Future<void> _renameGarden() async {
-    final controller = TextEditingController(text: widget.garden.name);
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('garden_view.rename_garden'.tr()),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 100,
-          decoration: InputDecoration(labelText: 'garden_name'.tr(), border: const OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
-          TextButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: Text('save'.tr())),
-        ],
-      ),
+    final name = await showRenameDialog(
+      context,
+      title: 'garden_view.rename_garden'.tr(),
+      label: 'garden_name'.tr(),
+      name: widget.garden.name,
     );
-    controller.dispose();
 
     if (name == null || name.isEmpty || name == widget.garden.name) return;
     try {
@@ -359,19 +349,25 @@ class _GardenViewState extends ConsumerState<GardenView> {
     final parcelsById = {for (final p in parcels) p.id: p};
     return [
       for (final zone in zones)
-        if (parcelsById[zone.parcelId] != null)
-          CanvasShape(
-            id: zone.id,
-            points: zone.absoluteShape(parcelsById[zone.parcelId]!),
-            fill: AppColors.primaryLight.withValues(alpha: 0.5),
-            border: AppColors.primaryDark.withValues(alpha: 0.6),
-            labels: [
-              for (final crop in crops)
-                if (crop.zoneId == zone.id && crop.isInGround && plantsById[crop.plantId] != null)
-                  AppLocalizations.plantName(plantsById[crop.plantId]!),
-            ],
-          ),
+        if (parcelsById[zone.parcelId] != null) _zoneShape(zone, parcelsById[zone.parcelId]!, crops, plantsById),
     ];
+  }
+
+  /// A zone in the color of its plant, the name of each plant in its dark shade.
+  CanvasShape _zoneShape(Zone zone, Parcel parcel, List<Crop> crops, Map<int, Plant> plantsById) {
+    final plants = {
+      for (final crop in crops)
+        if (crop.zoneId == zone.id && crop.isInGround && plantsById[crop.plantId] != null) plantsById[crop.plantId]!,
+    }.toList();
+    final (fill, border) = PlantColors.zone(plants);
+    return CanvasShape(
+      id: zone.id,
+      points: zone.absoluteShape(parcel),
+      fill: fill.withValues(alpha: 0.6),
+      border: border.withValues(alpha: 0.7),
+      labels: [for (final p in plants) AppLocalizations.plantName(p)],
+      labelColors: [for (final p in plants) PlantColors.dark(p)],
+    );
   }
 
   Widget _buildSelectedBar(Parcel parcel) {

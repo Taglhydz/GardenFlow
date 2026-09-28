@@ -35,7 +35,9 @@ void main() {
     final world = canvas.world;
     final view = canvas.view ?? world;
     final ppm = math.min(box.width / view.width, box.height / view.height);
-    return box.topLeft + (meters - world.topLeft) * ppm;
+    // position and zoom of the plan (moved with the finger, recentered…)
+    final matrix = tester.widget<InteractiveViewer>(find.byType(InteractiveViewer)).transformationController!.value;
+    return box.topLeft + MatrixUtils.transformPoint(matrix, (meters - world.topLeft) * ppm);
   }
 
   Future<void> tapAt(WidgetTester tester, Offset meters) async {
@@ -128,6 +130,24 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(services.parcels.created.single['pos_x'], 3);
+    });
+
+    testWidgets('the plan moved far away comes back with the recenter button', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+
+      final parcel = toScreen(tester, const Offset(2, 2));
+      await tester.dragFrom(toScreen(tester, const Offset(5, 5)), const Offset(-600, -400));
+      await tester.pumpAndSettle();
+      expect(toScreen(tester, const Offset(2, 2)), isNot(parcel)); // the plan moved
+
+      await tester.tap(find.byTooltip('Recentrer le plan'));
+      await tester.pumpAndSettle();
+      final box = tester.getRect(find.byType(ShapeCanvas));
+      expect(box.contains(toScreen(tester, const Offset(2, 2))), isTrue);
+
+      await tapAt(tester, const Offset(2, 2)); // the parcel can be selected again
+      expect(find.text('Ouvrir'), findsOneWidget);
     });
 
     testWidgets('the help can be closed and shown again with the "i"', (tester) async {
@@ -293,7 +313,41 @@ void main() {
       expect(planted.zoneId, 71);
     });
 
-    testWidgets('whole parcel : every crop with the name of its zone', (tester) async {
+    testWidgets('the red bin deletes the parcel after a confirmation', (tester) async {
+      await openParcel(tester);
+
+      await tester.tap(find.byTooltip('Supprimer la parcelle'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Annuler')); // changed my mind
+      await tester.pumpAndSettle();
+      expect(services.parcels.parcels, hasLength(1));
+
+      await tester.tap(find.byTooltip('Supprimer la parcelle'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Supprimer la parcelle « Carré A »'), findsOneWidget);
+      await tester.tap(find.text('Supprimer'));
+      await tester.pumpAndSettle();
+
+      expect(services.parcels.parcels, isEmpty);
+      expect(find.text('Dessiner une parcelle'), findsOneWidget); // back to the garden plan
+    });
+
+    testWidgets('rename a zone, then close the dialog by tapping outside : no crash, nothing saved', (tester) async {
+      services.zones.zones = [Zone(id: 70, parcelId: 1, name: 'Rang 1', shape: rect(1, 2))];
+      await openParcel(tester);
+      await tapAt(tester, const Offset(0.5, 1)); // select the zone
+
+      await tester.tap(find.byTooltip('Renommer la zone'));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(5, 5)); // outside the dialog
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(services.zones.zones.single.name, 'Rang 1');
+    });
+
+    testWidgets('all the plants of the parcel : button at the bottom left, every crop with the name of its zone', (tester) async {
       services.zones.zones = [Zone(id: 70, parcelId: 1, name: 'Rang 1', shape: rect(1, 2))];
       services.crops.crops = [
         const Crop(id: 10, parcelId: 1, zoneId: 70, plantId: 1),
@@ -301,10 +355,13 @@ void main() {
       ];
       await openParcel(tester);
 
-      await tester.tap(find.byIcon(Icons.more_vert).last);
+      final button = find.widgetWithText(FloatingActionButton, 'Toutes les plantes');
+      // at the bottom left, the "draw a zone" button at the bottom right
+      expect(tester.getCenter(button).dx, lessThan(tester.getCenter(find.text('Dessiner une zone')).dx));
+      await tester.tap(button);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Toute la parcelle').last);
-      await tester.pumpAndSettle();
+
+      expect(find.text('Toutes les plantes'), findsOneWidget); // title of the screen
 
       expect(find.text('Tomate'), findsOneWidget);
       expect(find.text('Basilic'), findsOneWidget);
