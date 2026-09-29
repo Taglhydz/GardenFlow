@@ -18,6 +18,8 @@ import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
 import '../widgets/help_banner.dart';
 import '../widgets/parcel_form_sheet.dart';
+import '../widgets/plan_bottom_slot.dart';
+import '../widgets/plan_entrance.dart';
 import '../widgets/rename_dialog.dart';
 import '../widgets/shape_canvas.dart';
 import '../widgets/snap_button.dart';
@@ -264,138 +266,178 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
       if (z.id == _selectedZoneId) selected = z;
     }
 
-    return Scaffold(
+    final appBar = AppBar(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.primary,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(current.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(
-              '${AppLocalizations.area(current.areaM2)} · ${AppLocalizations.getSoilTypeLabel(current.soilType)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.straighten),
-            tooltip: 'dimensions.of_parcel'.tr(),
-            onPressed: () => _editParcelDimensions(current),
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'edit_parcel'.tr(),
-            onPressed: () => ParcelFormSheet.show(context, gardenId: _gardenId, parcel: current),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppColors.error),
-            tooltip: 'delete_parcel'.tr(),
-            onPressed: () => _deleteParcel(current),
+      foregroundColor: AppColors.primary,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(current.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            '${AppLocalizations.area(current.areaM2)} · ${AppLocalizations.getSoilTypeLabel(current.soilType)}',
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
           ),
         ],
       ),
-      // all the plants of the parcel at the bottom left, draw a zone at the bottom right
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _draft == null && selected == null
-          ? Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.straighten),
+          tooltip: 'dimensions.of_parcel'.tr(),
+          onPressed: () => _editParcelDimensions(current),
+        ),
+        IconButton(
+          icon: const Icon(Icons.edit_outlined),
+          tooltip: 'edit_parcel'.tr(),
+          onPressed: () => ParcelFormSheet.show(context, gardenId: _gardenId, parcel: current),
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_outline, color: AppColors.error),
+          tooltip: 'delete_parcel'.tr(),
+          onPressed: () => _deleteParcel(current),
+        ),
+      ],
+    );
+
+    // opened from the garden plan (PlanEntrance) : the garden is seen around the parcel while it grows
+    return EntranceBackdrop(
+      color: AppColors.background,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        // the header comes down from the top of the screen
+        appBar: PreferredSize(
+          preferredSize: appBar.preferredSize,
+          child: EntranceSlide(offset: const Offset(0, -1), start: 0.35, child: appBar),
+        ),
+        // the plan goes on behind the bottom bar (no jump when it appears), it is centered above it
+        extendBody: true,
+        body: Column(
+          children: [
+            EntranceSlide(
+              offset: const Offset(0, -2),
+              child: HelpBanner(
+                screen: 'parcel',
+                text: _draft != null
+                    ? 'parcel_screen.draw_hint'.tr()
+                    : selected != null
+                    ? 'parcel_screen.hint_selected'.tr()
+                    : zones.isEmpty
+                    ? 'parcel_screen.empty_hint'.tr()
+                    : 'parcel_screen.hint'.tr(),
+              ),
+            ),
+            Expanded(
+              child: Stack(
                 children: [
-                  FloatingActionButton.extended(
-                    heroTag: 'all_plants',
-                    onPressed: () => _openZone(null),
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.white,
-                    icon: const Icon(Icons.local_florist_outlined),
-                    label: Text('zone_screen.whole_parcel'.tr()),
+                  Positioned.fill(
+                    child: ShapeCanvas(
+                      snapCm: ref.watch(snapProvider).effectiveCm,
+                      world: PlanGeometry.parcelWorld(current.shape),
+                      // plain infinite grid : the meters are given by the lengths of the sides
+                      rulers: false,
+                      // the corners of the zones stay in the parcel and stick to its sides
+                      area: current.shape,
+                      background: [
+                        CanvasShape(
+                          id: -1,
+                          points: current.shape,
+                          fill: soilColor(current.soilType),
+                          border: AppColors.parcels,
+                        ),
+                      ],
+                      shapes: [
+                        for (final zone in zones) _zoneShape(zone, names[zone.id] ?? '', plantsIn(zone), plantColors),
+                      ],
+                      selectedId: selected?.id,
+                      draft: _draft,
+                      onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
+                      onDraftClose: _finishDrawing,
+                      onDraftRefused: (refusal) => _showError(
+                        refusal == DraftRefusal.outside
+                            ? 'parcel_screen.point_outside'.tr()
+                            : 'parcel_screen.point_on_zone'.tr(),
+                      ),
+                      onSelect: (id) => setState(() => _selectedZoneId = id),
+                      onOpen: _openZone,
+                      onMoved: (id, delta) {
+                        final zone = zones.firstWhere((z) => z.id == id);
+                        _reshapeZone(id, Geometry.translate(zone.shape, delta));
+                      },
+                      onReshaped: _reshapeZone,
+                    ),
                   ),
-                  FloatingActionButton.extended(
-                    heroTag: 'draw_zone',
-                    onPressed: _startDrawing,
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.white,
-                    icon: const Icon(Icons.draw_outlined),
-                    label: Text('parcel_screen.draw_zone'.tr()),
+                  // the small buttons come in from their side of the screen
+                  const Positioned(
+                    top: 8,
+                    right: 8,
+                    child: EntranceSlide(offset: Offset(2.5, 0), start: 0.5, child: SnapButton()),
+                  ),
+                  const Positioned(
+                    top: 8,
+                    left: 8,
+                    child: EntranceSlide(offset: Offset(-2.5, 0), start: 0.5, child: HelpButton(screen: 'parcel')),
                   ),
                 ],
               ),
-            )
-          : null,
-      body: Column(
-        children: [
-          HelpBanner(
-            screen: 'parcel',
-            text: _draft != null
-                ? 'parcel_screen.draw_hint'.tr()
-                : selected != null
-                ? 'parcel_screen.hint_selected'.tr()
-                : zones.isEmpty
-                ? 'parcel_screen.empty_hint'.tr()
-                : 'parcel_screen.hint'.tr(),
-          ),
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ShapeCanvas(
-                    snapCm: ref.watch(snapProvider).effectiveCm,
-                    world: PlanGeometry.parcelWorld(current.shape),
-                    // plain infinite grid : the meters are given by the lengths of the sides
-                    rulers: false,
-                    // the corners of the zones stay in the parcel and stick to its sides
-                    area: current.shape,
-                    background: [
-                      CanvasShape(
-                        id: -1,
-                        points: current.shape,
-                        fill: soilColor(current.soilType),
-                        border: AppColors.parcels,
+            ),
+          ],
+        ),
+        // in the bottom bar of the Scaffold, error messages are shown above it instead of hiding it.
+        // The buttons, the drawing bar and the bar of the selected zone come up from the bottom
+        bottomNavigationBar: PlanBottomSlot(
+          child: _draft != null
+              ? DrawingBar(
+                  key: const ValueKey('drawing'),
+                  pointCount: _draft!.length,
+                  isSaving: _isSaving,
+                  onUndo: () => setState(() => _draft = [..._draft!]..removeLast()),
+                  onCancel: () => setState(() => _draft = null),
+                  onFinish: _finishDrawing,
+                )
+              : selected != null
+              ? KeyedSubtree(
+                  key: const ValueKey('selected'),
+                  child: _buildSelectedBar(
+                    selected,
+                    names[selected.id] ?? '',
+                    [for (final p in plantsIn(selected)) AppLocalizations.plantName(p)],
+                  ),
+                )
+              // all the plants of the parcel at the bottom left, draw a zone at the bottom right
+              : SafeArea(
+                  key: const ValueKey('buttons'),
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    // when the parcel opens, they come up from the bottom of the screen
+                    child: EntranceSlide(
+                      offset: const Offset(0, 2),
+                      start: 0.45,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          FloatingActionButton.extended(
+                            heroTag: 'all_plants',
+                            onPressed: () => _openZone(null),
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: AppColors.white,
+                            icon: const Icon(Icons.local_florist_outlined),
+                            label: Text('zone_screen.whole_parcel'.tr()),
+                          ),
+                          FloatingActionButton.extended(
+                            heroTag: 'draw_zone',
+                            onPressed: _startDrawing,
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: AppColors.white,
+                            icon: const Icon(Icons.draw_outlined),
+                            label: Text('parcel_screen.draw_zone'.tr()),
+                          ),
+                        ],
                       ),
-                    ],
-                    shapes: [
-                      for (final zone in zones) _zoneShape(zone, names[zone.id] ?? '', plantsIn(zone), plantColors),
-                    ],
-                    selectedId: selected?.id,
-                    draft: _draft,
-                    onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
-                    onDraftClose: _finishDrawing,
-                    onDraftRefused: (refusal) => _showError(
-                      refusal == DraftRefusal.outside
-                          ? 'parcel_screen.point_outside'.tr()
-                          : 'parcel_screen.point_on_zone'.tr(),
                     ),
-                    onSelect: (id) => setState(() => _selectedZoneId = id),
-                    onOpen: _openZone,
-                    onMoved: (id, delta) {
-                      final zone = zones.firstWhere((z) => z.id == id);
-                      _reshapeZone(id, Geometry.translate(zone.shape, delta));
-                    },
-                    onReshaped: _reshapeZone,
                   ),
                 ),
-                const Positioned(top: 8, right: 8, child: SnapButton()),
-                const Positioned(top: 8, left: 8, child: HelpButton(screen: 'parcel')),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
-      // in the bottom bar of the Scaffold, error messages are shown above it instead of hiding it
-      bottomNavigationBar: _draft != null
-          ? DrawingBar(
-              pointCount: _draft!.length,
-              isSaving: _isSaving,
-              onUndo: () => setState(() => _draft = [..._draft!]..removeLast()),
-              onCancel: () => setState(() => _draft = null),
-              onFinish: _finishDrawing,
-            )
-          : selected != null
-          ? _buildSelectedBar(selected, names[selected.id] ?? '', [for (final p in plantsIn(selected)) AppLocalizations.plantName(p)])
-          : null,
     );
   }
 

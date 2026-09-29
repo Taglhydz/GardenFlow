@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:GardenFlow/models/garden.dart';
+import 'package:GardenFlow/screens/garden_view.dart';
 import 'package:GardenFlow/services/api_service.dart';
 import 'package:GardenFlow/widgets/garden_mini_map.dart';
+import 'package:GardenFlow/widgets/shape_canvas.dart';
 import 'app_harness.dart';
 import 'fakes.dart';
 
@@ -71,6 +73,43 @@ void main() {
     await tester.tap(find.text('Balcon'));
     await tester.pumpAndSettle();
     expect(find.text('Dessiner une parcelle'), findsOneWidget);
+  });
+
+  testWidgets('opening a garden : the plan grows out of its mini plan, the buttons slide in, backwards when closing', (tester) async {
+    services.auth.restoreResult = alice;
+    services.gardens.gardens = [
+      const Garden(id: 7, userId: 1, name: 'Mon potager'),
+      const Garden(id: 8, userId: 1, name: 'Balcon'),
+    ];
+    await pumpApp(tester, services);
+    final miniMap = tester.getRect(find.byType(GardenMiniMap).last);
+
+    await tester.tap(find.text('Balcon'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    // early : the plan is still around the mini plan, the header and the button are not in place yet
+    final plan = tester.getRect(find.byType(ShapeCanvas));
+    final earlyTitle = tester.getRect(find.text('Balcon').last);
+    final earlyButton = tester.getRect(find.text('Dessiner une parcelle'));
+    expect(find.text('Mon potager'), findsOneWidget); // the list is still behind
+
+    await tester.pumpAndSettle();
+    expect(find.text('Mon potager'), findsNothing);
+    final title = tester.getRect(find.text('Balcon'));
+    final button = tester.getRect(find.text('Dessiner une parcelle'));
+    expect(earlyTitle.top, lessThan(title.top)); // the header came down
+    expect(earlyButton.top, greaterThan(button.top)); // the button came up
+    expect(plan.contains(miniMap.center), isTrue);
+
+    // closing : the same animation backwards, then the list is back
+    await tester.tap(find.byTooltip('Mes jardins'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.getRect(find.text('Dessiner une parcelle')).top, greaterThan(button.top)); // going down
+    await tester.pumpAndSettle();
+    expect(find.byType(GardenView), findsNothing);
+    expect(find.text('Mon potager'), findsOneWidget);
+    expect(tester.getRect(find.byType(GardenMiniMap).last), miniMap);
   });
 
   testWidgets('register from the login screen -> home with welcome dialog', (tester) async {

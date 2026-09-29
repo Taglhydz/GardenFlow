@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +8,7 @@ import 'package:GardenFlow/models/suggestion.dart';
 import 'package:GardenFlow/models/zone.dart';
 import 'package:GardenFlow/utils/plan_geometry.dart';
 import 'package:GardenFlow/utils/plant_colors.dart';
+import 'package:GardenFlow/widgets/plan_bottom_slot.dart';
 import 'package:GardenFlow/widgets/plant_color_sheet.dart';
 import 'package:GardenFlow/widgets/shape_canvas.dart';
 import 'package:GardenFlow/widgets/snap_button.dart';
@@ -30,17 +30,9 @@ void main() {
     services.gardens.gardens = [const Garden(id: 7, userId: 1, name: 'Mon potager')];
   });
 
-  /// Screen position of a point of the plan (meters), like ShapeCanvas computes it.
-  Offset toScreen(WidgetTester tester, Offset meters) {
-    final canvas = tester.widget<ShapeCanvas>(find.byType(ShapeCanvas));
-    final box = tester.getRect(find.byType(ShapeCanvas));
-    final world = canvas.world;
-    final view = canvas.view ?? world;
-    final ppm = math.min(box.width / view.width, box.height / view.height);
-    // position and zoom of the plan (moved with the finger, recentered…)
-    final matrix = tester.widget<InteractiveViewer>(find.byType(InteractiveViewer)).transformationController!.value;
-    return box.topLeft + MatrixUtils.transformPoint(matrix, (meters - world.topLeft) * ppm);
-  }
+  /// Screen position of a point of the plan (meters), computed by the plan on the screen.
+  Offset toScreen(WidgetTester tester, Offset meters) =>
+      tester.state<ShapeCanvasState>(find.byType(ShapeCanvas)).toGlobal(meters)!;
 
   Future<void> tapAt(WidgetTester tester, Offset meters) async {
     await tester.tapAt(toScreen(tester, meters));
@@ -134,14 +126,64 @@ void main() {
       expect(services.parcels.created.single['pos_x'], 3);
     });
 
-    testWidgets('the plan opens centered on the parcels, even far from the corner of the garden', (tester) async {
+    testWidgets('the plan opens centered on the parcels (above the bottom button), even far from the corner', (tester) async {
       services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 40, posY: 30, shape: rect(4, 2))];
       await pumpApp(tester, services);
 
       final box = tester.getRect(find.byType(ShapeCanvas));
+      final bottom = tester.getRect(find.byType(PlanBottomSlot));
       final center = toScreen(tester, const Offset(42, 31));
       expect(center.dx, closeTo(box.center.dx, 1));
-      expect(center.dy, closeTo(box.center.dy, 1));
+      expect(center.dy, closeTo((box.top + bottom.top) / 2, 1));
+    });
+
+    testWidgets('selecting a parcel : its bar comes up from the bottom, the plan follows it smoothly', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+      final before = toScreen(tester, const Offset(2, 2));
+      final plan = tester.getRect(find.byType(ShapeCanvas));
+
+      await tester.tapAt(before);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      // the bar is on its way up, over the plan : the plan still goes to the bottom of the screen
+      final bar = tester.getRect(find.text('Ouvrir'));
+      expect(tester.getRect(find.byType(ShapeCanvas)).bottom, plan.bottom);
+
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.text('Ouvrir')).top, lessThan(bar.top)); // it came up
+      final after = toScreen(tester, const Offset(2, 2));
+      final bottom = tester.getRect(find.byType(PlanBottomSlot));
+      // centered between the help (now on two lines) and the bar
+      expect(after.dy, closeTo((tester.getRect(find.byType(ShapeCanvas)).top + bottom.top) / 2, 1));
+
+      // unselected : the button comes back up from the bottom
+      await tester.tapAt(toScreen(tester, const Offset(4.5, 0)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final button = tester.getRect(find.text('Dessiner une parcelle'));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.text('Dessiner une parcelle')).top, lessThan(button.top));
+    });
+
+    testWidgets('opening a parcel : it grows out of its shape on the garden plan, and back when closing', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+      await tapAt(tester, const Offset(2, 2));
+
+      await tester.tap(find.text('Ouvrir'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      // early : the parcel plan is still around the parcel, the garden is seen around it
+      expect(find.byType(ShapeCanvas), findsNWidgets(2));
+      final earlyButton = tester.getRect(find.text('Dessiner une zone'));
+      await tester.pumpAndSettle();
+      expect(earlyButton.top, greaterThan(tester.getRect(find.text('Dessiner une zone')).top)); // it came up
+
+      await tester.tap(find.byTooltip('Retour'));
+      await tester.pumpAndSettle();
+      expect(find.text('Dessiner une zone'), findsNothing);
+      expect(find.byType(ShapeCanvas), findsOneWidget);
     });
 
     testWidgets('the plan moved far away comes back with the recenter button', (tester) async {

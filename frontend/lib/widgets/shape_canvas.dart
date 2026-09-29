@@ -6,6 +6,7 @@ import '../config/app_localizations.dart';
 import '../config/constants.dart';
 import '../utils/geometry.dart';
 import '../utils/plan_geometry.dart';
+import 'plan_entrance.dart';
 
 /// A shape shown on a [ShapeCanvas], points in meters (canvas coordinates).
 class CanvasShape {
@@ -143,10 +144,10 @@ class ShapeCanvas extends StatefulWidget {
   final bool rulers;
 
   @override
-  State<ShapeCanvas> createState() => _ShapeCanvasState();
+  State<ShapeCanvas> createState() => ShapeCanvasState();
 }
 
-class _ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderStateMixin {
+class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderStateMixin {
   /// Touch areas (px on the screen) of the corners and of the "+" in the middle of the sides
   static const _vertexTouch = 24.0;
   static const _midpointTouch = 20.0;
@@ -163,17 +164,24 @@ class _ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderStat
   /// Zoom of the plan (pinch), the grid is drawn for the part on the screen
   final _viewer = TransformationController();
 
-  /// Pixels per meter computed for this screen size, kept when [ShapeCanvas.view] is given
-  (Size, double)? _ppm;
+  /// Pixels per meter, computed for a screen width and a [ShapeCanvas.view]. Kept when only the height of
+  /// the plan changes (help banner...) : the plan doesn't jump, the zoom of the viewer adapts smoothly.
+  (double, Rect, double)? _ppm;
 
-  /// Screen size the plan was last centered for : it opens centered, and stays centered when
-  /// the screen changes size (help closed...) until the user moves or zooms it.
+  /// Screen size and bottom bar the plan was last centered for : it opens centered, and stays centered when
+  /// the screen changes size (help banner...) or a bar comes up at the bottom, until the user moves or zooms it.
   Size? _centeredFor;
+  double _centeredInset = 0;
   bool _movedByUser = false;
 
   /// Recenter button : the plan glides back (move + zoom) instead of jumping
+  static const _recenterDuration = Duration(milliseconds: 400);
+
+  /// A bar coming up at the bottom, the help banner changing : the plan follows quickly
+  static const _followDuration = Duration(milliseconds: 220);
+
   late final AnimationController _recenterAnimation =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 400))..addListener(_onRecenterTick);
+      AnimationController(vsync: this, duration: _recenterDuration)..addListener(_onRecenterTick);
   late final Animation<double> _recenterCurve = CurvedAnimation(parent: _recenterAnimation, curve: Curves.easeInOutCubic);
   Matrix4Tween _recenterTween = Matrix4Tween();
 
@@ -187,12 +195,32 @@ class _ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderStat
   }
 
   double _pixelsPerMeter(Size screen) {
-    final cached = _ppm;
-    if (widget.view != null && cached != null && cached.$1 == screen) return cached.$2;
     final view = widget.view ?? widget.world;
+    final cached = _ppm;
+    if (cached != null && cached.$1 == screen.width && cached.$2 == view) return cached.$3;
     final ppm = math.min(screen.width / view.width, screen.height / view.height);
-    _ppm = (screen, ppm);
+    _ppm = (screen.width, view, ppm);
     return ppm;
+  }
+
+  /// Where a point of the plan (meters) is on the screen (global coordinates), null before the first layout.
+  Offset? toGlobal(Offset meters) {
+    final box = context.findRenderObject() as RenderBox?;
+    final ppm = _ppm?.$3;
+    if (box == null || !box.attached || !box.hasSize || ppm == null) return null;
+    return box.localToGlobal(MatrixUtils.transformPoint(_viewer.value, (meters - widget.world.topLeft) * ppm));
+  }
+
+  /// Where the shape [id] is on the screen (its bounding box, global coordinates), null when it is not
+  /// shown : a parcel screen opens from there.
+  ///   final rect = canvasKey.currentState?.globalRectOf(parcel.id);
+  Rect? globalRectOf(int id) {
+    final shape = widget.shapes.where((s) => s.id == id).firstOrNull;
+    if (shape == null) return null;
+
+    final bounds = Geometry.bounds(shape.points);
+    final (topLeft, bottomRight) = (toGlobal(bounds.topLeft), toGlobal(bounds.bottomRight));
+    return topLeft == null || bottomRight == null ? null : Rect.fromPoints(topLeft, bottomRight);
   }
 
   /// Sides a point sticks to : the area, the background and the shapes (except the one being edited)
@@ -376,47 +404,68 @@ class _ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    // bar over the bottom of the plan (Scaffold.extendBody) : the plan is centered above it
+    final inset = MediaQuery.paddingOf(context).bottom;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final screen = constraints.biggest;
         final (world, ppm) = _frozen ?? (widget.world, _pixelsPerMeter(screen));
         final editing = widget.selectedId != null && !_isDrawing;
+        // part of the plan that is not behind the bottom bar
+        final visible = Size(screen.width, math.max(1, screen.height - inset));
 
         if (_centeredFor == null) {
           // first layout : nothing listens to the viewer yet, it can be set right away
           _centeredFor = screen;
-          _recenter(screen, ppm);
-        } else if (_centeredFor != screen && !_movedByUser) {
+          _centeredInset = inset;
+          _recenter(visible, ppm);
+        } else if ((_centeredFor != screen || _centeredInset != inset) && !_movedByUser) {
+          // a bar at the bottom, the help banner changing size : the plan follows it quickly
           _centeredFor = screen;
+          _centeredInset = inset;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && !_movedByUser) _recenter(screen, ppm);
+            if (mounted && !_movedByUser) _recenter(visible, ppm, duration: _followDuration);
           });
         }
 
         return Stack(
           children: [
-            // the grid fills the whole screen wherever the plan is moved : the background is infinite
+            // when a garden opens, the plan grows out of its mini plan
             Positioned.fill(
-              child: CustomPaint(
-                painter: _GridPainter(viewer: _viewer, world: world, ppm: ppm, snapCm: widget.snapCm, rulers: widget.rulers),
+              child: EntranceReveal(
+                child: Stack(
+                  children: [
+                    // the grid fills the whole screen wherever the plan is moved : the background is infinite
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _GridPainter(viewer: _viewer, world: world, ppm: ppm, snapCm: widget.snapCm, rulers: widget.rulers),
+                      ),
+                    ),
+                    Positioned.fill(child: _buildPlan(world, ppm, editing)),
+                  ],
+                ),
               ),
             ),
-            Positioned.fill(child: _buildPlan(world, ppm, editing)),
             Positioned(
               top: 52,
               right: 8,
-              child: Material(
-                color: AppColors.white,
-                elevation: 2,
-                shape: const CircleBorder(),
-                child: IconButton(
-                  icon: const Icon(Icons.center_focus_strong_outlined, color: AppColors.primaryDark),
-                  tooltip: 'plan.recenter'.tr(),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    _movedByUser = false;
-                    _recenter(screen, ppm, animate: true);
-                  },
+              child: EntranceSlide(
+                offset: const Offset(2.5, 0),
+                start: 0.55,
+                child: Material(
+                  color: AppColors.white,
+                  elevation: 2,
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    icon: const Icon(Icons.center_focus_strong_outlined, color: AppColors.primaryDark),
+                    tooltip: 'plan.recenter'.tr(),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      _movedByUser = false;
+                      _recenter(visible, ppm, duration: _recenterDuration);
+                    },
+                  ),
                 ),
               ),
             ),
@@ -429,9 +478,9 @@ class _ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderStat
   /// Smallest zoom : a big plan can be zoomed out much more to see it
   double get _minScale => widget.view == null ? 0.5 : 0.05;
 
-  /// Shows the whole [ShapeCanvas.view] (or the whole plan), centered on the screen,
-  /// right away or with a short move + zoom animation.
-  void _recenter(Size screen, double ppm, {bool animate = false}) {
+  /// Shows the whole [ShapeCanvas.view] (or the whole plan), centered in the [screen] part of the plan,
+  /// right away or with a move + zoom animation lasting [duration].
+  void _recenter(Size screen, double ppm, {Duration? duration}) {
     final view = widget.view ?? widget.world;
     final width = view.width * ppm;
     final height = view.height * ppm;
@@ -441,12 +490,14 @@ class _ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderStat
       ..setTranslationRaw((screen.width - width * scale) / 2 - topLeft.dx, (screen.height - height * scale) / 2 - topLeft.dy, 0);
 
     _recenterAnimation.stop();
-    if (!animate) {
+    if (duration == null) {
       _viewer.value = centered;
       return;
     }
     _recenterTween = Matrix4Tween(begin: _viewer.value.clone(), end: centered);
-    _recenterAnimation.forward(from: 0);
+    _recenterAnimation
+      ..duration = duration
+      ..forward(from: 0);
   }
 
   Widget _buildPlan(Rect world, double ppm, bool editing) {

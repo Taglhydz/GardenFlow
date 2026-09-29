@@ -5,6 +5,7 @@ import '../config/constants.dart';
 import '../providers/help_provider.dart';
 
 /// Help of a screen, under the app bar : the cross closes it, [HelpButton] shows it again.
+/// Its height changes smoothly (text on one more line, closed...) : the plan below follows it without jumping.
 class HelpBanner extends ConsumerWidget {
   const HelpBanner({super.key, required this.screen, required this.text});
 
@@ -12,10 +13,21 @@ class HelpBanner extends ConsumerWidget {
   final String screen;
   final String text;
 
+  static const _resizeDuration = Duration(milliseconds: 200);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(hiddenHelpProvider).contains(screen)) return const SizedBox.shrink();
+    final hidden = ref.watch(hiddenHelpProvider).contains(screen);
 
+    return AnimatedSize(
+      duration: _resizeDuration,
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: hidden ? const SizedBox(width: double.infinity) : _buildBanner(ref),
+    );
+  }
+
+  Widget _buildBanner(WidgetRef ref) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.only(left: 16),

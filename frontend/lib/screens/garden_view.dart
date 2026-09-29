@@ -19,6 +19,8 @@ import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
 import '../widgets/help_banner.dart';
 import '../widgets/parcel_form_sheet.dart';
+import '../widgets/plan_bottom_slot.dart';
+import '../widgets/plan_entrance.dart';
 import '../widgets/rename_dialog.dart';
 import '../widgets/shape_canvas.dart';
 import '../widgets/snap_button.dart';
@@ -42,6 +44,9 @@ class GardenView extends ConsumerStatefulWidget {
 
 class _GardenViewState extends ConsumerState<GardenView> {
   int? _selectedParcelId;
+
+  /// The plan : a parcel screen opens from the parcel on it
+  final _canvasKey = GlobalKey<ShapeCanvasState>();
 
   /// Points of the parcel being drawn (null = not drawing)
   List<Offset>? _draft;
@@ -153,9 +158,11 @@ class _GardenViewState extends ConsumerState<GardenView> {
   }
 
   void _openParcel(int id) {
+    // the parcel grows out of its shape on the garden plan, and shrinks back into it when closed
     Navigator.push(
       context,
-      MaterialPageRoute(
+      PlanEntrance.route(
+        from: () => _canvasKey.currentState?.globalRectOf(id),
         builder: (_) => ParcelScreen(gardenId: _gardenId, parcelId: id),
       ),
     );
@@ -232,70 +239,74 @@ class _GardenViewState extends ConsumerState<GardenView> {
       if (p.id == _selectedParcelId) selected = p;
     }
 
-    return Scaffold(
+    final appBar = AppBar(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.primary,
-        leading: IconButton(
-          icon: const Icon(Icons.home_outlined, size: 28),
-          onPressed: widget.onHome,
-          tooltip: 'my_gardens'.tr(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.garden.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            if (widget.garden.location != null)
-              Text(widget.garden.location!, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          ],
-        ),
-        actions: [
-          PopupMenuButton<_GardenAction>(
-            onSelected: _onGardenAction,
-            itemBuilder: (context) => [
-              PopupMenuItem(value: _GardenAction.rename, child: Text('garden_view.rename_garden'.tr())),
-              PopupMenuItem(
-                value: _GardenAction.delete,
-                child: Text('delete_garden'.tr(), style: const TextStyle(color: AppColors.error)),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            onPressed: widget.onProfile,
-            tooltip: 'profile.title'.tr(),
-          ),
+      foregroundColor: AppColors.primary,
+      leading: IconButton(
+        icon: const Icon(Icons.home_outlined, size: 28),
+        onPressed: widget.onHome,
+        tooltip: 'my_gardens'.tr(),
+      ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.garden.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+          if (widget.garden.location != null)
+            Text(widget.garden.location!, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
         ],
       ),
-      floatingActionButton: parcelsAsync.hasValue && _draft == null && selected == null
-          ? FloatingActionButton.extended(
-              onPressed: _startDrawing,
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.white,
-              icon: const Icon(Icons.draw_outlined),
-              label: Text('garden_view.draw_parcel'.tr()),
-            )
-          : null,
+      actions: [
+        PopupMenuButton<_GardenAction>(
+          onSelected: _onGardenAction,
+          itemBuilder: (context) => [
+            PopupMenuItem(value: _GardenAction.rename, child: Text('garden_view.rename_garden'.tr())),
+            PopupMenuItem(
+              value: _GardenAction.delete,
+              child: Text('delete_garden'.tr(), style: const TextStyle(color: AppColors.error)),
+            ),
+          ],
+        ),
+        IconButton(
+          icon: const Icon(Icons.person_outline),
+          onPressed: widget.onProfile,
+          tooltip: 'profile.title'.tr(),
+        ),
+      ],
+    );
+
+    return Scaffold(
+      // transparent : the list of the gardens is seen around the plan while the garden opens (PlanEntrance)
+      backgroundColor: Colors.transparent,
+      // the header comes down from the top of the screen
+      appBar: PreferredSize(
+        preferredSize: appBar.preferredSize,
+        child: EntranceSlide(offset: const Offset(0, -1), start: 0.35, child: appBar),
+      ),
+      // the plan goes on behind the bottom bar (no jump when it appears), it is centered above it
+      extendBody: true,
       body: !parcelsAsync.hasValue
           ? (parcelsAsync.hasError ? _buildError() : const Center(child: CircularProgressIndicator()))
           : Column(
               children: [
-                HelpBanner(
-                  screen: 'garden',
-                  text: _draft != null
-                      ? 'garden_view.draw_hint'.tr()
-                      : selected != null
-                      ? 'garden_view.hint_selected'.tr()
-                      : parcels.isEmpty
-                      ? 'garden_view.empty_hint'.tr()
-                      : 'garden_view.hint'.tr(),
+                EntranceSlide(
+                  offset: const Offset(0, -2),
+                  child: HelpBanner(
+                    screen: 'garden',
+                    text: _draft != null
+                        ? 'garden_view.draw_hint'.tr()
+                        : selected != null
+                        ? 'garden_view.hint_selected'.tr()
+                        : parcels.isEmpty
+                        ? 'garden_view.empty_hint'.tr()
+                        : 'garden_view.hint'.tr(),
+                  ),
                 ),
                 Expanded(
                   child: Stack(
                     children: [
                       Positioned.fill(
                         child: ShapeCanvas(
+                          key: _canvasKey,
                           snapCm: ref.watch(snapProvider).effectiveCm,
                           world: PlanGeometry.gardenWorld([
                             for (final p in parcels) p.absoluteShape,
@@ -324,25 +335,63 @@ class _GardenViewState extends ConsumerState<GardenView> {
                           onReshaped: _onReshaped,
                         ),
                       ),
-                      const Positioned(top: 8, right: 8, child: SnapButton()),
-                      const Positioned(top: 8, left: 8, child: HelpButton(screen: 'garden')),
+                      // the small buttons come in from their side of the screen
+                      const Positioned(
+                        top: 8,
+                        right: 8,
+                        child: EntranceSlide(offset: Offset(2.5, 0), start: 0.5, child: SnapButton()),
+                      ),
+                      const Positioned(
+                        top: 8,
+                        left: 8,
+                        child: EntranceSlide(offset: Offset(-2.5, 0), start: 0.5, child: HelpButton(screen: 'garden')),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
-      // in the bottom bar of the Scaffold, error messages are shown above it instead of hiding it
-      bottomNavigationBar: _draft != null
-          ? DrawingBar(
-              pointCount: _draft!.length,
-              isSaving: _isSaving,
-              onUndo: () => setState(() => _draft = [..._draft!]..removeLast()),
-              onCancel: () => setState(() => _draft = null),
-              onFinish: _finishDrawing,
-            )
-          : selected != null
-          ? _buildSelectedBar(selected)
-          : null,
+      // in the bottom bar of the Scaffold, error messages are shown above it instead of hiding it.
+      // The button, the drawing bar and the bar of the selected parcel come up from the bottom
+      bottomNavigationBar: PlanBottomSlot(
+        child: _draft != null
+            ? DrawingBar(
+                key: const ValueKey('drawing'),
+                pointCount: _draft!.length,
+                isSaving: _isSaving,
+                onUndo: () => setState(() => _draft = [..._draft!]..removeLast()),
+                onCancel: () => setState(() => _draft = null),
+                onFinish: _finishDrawing,
+              )
+            : selected != null
+            ? KeyedSubtree(key: const ValueKey('selected'), child: _buildSelectedBar(selected))
+            : parcelsAsync.hasValue
+            ? SafeArea(
+                key: const ValueKey('buttons'),
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    heightFactor: 1,
+                    // when the garden opens, comes up from the bottom of the screen
+                    child: EntranceSlide(
+                      offset: const Offset(0, 2),
+                      start: 0.45,
+                      child: FloatingActionButton.extended(
+                        heroTag: 'draw_parcel',
+                        onPressed: _startDrawing,
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.white,
+                        icon: const Icon(Icons.draw_outlined),
+                        label: Text('garden_view.draw_parcel'.tr()),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : const SizedBox.shrink(key: ValueKey('none')),
+      ),
     );
   }
 

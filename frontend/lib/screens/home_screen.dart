@@ -6,6 +6,7 @@ import '../models/garden.dart';
 import '../providers/auth_provider.dart';
 import '../providers/garden_providers.dart';
 import '../widgets/create_garden_dialog.dart';
+import '../widgets/plan_entrance.dart';
 import '../widgets/garden_mini_map.dart';
 import '../widgets/welcome_dialog.dart';
 import 'garden_view.dart';
@@ -18,12 +19,25 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
   bool _autoSelectChecked = false;
+
+  /// Opening of the garden (see PlanEntrance), played backwards when it closes
+  late final AnimationController _entrance = AnimationController(vsync: this, duration: PlanEntrance.duration);
+
+  /// Garden on the screen : still shown while it closes
+  Garden? _shownGarden;
+
+  /// Mini plan of each card : the garden grows out of it and shrinks back into it
+  final _miniMapKeys = <int, GlobalKey>{};
 
   @override
   void initState() {
     super.initState();
+    // garden remembered from the last session : shown right away
+    _shownGarden = ref.read(selectedGardenProvider);
+    if (_shownGarden != null) _entrance.value = 1;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
@@ -59,6 +73,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _entrance.dispose();
+    super.dispose();
+  }
+
+  void _onSelectedGarden(Garden? previous, Garden? next) {
+    if (next != null) {
+      setState(() => _shownGarden = next);
+      if (previous == null) _entrance.forward();
+    } else if (_shownGarden != null) {
+      _entrance.reverse().whenComplete(() {
+        if (mounted && ref.read(selectedGardenProvider) == null) setState(() => _shownGarden = null);
+      });
+    }
+  }
+
+  Rect? _miniMapRect(int gardenId) {
+    final box = _miniMapKeys[gardenId]?.currentContext?.findRenderObject() as RenderBox?;
+    return box != null && box.hasSize && box.attached ? box.localToGlobal(Offset.zero) & box.size : null;
+  }
+
   void _openProfile() {
     Navigator.push(
       context,
@@ -71,9 +107,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.listen(gardensProvider, (_, next) {
       if (next.hasValue) _autoSelectSingleGarden(next.value!);
     });
+    ref.listen<Garden?>(selectedGardenProvider, _onSelectedGarden);
 
     final gardensAsync = ref.watch(gardensProvider);
-    final selectedGarden = ref.watch(selectedGardenProvider);
+    final garden = _shownGarden;
 
     if (!gardensAsync.hasValue) {
       return gardensAsync.hasError
@@ -81,18 +118,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           : const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // Afficher le jardin sélectionné
-    if (selectedGarden != null) {
-      return GardenView(
-        key: ValueKey(selectedGarden.id),
-        garden: selectedGarden,
-        onHome: () => ref.read(selectedGardenIdProvider.notifier).select(null),
-        onProfile: _openProfile,
-      );
-    }
+    // the list stays below the garden (hidden once it is open) : the mini plans stay where they are
+    // for the garden to shrink back into them, and the list keeps its scroll position
+    final list = _buildGardenSelectionView(gardensAsync.value!);
+    final gardenView = garden == null
+        ? null
+        : PlanEntrance(
+            animation: _entrance,
+            from: () => _miniMapRect(garden.id),
+            child: GardenView(
+              key: ValueKey(garden.id),
+              garden: garden,
+              onHome: () => ref.read(selectedGardenIdProvider.notifier).select(null),
+              onProfile: _openProfile,
+            ),
+          );
 
-    // Afficher la sélection/création de jardin
-    return _buildGardenSelectionView(gardensAsync.value!);
+    return ColoredBox(
+      color: AppColors.background,
+      child: AnimatedBuilder(
+        animation: _entrance,
+        builder: (context, _) {
+          final t = _entrance.value;
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: Offstage(
+                  offstage: gardenView != null && t == 1,
+                  child: IgnorePointer(
+                    ignoring: gardenView != null,
+                    // the list fades out while the plan grows
+                    child: Opacity(opacity: 1 - const Interval(0.2, 0.8).transform(t), child: list),
+                  ),
+                ),
+              ),
+              if (gardenView != null) Positioned.fill(child: gardenView),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   /// Page with the header on top : nothing is hidden behind the buttons.
@@ -188,6 +253,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return _buildPage(
       _buildGardenListView(gardens),
       floatingActionButton: FloatingActionButton(
+        // the list stays below an open garden : its button needs its own tag
+        heroTag: 'create_garden',
         onPressed: _createGarden,
         tooltip: 'home.create_new_garden'.tr(),
         backgroundColor: AppColors.primary,
@@ -258,6 +325,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         itemBuilder: (context, index) {
           return _GardenCard(
             garden: gardens[index],
+            miniMapKey: _miniMapKeys.putIfAbsent(gardens[index].id, GlobalKey.new),
             onTap: () => ref.read(selectedGardenIdProvider.notifier).select(gardens[index].id),
           );
         },
@@ -269,9 +337,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 /// A garden of the list : its name at the top, its mini plan (~3 cm) on the left,
 /// its place and description on the right.
 class _GardenCard extends StatelessWidget {
-  const _GardenCard({required this.garden, required this.onTap});
+  const _GardenCard({required this.garden, required this.miniMapKey, required this.onTap});
 
   final Garden garden;
+
+  /// The garden grows out of its mini plan when it opens
+  final GlobalKey miniMapKey;
   final VoidCallback onTap;
 
   @override
@@ -305,7 +376,7 @@ class _GardenCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GardenMiniMap(gardenId: garden.id),
+                  GardenMiniMap(key: miniMapKey, gardenId: garden.id),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
