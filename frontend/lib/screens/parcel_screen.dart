@@ -288,7 +288,13 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
         IconButton(
           icon: const Icon(Icons.edit_outlined),
           tooltip: 'edit_parcel'.tr(),
-          onPressed: () => ParcelFormSheet.show(context, gardenId: _gardenId, parcel: current),
+          // deleted from the sheet : back to the garden plan
+          onPressed: () => ParcelFormSheet.show(
+            context,
+            gardenId: _gardenId,
+            parcel: current,
+            onDeleted: () => Navigator.pop(context),
+          ),
         ),
         IconButton(
           icon: const Icon(Icons.delete_outline, color: AppColors.error),

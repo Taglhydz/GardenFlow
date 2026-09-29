@@ -72,6 +72,46 @@ void main() {
       expect(fields['pos_y'], 1);
       expect(shapeFromJson(fields['shape']), rect(2, 1));
       expect(find.text('Ouvrir'), findsOneWidget); // the new parcel is selected
+
+      // the plan glided to the new parcel : centered above its bar
+      final box = tester.getRect(find.byType(ShapeCanvas));
+      final bottom = tester.getRect(find.byType(PlanBottomSlot));
+      final center = toScreen(tester, const Offset(2, 1.5));
+      expect(center.dx, closeTo(box.center.dx, 1));
+      expect(center.dy, closeTo((box.top + bottom.top) / 2, 1));
+    });
+
+    testWidgets('a parcel drawn far from the others : the plan doesn\'t jump, then glides to it', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+
+      await tester.tap(find.text('Dessiner une parcelle'));
+      await tester.pumpAndSettle();
+      // beyond the view of the garden : the new parcel makes it grow
+      final corners = const [Offset(5.5, 2), Offset(6.5, 2), Offset(6.5, 3), Offset(5.5, 3)];
+      for (final corner in corners) {
+        await tapAt(tester, corner);
+      }
+      final before = toScreen(tester, const Offset(1, 1));
+      await tester.tap(find.text('Terminer'));
+      await tester.pump();
+      expect(toScreen(tester, const Offset(1, 1)), before); // same zoom, same place
+
+      await tester.pumpAndSettle();
+      final box = tester.getRect(find.byType(ShapeCanvas));
+      final bottom = tester.getRect(find.byType(PlanBottomSlot));
+      final center = toScreen(tester, const Offset(6, 2.5));
+      expect(center.dx, closeTo(box.center.dx, 1));
+      expect(center.dy, closeTo((box.top + bottom.top) / 2, 1));
+    });
+
+    testWidgets('the name of a parcel is written above its top-left corner', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+
+      final shape = tester.widget<ShapeCanvas>(find.byType(ShapeCanvas)).shapes.single;
+      expect(shape.tag, 'Carré A');
+      expect(shape.labels, isEmpty); // the inside is left to the plants of the zones
     });
 
     testWidgets('a self-crossing drawing is refused', (tester) async {
@@ -137,7 +177,7 @@ void main() {
       expect(center.dy, closeTo((box.top + bottom.top) / 2, 1));
     });
 
-    testWidgets('selecting a parcel : its bar comes up from the bottom, the plan follows it smoothly', (tester) async {
+    testWidgets('selecting a parcel : its bar comes up from the bottom, the plan doesn\'t move when the parcel is still seen', (tester) async {
       services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
       await pumpApp(tester, services);
       final before = toScreen(tester, const Offset(2, 2));
@@ -152,10 +192,9 @@ void main() {
 
       await tester.pumpAndSettle();
       expect(tester.getRect(find.text('Ouvrir')).top, lessThan(bar.top)); // it came up
+      // the parcel is above the bar : same place on the plan (the help, now on two lines, only pushed the plan down)
       final after = toScreen(tester, const Offset(2, 2));
-      final bottom = tester.getRect(find.byType(PlanBottomSlot));
-      // centered between the help (now on two lines) and the bar
-      expect(after.dy, closeTo((tester.getRect(find.byType(ShapeCanvas)).top + bottom.top) / 2, 1));
+      expect(after - tester.getRect(find.byType(ShapeCanvas)).topLeft, before - plan.topLeft);
 
       // unselected : the button comes back up from the bottom
       await tester.tapAt(toScreen(tester, const Offset(4.5, 0)));
@@ -164,6 +203,64 @@ void main() {
       final button = tester.getRect(find.text('Dessiner une parcelle'));
       await tester.pumpAndSettle();
       expect(tester.getRect(find.text('Dessiner une parcelle')).top, lessThan(button.top));
+    });
+
+    testWidgets('selecting a parcel partly hidden by its bar : the plan glides to show it', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+
+      // the plan moved down : the bottom of the parcel is where the bar will be
+      final barTop = tester.getRect(find.byType(PlanBottomSlot)).top;
+      await tester.dragFrom(toScreen(tester, const Offset(4.5, 0.5)), Offset(0, barTop + 40 - toScreen(tester, const Offset(2, 3)).dy));
+      await tester.pumpAndSettle();
+      expect(toScreen(tester, const Offset(2, 3)).dy, greaterThan(barTop));
+
+      await tapAt(tester, const Offset(2, 1.5));
+      final bottom = tester.getRect(find.byType(PlanBottomSlot));
+      expect(toScreen(tester, const Offset(2, 3)).dy, lessThanOrEqualTo(bottom.top));
+      expect(toScreen(tester, const Offset(2, 1)).dy, greaterThanOrEqualTo(tester.getRect(find.byType(ShapeCanvas)).top));
+    });
+
+    testWidgets('a parcel selected : a drag outside of it moves the plan, not the parcel', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+      await tapAt(tester, const Offset(2, 2)); // select
+
+      final before = toScreen(tester, const Offset(2, 2));
+      await tester.dragFrom(toScreen(tester, const Offset(4.5, 0.5)), const Offset(-80, 60));
+      await tester.pumpAndSettle();
+
+      // the start of the drag (slop) doesn't move the plan : the rest does
+      final moved = toScreen(tester, const Offset(2, 2)) - before;
+      expect(moved.dx, lessThan(-40));
+      expect(moved.dy, greaterThan(30));
+      expect(services.parcels.updates, isEmpty);
+      expect(find.text('Ouvrir'), findsOneWidget); // still selected
+    });
+
+    testWidgets('delete a parcel from its edit sheet, after a confirmation', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+      await tapAt(tester, const Offset(2, 2)); // select
+
+      await tester.tap(find.byTooltip('Modifier la parcelle'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Supprimer'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Annuler'))); // changed my mind
+      await tester.pumpAndSettle();
+      expect(services.parcels.parcels, hasLength(1));
+      expect(find.text('Enregistrer'), findsOneWidget); // the sheet is still open
+
+      await tester.tap(find.widgetWithText(TextButton, 'Supprimer'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Supprimer la parcelle « Carré A »'), findsOneWidget);
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Supprimer')));
+      await tester.pumpAndSettle();
+
+      expect(services.parcels.parcels, isEmpty);
+      expect(find.text('Enregistrer'), findsNothing); // the sheet closed
+      expect(find.text('Dessiner une parcelle'), findsOneWidget); // nothing selected any more
     });
 
     testWidgets('opening a parcel : it grows out of its shape on the garden plan, and back when closing', (tester) async {
@@ -446,6 +543,21 @@ void main() {
 
       expect(services.parcels.parcels, isEmpty);
       expect(find.text('Dessiner une parcelle'), findsOneWidget); // back to the garden plan
+    });
+
+    testWidgets('delete the parcel from its edit sheet : back to the garden plan', (tester) async {
+      await openParcel(tester);
+
+      await tester.tap(find.byTooltip('Modifier la parcelle'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Supprimer'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Supprimer')));
+      await tester.pumpAndSettle();
+
+      expect(services.parcels.parcels, isEmpty);
+      expect(find.text('Dessiner une zone'), findsNothing);
+      expect(find.text('Dessiner une parcelle'), findsOneWidget);
     });
 
     testWidgets('rename a zone, then close the dialog by tapping outside : no crash, nothing saved', (tester) async {

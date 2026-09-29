@@ -7,20 +7,28 @@ import '../models/parcel.dart';
 import '../providers/garden_providers.dart';
 import '../utils/validators.dart';
 
-/// Edits the name and the growing conditions of a parcel (its shape is drawn on the plan).
-/// Returns the saved parcel, or null if cancelled.
+/// Edits the name and the growing conditions of a parcel (its shape is drawn on the plan), or deletes it
+/// after a confirmation. Returns the saved parcel, or null if cancelled or deleted.
 class ParcelFormSheet extends ConsumerStatefulWidget {
-  const ParcelFormSheet({super.key, required this.gardenId, required this.parcel});
+  const ParcelFormSheet({super.key, required this.gardenId, required this.parcel, this.onDeleted});
 
   final int gardenId;
   final Parcel parcel;
 
-  static Future<Parcel?> show(BuildContext context, {required int gardenId, required Parcel parcel}) {
+  /// Called once the parcel is deleted and the sheet closed (e.g. the parcel screen goes back to the garden)
+  final VoidCallback? onDeleted;
+
+  static Future<Parcel?> show(
+    BuildContext context, {
+    required int gardenId,
+    required Parcel parcel,
+    VoidCallback? onDeleted,
+  }) {
     return showModalBottomSheet<Parcel>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => ParcelFormSheet(gardenId: gardenId, parcel: parcel),
+      builder: (_) => ParcelFormSheet(gardenId: gardenId, parcel: parcel, onDeleted: onDeleted),
     );
   }
 
@@ -51,6 +59,13 @@ class _ParcelFormSheetState extends ConsumerState<ParcelFormSheet> {
     super.dispose();
   }
 
+  void _showError(Object error) {
+    setState(() => _isLoading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.errorMessage(error)), backgroundColor: AppColors.error),
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -64,12 +79,37 @@ class _ParcelFormSheetState extends ConsumerState<ParcelFormSheet> {
       });
       if (mounted) Navigator.pop(context, saved);
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.errorMessage(e)), backgroundColor: AppColors.error),
-        );
-      }
+      if (mounted) _showError(e);
+    }
+  }
+
+  /// After a confirmation : the parcel, its zones and its crops are deleted, the sheet closes.
+  Future<void> _delete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('delete_parcel'.tr()),
+        content: Text('parcel_screen.delete_confirm'.tr(args: [widget.parcel.name])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('cancel'.tr())),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: Text('delete'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(parcelsProvider(widget.gardenId).notifier).delete(widget.parcel.id);
+      if (!mounted) return;
+      Navigator.pop(context);
+      widget.onDeleted?.call();
+    } catch (e) {
+      if (mounted) _showError(e);
     }
   }
 
@@ -111,8 +151,15 @@ class _ParcelFormSheetState extends ConsumerState<ParcelFormSheet> {
               _dropdown('moisture'.tr(), _moisture, AppLocalizations.moistureLevels, (v) => setState(() => _moisture = v)),
               const SizedBox(height: 24),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  // on the left, away from the save button
+                  TextButton.icon(
+                    onPressed: _isLoading ? null : _delete,
+                    style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text('delete'.tr()),
+                  ),
+                  const Spacer(),
                   TextButton(
                     onPressed: _isLoading ? null : () => Navigator.pop(context),
                     child: Text('cancel'.tr()),
