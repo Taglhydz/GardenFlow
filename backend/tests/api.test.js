@@ -159,6 +159,11 @@ describe('gardens ownership', () => {
     expect(res.body).toMatchObject({ name: 'Potager', location: 'Lyon', description: 'Plein sud' });
   });
 
+  test('the location gets a capital on each word', async () => {
+    const res = await api.patch(`/api/gardens/${gardenId}`).set(auth(alice.token)).send({ location: 'saint-étienne, france' });
+    expect(res.body.location).toBe('Saint-Étienne, France');
+  });
+
   test('empty strings are stored as null', async () => {
     const res = await api.patch(`/api/gardens/${gardenId}`).set(auth(alice.token)).send({ location: '   ' });
     expect(res.body.location).toBeNull();

@@ -92,6 +92,8 @@ class _CreateGardenDialogState extends ConsumerState<CreateGardenDialog> {
                   border: const OutlineInputBorder(),
                 ),
                 maxLength: 255,
+                // the server also puts a capital on each word
+                textCapitalization: TextCapitalization.words,
               ),
               const SizedBox(height: 8),
               TextFormField(

@@ -1,6 +1,6 @@
 const { z } = require('zod');
 const {
-  SOIL_TYPES, LEVELS, id, requiredText, optionalText, optionalDate, positiveDecimal, month, shape, nonEmpty,
+  SOIL_TYPES, LEVELS, id, requiredText, optionalText, placeName, optionalDate, positiveDecimal, month, shape, nonEmpty,
 } = require('./common');
 
 // ======
@@ -8,7 +8,7 @@ const {
 // ======
 const gardenFields = {
   name       : requiredText(100),
-  location   : optionalText(255),
+  location   : placeName(255),
   description: optionalText(2000),
 };
 
