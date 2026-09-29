@@ -96,9 +96,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// Page with the header on top : nothing is hidden behind the buttons.
-  Widget _buildPage(Widget content) {
+  Widget _buildPage(Widget content, {Widget? floatingActionButton}) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: floatingActionButton,
       body: SafeArea(
         child: Column(
           children: [
@@ -182,7 +183,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildGardenSelectionView(List<Garden> gardens) {
-    return _buildPage(gardens.isEmpty ? _buildNoGardenView() : _buildGardenListView(gardens));
+    if (gardens.isEmpty) return _buildPage(_buildNoGardenView());
+
+    return _buildPage(
+      _buildGardenListView(gardens),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _createGarden,
+        tooltip: 'home.create_new_garden'.tr(),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.add, size: 32),
+      ),
+    );
   }
 
   Widget _buildNoGardenView() {
@@ -236,54 +249,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildGardenListView(List<Garden> gardens) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            'home.select_garden'.tr(),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
-          ),
-        ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () => ref.refresh(gardensProvider.future),
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: gardens.length,
-              itemBuilder: (context, index) {
-                return _GardenCard(
-                  garden: gardens[index],
-                  onTap: () => ref.read(selectedGardenIdProvider.notifier).select(gardens[index].id),
-                );
-              },
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _createGarden,
-              icon: const Icon(Icons.add),
-              label: Text('home.create_new_garden'.tr()),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: const BorderSide(color: AppColors.primary),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+    return RefreshIndicator(
+      onRefresh: () => ref.refresh(gardensProvider.future),
+      child: ListView.builder(
+        // bottom space : the last card is not hidden behind the + button
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+        itemCount: gardens.length,
+        itemBuilder: (context, index) {
+          return _GardenCard(
+            garden: gardens[index],
+            onTap: () => ref.read(selectedGardenIdProvider.notifier).select(gardens[index].id),
+          );
+        },
+      ),
     );
   }
 }

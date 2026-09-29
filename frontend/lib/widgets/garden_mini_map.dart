@@ -13,7 +13,7 @@ import '../utils/plant_colors.dart';
 import '../utils/zone_names.dart';
 
 /// Small square plan of a garden (garden list) : its parcels in the color of their soil,
-/// their zones in the color of their plant, the whole garden fitted in the square.
+/// their zones in the color of their plant, the whole garden fitted in the square, on the grid of the plans.
 class GardenMiniMap extends ConsumerWidget {
   const GardenMiniMap({super.key, required this.gardenId, this.size = 180});
 
@@ -35,9 +35,9 @@ class GardenMiniMap extends ConsumerWidget {
       child: SizedBox.square(
         dimension: size,
         child: parcels.isEmpty
-            ? const ColoredBox(
-                color: Color(0xFFF1F8E9),
-                child: Center(child: Icon(Icons.yard_outlined, size: 48, color: AppColors.primaryLight)),
+            ? CustomPaint(
+                painter: _MiniMapPainter(parcels: const [], zones: const []),
+                child: const Center(child: Icon(Icons.yard_outlined, size: 48, color: AppColors.primaryLight)),
               )
             : CustomPaint(
                 painter: _MiniMapPainter(
@@ -62,9 +62,21 @@ class _MiniMapPainter extends CustomPainter {
 
   static const _padding = 10.0;
 
+  /// Meters between the grid lines, the first one at least [_minGridGap] px apart (like the plans)
+  static const _gridSteps = [1, 5, 10, 50, 100];
+  static const _minGridGap = 12.0;
+
+  /// Grid of an empty garden (px)
+  static const _emptyGridGap = 18.0;
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFF1F8E9));
+
+    if (parcels.isEmpty) {
+      _grid(canvas, size, _emptyGridGap, Offset.zero);
+      return;
+    }
 
     // the whole garden, centered in the square
     final bounds = Geometry.bounds([for (final (points, _) in parcels) ...points]);
@@ -73,6 +85,11 @@ class _MiniMapPainter extends CustomPainter {
       (size.height - 2 * _padding) / math.max(bounds.height, 0.01),
     );
     final origin = Offset((size.width - bounds.width * scale) / 2, (size.height - bounds.height * scale) / 2);
+
+    // grid on the whole meters of the garden, like on its plan
+    final step = _gridSteps.firstWhere((m) => m * scale >= _minGridGap, orElse: () => _gridSteps.last);
+    final zero = origin - bounds.topLeft * scale;
+    _grid(canvas, size, step * scale, zero);
     Path path(List<Offset> points) =>
         Path()..addPolygon([for (final p in points) origin + (p - bounds.topLeft) * scale], true);
 
@@ -83,6 +100,19 @@ class _MiniMapPainter extends CustomPainter {
     for (final (points, (fill, border)) in zones) {
       canvas.drawPath(path(points), Paint()..color = fill.withValues(alpha: 0.75));
       canvas.drawPath(path(points), Paint()..color = border..style = PaintingStyle.stroke..strokeWidth = 0.8);
+    }
+  }
+
+  /// Lines every [gap] px going through [through]
+  void _grid(Canvas canvas, Size size, double gap, Offset through) {
+    final paint = Paint()
+      ..color = const Color(0x3366BB6A)
+      ..strokeWidth = 1;
+    for (var x = through.dx % gap; x <= size.width; x += gap) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (var y = through.dy % gap; y <= size.height; y += gap) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
   }
 
