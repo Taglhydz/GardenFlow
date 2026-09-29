@@ -151,10 +151,18 @@ void main() {
       final parcel = toScreen(tester, const Offset(2, 2));
       await tester.dragFrom(toScreen(tester, const Offset(4, 4)), const Offset(-600, -400));
       await tester.pumpAndSettle();
-      expect(toScreen(tester, const Offset(2, 2)), isNot(parcel)); // the plan moved
+      final moved = toScreen(tester, const Offset(2, 2));
+      expect(moved, isNot(parcel)); // the plan moved
 
+      // the plan glides back : halfway through, it is between where it was and the center
       await tester.tap(find.byTooltip('Recentrer le plan'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      final halfway = toScreen(tester, const Offset(2, 2));
+      expect(halfway, isNot(moved));
+      expect(halfway, isNot(parcel));
       await tester.pumpAndSettle();
+      expect(toScreen(tester, const Offset(2, 2)), parcel); // back exactly where it opened
       final box = tester.getRect(find.byType(ShapeCanvas));
       expect(box.contains(toScreen(tester, const Offset(2, 2))), isTrue);
 

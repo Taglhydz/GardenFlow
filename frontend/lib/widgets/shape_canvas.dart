@@ -146,7 +146,7 @@ class ShapeCanvas extends StatefulWidget {
   State<ShapeCanvas> createState() => _ShapeCanvasState();
 }
 
-class _ShapeCanvasState extends State<ShapeCanvas> {
+class _ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderStateMixin {
   /// Touch areas (px on the screen) of the corners and of the "+" in the middle of the sides
   static const _vertexTouch = 24.0;
   static const _midpointTouch = 20.0;
@@ -171,8 +171,17 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
   Size? _centeredFor;
   bool _movedByUser = false;
 
+  /// Recenter button : the plan glides back (move + zoom) instead of jumping
+  late final AnimationController _recenterAnimation =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 400))..addListener(_onRecenterTick);
+  late final Animation<double> _recenterCurve = CurvedAnimation(parent: _recenterAnimation, curve: Curves.easeInOutCubic);
+  Matrix4Tween _recenterTween = Matrix4Tween();
+
+  void _onRecenterTick() => _viewer.value = _recenterTween.evaluate(_recenterCurve);
+
   @override
   void dispose() {
+    _recenterAnimation.dispose();
     _viewer.dispose();
     super.dispose();
   }
@@ -406,7 +415,7 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
                   visualDensity: VisualDensity.compact,
                   onPressed: () {
                     _movedByUser = false;
-                    _recenter(screen, ppm);
+                    _recenter(screen, ppm, animate: true);
                   },
                 ),
               ),
@@ -420,15 +429,24 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
   /// Smallest zoom : a big plan can be zoomed out much more to see it
   double get _minScale => widget.view == null ? 0.5 : 0.05;
 
-  /// Shows the whole [ShapeCanvas.view] (or the whole plan), centered on the screen.
-  void _recenter(Size screen, double ppm) {
+  /// Shows the whole [ShapeCanvas.view] (or the whole plan), centered on the screen,
+  /// right away or with a short move + zoom animation.
+  void _recenter(Size screen, double ppm, {bool animate = false}) {
     final view = widget.view ?? widget.world;
     final width = view.width * ppm;
     final height = view.height * ppm;
     final scale = math.min(screen.width / width, screen.height / height).clamp(_minScale, 6.0);
     final topLeft = (view.topLeft - widget.world.topLeft) * ppm * scale;
-    _viewer.value = Matrix4.diagonal3Values(scale, scale, 1)
+    final centered = Matrix4.diagonal3Values(scale, scale, 1)
       ..setTranslationRaw((screen.width - width * scale) / 2 - topLeft.dx, (screen.height - height * scale) / 2 - topLeft.dy, 0);
+
+    _recenterAnimation.stop();
+    if (!animate) {
+      _viewer.value = centered;
+      return;
+    }
+    _recenterTween = Matrix4Tween(begin: _viewer.value.clone(), end: centered);
+    _recenterAnimation.forward(from: 0);
   }
 
   Widget _buildPlan(Rect world, double ppm, bool editing) {
@@ -439,7 +457,11 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
       maxScale: 6,
       // the plan can be moved anywhere, the recenter button brings it back
       boundaryMargin: const EdgeInsets.all(double.infinity),
-      onInteractionStart: (_) => _movedByUser = true,
+      onInteractionStart: (_) {
+        // the finger takes the plan back, even in the middle of the recenter animation
+        _recenterAnimation.stop();
+        _movedByUser = true;
+      },
       // while a shape is selected, the finger edits the shape, not the plan
       panEnabled: !editing,
       scaleEnabled: !editing,
