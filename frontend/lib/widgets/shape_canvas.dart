@@ -287,10 +287,14 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
         widget.onDraftClose?.call();
       } else {
         final (placed, refusal) = _place(point, ppm);
-        if (placed != null) {
-          widget.onDraftPoint?.call(placed);
-        } else {
+        if (placed == null) {
           widget.onDraftRefused?.call(refusal!);
+        } else if (draft.length >= 3 && placed == draft.first) {
+          // a tap a bit far from the first point, snapped onto it (grid, magnet) : closes the shape too
+          widget.onDraftClose?.call();
+        } else if (!draft.contains(placed)) {
+          // the same point twice would make an invalid shape : a tap snapped onto a placed point does nothing
+          widget.onDraftPoint?.call(placed);
         }
       }
       return;

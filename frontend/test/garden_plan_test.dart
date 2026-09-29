@@ -295,6 +295,23 @@ void main() {
       expect(zone.shape, rect(1, 1));
     });
 
+    testWidgets('a tap snapped onto a placed point : closes on the first one, ignored on another one', (tester) async {
+      await openParcel(tester);
+
+      await tester.tap(find.text('Dessiner une zone'));
+      await tester.pumpAndSettle();
+      await tapAt(tester, const Offset(0, 0));
+      await tapAt(tester, const Offset(1, 0));
+      await tapAt(tester, const Offset(1.1, 0.1)); // snapped onto (1, 0) again : nothing added
+      await tapAt(tester, const Offset(1, 1));
+      await tapAt(tester, const Offset(0, 1));
+      // too far from the first point to close it, but the 50 cm grid snaps it there : the zone is closed
+      await tapAt(tester, const Offset(0.2, 0.2));
+
+      expect(find.textContaining('se croiser'), findsNothing);
+      expect(services.zones.zones.single.shape, rect(1, 1));
+    });
+
     testWidgets('a zone outside the parcel or overlapping another zone is refused', (tester) async {
       services.zones.zones = [Zone(id: 70, parcelId: 1, name: 'Rang 1', shape: rect(1, 2))];
       await openParcel(tester);
