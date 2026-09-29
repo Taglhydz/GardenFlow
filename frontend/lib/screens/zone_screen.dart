@@ -12,6 +12,7 @@ import '../providers/garden_providers.dart';
 import '../providers/plant_providers.dart';
 import '../utils/zone_names.dart';
 import '../widgets/crop_form_sheet.dart';
+import '../widgets/plant_color_sheet.dart';
 
 /// A zone of a parcel (or the whole parcel when [zoneId] is null) : its crops and the plants suggested for it.
 class ZoneScreen extends ConsumerWidget {
@@ -92,7 +93,7 @@ String _formatDate(BuildContext context, DateTime date) => MaterialLocalizations
 // =====
 // Crops
 // =====
-enum _CropAction { harvest, edit, delete }
+enum _CropAction { harvest, color, edit, delete }
 
 class _CropsTab extends ConsumerWidget {
   const _CropsTab({required this.gardenId, required this.parcelId, required this.zoneId, required this.zoneNames});
@@ -110,6 +111,9 @@ class _CropsTab extends ConsumerWidget {
       switch (action) {
         case _CropAction.harvest:
           await notifier.harvest(crop.id, DateUtils.dateOnly(DateTime.now()));
+        case _CropAction.color:
+          final plant = ref.read(plantsByIdProvider)[crop.plantId];
+          if (plant != null) await PlantColorSheet.show(context, gardenId: gardenId, plant: plant);
         case _CropAction.edit:
           await CropFormSheet.show(context, gardenId: gardenId, parcelId: parcelId, crop: crop);
         case _CropAction.delete:
@@ -139,6 +143,7 @@ class _CropsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cropsAsync = ref.watch(gardenCropsProvider(gardenId));
     final plantsById = ref.watch(plantsByIdProvider);
+    final plantColors = ref.watch(plantColorsProvider);
 
     if (!cropsAsync.hasValue) {
       return cropsAsync.hasError
@@ -165,10 +170,15 @@ class _CropsTab extends ConsumerWidget {
       return Card(
         margin: const EdgeInsets.only(bottom: 8),
         child: ListTile(
-          leading: Icon(
-            crop.isInGround ? Icons.eco : Icons.check_circle_outline,
-            color: crop.isInGround ? AppColors.primary : AppColors.grey,
-          ),
+          // in the ground : the color of the plant on the plan, touched to change it
+          leading: crop.isInGround && plant != null
+              ? IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: 'plant_color.change'.tr(),
+                  onPressed: () => _onAction(context, ref, crop, _CropAction.color),
+                  icon: PlantColorDot(hue: plantColors.hue(plant), child: const Icon(Icons.eco)),
+                )
+              : const Icon(Icons.check_circle_outline, color: AppColors.grey),
           title: Text(plant != null ? AppLocalizations.plantName(plant) : '…'),
           subtitle: details.isEmpty ? null : Text(details.join('\n')),
           trailing: PopupMenuButton<_CropAction>(
@@ -176,6 +186,8 @@ class _CropsTab extends ConsumerWidget {
             itemBuilder: (context) => [
               if (crop.isInGround)
                 PopupMenuItem(value: _CropAction.harvest, child: Text('zone_screen.harvest_action'.tr())),
+              if (crop.isInGround && plant != null)
+                PopupMenuItem(value: _CropAction.color, child: Text('plant_color.change'.tr())),
               PopupMenuItem(value: _CropAction.edit, child: Text('edit'.tr())),
               PopupMenuItem(
                 value: _CropAction.delete,

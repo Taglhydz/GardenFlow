@@ -678,6 +678,40 @@ describe('seed translations (frontend/assets/translations/en.json)', () => {
   });
 });
 
+describe('plant colors', () => {
+  let tomato;
+
+  beforeAll(async () => {
+    const res = await api.get('/api/plants?search=tomat').set(auth(alice.token));
+    tomato = res.body.find((p) => p.code === 'tomato');
+  });
+
+  test('a user chooses a color, changes it and goes back to the automatic one', async () => {
+    expect((await api.get('/api/users/me/plant-colors').set(auth(alice.token))).body).toEqual([]);
+
+    const set = await api.put(`/api/users/me/plant-colors/${tomato.id}`).set(auth(alice.token)).send({ hue: 10 });
+    expect(set.status).toBe(200);
+    expect(set.body).toEqual({ plant_id: tomato.id, hue: 10 });
+
+    await api.put(`/api/users/me/plant-colors/${tomato.id}`).set(auth(alice.token)).send({ hue: 200 });
+    expect((await api.get('/api/users/me/plant-colors').set(auth(alice.token))).body).toEqual([{ plant_id: tomato.id, hue: 200 }]);
+
+    expect((await api.delete(`/api/users/me/plant-colors/${tomato.id}`).set(auth(alice.token))).status).toBe(204);
+    expect((await api.get('/api/users/me/plant-colors').set(auth(alice.token))).body).toEqual([]);
+    expect((await api.delete(`/api/users/me/plant-colors/${tomato.id}`).set(auth(alice.token))).status).toBe(404);
+  });
+
+  test('the colors of a user are only his', async () => {
+    await api.put(`/api/users/me/plant-colors/${tomato.id}`).set(auth(bob.token)).send({ hue: 90 });
+    expect((await api.get('/api/users/me/plant-colors').set(auth(alice.token))).body).toEqual([]);
+  });
+
+  test('invalid hue -> 400, unknown plant -> 404', async () => {
+    expect((await api.put(`/api/users/me/plant-colors/${tomato.id}`).set(auth(alice.token)).send({ hue: 360 })).status).toBe(400);
+    expect((await api.put('/api/users/me/plant-colors/99999').set(auth(alice.token)).send({ hue: 10 })).status).toBe(404);
+  });
+});
+
 describe('users', () => {
   test('GET /users/me', async () => {
     const res = await api.get('/api/users/me').set(auth(alice.token));

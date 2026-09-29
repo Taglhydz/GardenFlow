@@ -8,6 +8,8 @@ import 'package:GardenFlow/models/parcel.dart';
 import 'package:GardenFlow/models/suggestion.dart';
 import 'package:GardenFlow/models/zone.dart';
 import 'package:GardenFlow/utils/plan_geometry.dart';
+import 'package:GardenFlow/utils/plant_colors.dart';
+import 'package:GardenFlow/widgets/plant_color_sheet.dart';
 import 'package:GardenFlow/widgets/shape_canvas.dart';
 import 'package:GardenFlow/widgets/snap_button.dart';
 import 'app_harness.dart';
@@ -414,6 +416,38 @@ void main() {
       expect(find.text('Basilic'), findsOneWidget);
       expect(find.textContaining('Rang 1'), findsOneWidget);
       expect(find.textContaining('Sans zone'), findsOneWidget);
+    });
+
+    testWidgets('all the plants : the color of a plant can be changed, a message tells when another plant has it', (tester) async {
+      services.zones.zones = [Zone(id: 70, parcelId: 1, name: 'Rang 1', shape: rect(1, 2))];
+      services.crops.crops = [
+        const Crop(id: 10, parcelId: 1, zoneId: 70, plantId: 1),
+        const Crop(id: 11, parcelId: 1, plantId: 2),
+      ];
+      await openParcel(tester);
+      await tester.tap(find.widgetWithText(FloatingActionButton, 'Toutes les plantes'));
+      await tester.pumpAndSettle();
+
+      // each plant in its color of the plan
+      final dots = tester.widgetList<PlantColorDot>(find.byType(PlantColorDot)).map((d) => d.hue).toList();
+      expect(dots, containsAll([PlantColors.automaticHue(services.plants.plants[0]), PlantColors.automaticHue(services.plants.plants[1])]));
+
+      // the tomato takes a color close to the one of the basil (automatic, ~275 degrees)
+      await tester.tap(find.byTooltip('Changer la couleur').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Couleur : Tomate'), findsOneWidget);
+      expect(find.textContaining('Même couleur que'), findsNothing);
+
+      await tester.tap(find.byWidgetPredicate((w) => w is PlantColorDot && w.hue == 280 && w.size == 40));
+      await tester.pumpAndSettle();
+      expect(services.plants.colors, {1: 280});
+      expect(find.textContaining('Même couleur que Basilic'), findsOneWidget);
+
+      // back to its automatic color
+      await tester.tap(find.byTooltip('Automatique'));
+      await tester.pumpAndSettle();
+      expect(services.plants.colors, isEmpty);
+      expect(find.textContaining('Même couleur que'), findsNothing);
     });
   });
 

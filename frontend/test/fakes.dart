@@ -214,6 +214,18 @@ class FakePlantService implements PlantService {
   @override
   Future<List<PlantAssociation>> getAllAssociations() async => const [];
 
+  /// Hues chosen by the user, by plant id
+  Map<int, int> colors = {};
+
+  @override
+  Future<Map<int, int>> getMyPlantColors() async => colors;
+
+  @override
+  Future<void> setPlantColor(int plantId, int hue) async => colors = {...colors, plantId: hue};
+
+  @override
+  Future<void> resetPlantColor(int plantId) async => colors = {...colors}..remove(plantId);
+
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }

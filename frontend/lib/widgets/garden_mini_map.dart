@@ -9,7 +9,6 @@ import '../providers/garden_providers.dart';
 import '../providers/plant_providers.dart';
 import '../screens/garden_view.dart' show soilColor;
 import '../utils/geometry.dart';
-import '../utils/plant_colors.dart';
 import '../utils/zone_names.dart';
 
 /// Small square plan of a garden (garden list) : its parcels in the color of their soil,
@@ -28,6 +27,7 @@ class GardenMiniMap extends ConsumerWidget {
     final zones = ref.watch(zonesProvider(gardenId)).value ?? const <Zone>[];
     final crops = ref.watch(gardenCropsProvider(gardenId)).value ?? const <Crop>[];
     final plantsById = ref.watch(plantsByIdProvider);
+    final plantColors = ref.watch(plantColorsProvider);
     final parcelsById = {for (final p in parcels) p.id: p};
 
     return ClipRRect(
@@ -45,7 +45,7 @@ class GardenMiniMap extends ConsumerWidget {
                   zones: [
                     for (final z in zones)
                       if (parcelsById[z.parcelId] != null)
-                        (z.absoluteShape(parcelsById[z.parcelId]!), PlantColors.zone(ZoneNames.plantsIn(z.id, crops, plantsById))),
+                        (z.absoluteShape(parcelsById[z.parcelId]!), plantColors.zone(ZoneNames.plantsIn(z.id, crops, plantsById))),
                   ],
                 ),
               ),

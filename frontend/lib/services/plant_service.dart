@@ -22,4 +22,19 @@ class PlantService {
     final response = await _api.get(AppConstants.plantAssociationsEndpoint) as List;
     return response.map((json) => PlantAssociation.fromJson(json)).toList();
   }
+
+  /// Colors chosen by the user : hue (degrees) by plant id. The other plants keep their automatic color.
+  Future<Map<int, int>> getMyPlantColors() async {
+    final response = await _api.get(AppConstants.plantColorsEndpoint) as List;
+    return {for (final json in response) json['plant_id'] as int: json['hue'] as int};
+  }
+
+  Future<void> setPlantColor(int plantId, int hue) async {
+    await _api.put('${AppConstants.plantColorsEndpoint}/$plantId', {'hue': hue});
+  }
+
+  /// Back to the automatic color
+  Future<void> resetPlantColor(int plantId) async {
+    await _api.delete('${AppConstants.plantColorsEndpoint}/$plantId');
+  }
 }

@@ -15,6 +15,7 @@ class AppConstants {
   static const String cropsEndpoint             = '/crops'             ;
   static const String zonesEndpoint             = '/zones'             ;
   static const String plantAssociationsEndpoint = '/plant-associations';
+  static const String plantColorsEndpoint       = '/users/me/plant-colors';
 
   // Storage Keys
   static const String tokenKey        = 'auth_token'    ; // secure storage

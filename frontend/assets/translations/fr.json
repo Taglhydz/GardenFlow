@@ -332,5 +332,13 @@
     "harvest_expected": "Récolte prévue le {}",
     "harvested_on": "Récoltée le {}",
     "delete_crop_confirm": "Supprimer cette culture ?"
+  },
+  "plant_color": {
+    "title": "Couleur : {}",
+    "automatic": "Automatique",
+    "change": "Changer la couleur",
+    "done": "Terminé",
+    "hint": "C'est la couleur de cette plante sur les plans de tous vos jardins.",
+    "same_as": "Même couleur que {} dans ce jardin : choisissez-en une autre pour les distinguer sur le plan."
   }
 }

@@ -12,6 +12,7 @@
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS suggestion;
+DROP TABLE IF EXISTS plant_color;
 DROP TABLE IF EXISTS plant_association;
 DROP TABLE IF EXISTS plant_period;
 DROP TABLE IF EXISTS crop;
@@ -182,4 +183,20 @@ CREATE TABLE plant_association (
     KEY idx_plant_id_2 (plant_id_2),
     FOREIGN KEY (plant_id_1) REFERENCES plant(id) ON DELETE CASCADE,
     FOREIGN KEY (plant_id_2) REFERENCES plant(id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+-- ============
+-- Plant colors
+-- ============
+-- Color chosen by a user for a plant on his plans, as a hue (0-359 degrees) : the app derives
+-- the light shade (zone background) and the dark shade (border, name) from it.
+-- No row = the automatic color of the plant, computed by the app from its id.
+CREATE TABLE plant_color (
+    user_id  INT NOT NULL,
+    plant_id INT NOT NULL,
+    hue      SMALLINT UNSIGNED NOT NULL CHECK (hue < 360),
+    PRIMARY KEY (user_id, plant_id),
+    KEY idx_plant_color_plant (plant_id),
+    FOREIGN KEY (user_id)  REFERENCES user(id)  ON DELETE CASCADE,
+    FOREIGN KEY (plant_id) REFERENCES plant(id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;

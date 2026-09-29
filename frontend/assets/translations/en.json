@@ -333,6 +333,14 @@
     "harvested_on": "Harvested on {}",
     "delete_crop_confirm": "Delete this crop?"
   },
+  "plant_color": {
+    "title": "Color: {}",
+    "automatic": "Automatic",
+    "change": "Change the color",
+    "done": "Done",
+    "hint": "This is the color of this plant on the plans of all your gardens.",
+    "same_as": "Same color as {} in this garden: choose another one to tell them apart on the plan."
+  },
   "plants": {
     "tomato": {
       "name": "Tomato",

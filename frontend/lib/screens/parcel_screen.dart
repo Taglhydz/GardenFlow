@@ -254,6 +254,7 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
         .toList();
     final crops = ref.watch(gardenCropsProvider(_gardenId)).value ?? const <Crop>[];
     final plantsById = ref.watch(plantsByIdProvider);
+    final plantColors = ref.watch(plantColorsProvider);
 
     List<Plant> plantsIn(Zone zone) => ZoneNames.plantsIn(zone.id, crops, plantsById);
     final names = ZoneNames.of(zones, crops, plantsById);
@@ -356,7 +357,7 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
                       ),
                     ],
                     shapes: [
-                      for (final zone in zones) _zoneShape(zone, names[zone.id] ?? '', plantsIn(zone)),
+                      for (final zone in zones) _zoneShape(zone, names[zone.id] ?? '', plantsIn(zone), plantColors),
                     ],
                     selectedId: selected?.id,
                     draft: _draft,
@@ -399,15 +400,15 @@ class _ParcelScreenState extends ConsumerState<ParcelScreen> {
   }
 
   /// The zone in the color of its plant, the name of each plant in its dark shade.
-  CanvasShape _zoneShape(Zone zone, String name, List<Plant> plants) {
-    final (fill, border) = PlantColors.zone(plants);
+  CanvasShape _zoneShape(Zone zone, String name, List<Plant> plants, PlantColors colors) {
+    final (fill, border) = colors.zone(plants);
     return CanvasShape(
       id: zone.id,
       points: zone.shape,
       fill: fill.withValues(alpha: 0.75),
       border: border,
       labels: [name, for (final p in plants) AppLocalizations.plantName(p)],
-      labelColors: [border, for (final p in plants) PlantColors.dark(p)],
+      labelColors: [border, for (final p in plants) colors.dark(p)],
     );
   }
 

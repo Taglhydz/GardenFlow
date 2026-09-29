@@ -225,6 +225,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
     final zones = ref.watch(zonesProvider(_gardenId)).value ?? const <Zone>[];
     final crops = ref.watch(gardenCropsProvider(_gardenId)).value ?? const <Crop>[];
     final plantsById = ref.watch(plantsByIdProvider);
+    final plantColors = ref.watch(plantColorsProvider);
 
     Parcel? selected;
     for (final p in parcels) {
@@ -311,7 +312,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
                                 labels: [p.name],
                               ),
                           ],
-                          overlay: _zoneShapes(parcels, zones, crops, plantsById),
+                          overlay: _zoneShapes(parcels, zones, crops, plantsById, plantColors),
                           selectedId: selected?.id,
                           draft: _draft,
                           onDraftPoint: (point) => setState(() => _draft = [..._draft!, point]),
@@ -346,25 +347,31 @@ class _GardenViewState extends ConsumerState<GardenView> {
   }
 
   /// Zones drawn inside the parcels, with their plants in the ground.
-  List<CanvasShape> _zoneShapes(List<Parcel> parcels, List<Zone> zones, List<Crop> crops, Map<int, Plant> plantsById) {
+  List<CanvasShape> _zoneShapes(
+    List<Parcel> parcels,
+    List<Zone> zones,
+    List<Crop> crops,
+    Map<int, Plant> plantsById,
+    PlantColors colors,
+  ) {
     final parcelsById = {for (final p in parcels) p.id: p};
     return [
       for (final zone in zones)
-        if (parcelsById[zone.parcelId] != null) _zoneShape(zone, parcelsById[zone.parcelId]!, crops, plantsById),
+        if (parcelsById[zone.parcelId] != null) _zoneShape(zone, parcelsById[zone.parcelId]!, crops, plantsById, colors),
     ];
   }
 
   /// A zone in the color of its plant, the name of each plant in its dark shade.
-  CanvasShape _zoneShape(Zone zone, Parcel parcel, List<Crop> crops, Map<int, Plant> plantsById) {
+  CanvasShape _zoneShape(Zone zone, Parcel parcel, List<Crop> crops, Map<int, Plant> plantsById, PlantColors colors) {
     final plants = ZoneNames.plantsIn(zone.id, crops, plantsById);
-    final (fill, border) = PlantColors.zone(plants);
+    final (fill, border) = colors.zone(plants);
     return CanvasShape(
       id: zone.id,
       points: zone.absoluteShape(parcel),
       fill: fill.withValues(alpha: 0.6),
       border: border.withValues(alpha: 0.7),
       labels: [for (final p in plants) AppLocalizations.plantName(p)],
-      labelColors: [for (final p in plants) PlantColors.dark(p)],
+      labelColors: [for (final p in plants) colors.dark(p)],
     );
   }
 

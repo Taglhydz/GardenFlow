@@ -51,6 +51,8 @@ class ApiService {
 
   Future<dynamic> patch(String endpoint, Map<String, dynamic> data) => _send('PATCH', endpoint, data);
 
+  Future<dynamic> put(String endpoint, Map<String, dynamic> data) => _send('PUT', endpoint, data);
+
   Future<dynamic> delete(String endpoint) => _send('DELETE', endpoint);
 
   Future<dynamic> _send(String method, String endpoint, [Map<String, dynamic>? data]) async {

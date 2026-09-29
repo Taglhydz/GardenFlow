@@ -40,7 +40,13 @@ const adminUpdateUserSchema = nonEmpty(z.object({
   role    : z.enum(ROLES).optional(),
 }));
 
+// hue of the color chosen for a plant (degrees)
+const plantColorSchema = z.object({
+  hue: z.coerce.number().int().min(0).max(359),
+});
+
 module.exports = {
+  plantColorSchema,
   registerSchema,
   loginSchema,
   updateMeSchema,
