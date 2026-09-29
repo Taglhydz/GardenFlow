@@ -173,6 +173,17 @@ void main() {
       expect(place([rect(10, 3, 0, 4)]), const Rect.fromLTWH(10, 7, 8, 2));
     });
 
+    test('a corner on the line between its neighbors is aligned', () {
+      const shape = [Offset(0, 0), Offset(1, 0), Offset(2, 0), Offset(2, 2), Offset(0, 2)];
+      expect(PlanGeometry.isAligned(shape, 1), isTrue);
+      expect(PlanGeometry.isAligned(shape, 2), isFalse); // a real corner
+      expect(PlanGeometry.isAligned(shape, 0), isFalse); // neighbors : the last and the second corners
+      // on a slanted side, rounded to the cm
+      expect(PlanGeometry.isAligned(const [Offset(0, 0), Offset(0.33, 0.67), Offset(1, 2), Offset(-1, 2)], 1), isTrue);
+      // 5 cm away from the side : kept
+      expect(PlanGeometry.isAligned(const [Offset(0, 0), Offset(1, 0.05), Offset(2, 0), Offset(2, 2)], 1), isFalse);
+    });
+
     test('top-most shape at a point', () {
       final shapes = [(1, rect(3, 3)), (2, rect(1, 1, 1, 1))];
       expect(PlanGeometry.shapeAt(shapes, const Offset(1.5, 1.5)), 2);

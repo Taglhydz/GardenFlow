@@ -436,10 +436,14 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
     if (drag.mode == _DragMode.move) {
       if (drag.delta != Offset.zero) widget.onMoved(drag.shapeId, drag.delta);
     } else {
+      // a corner dropped on the line between its neighbors is useless : it goes away
+      final points = PlanGeometry.isAligned(drag.current, drag.vertex) && drag.current.length > 3
+          ? ([...drag.current]..removeAt(drag.vertex))
+          : drag.current;
       final original = _selected?.points ?? const [];
-      final changed = drag.current.length != original.length ||
-          [for (var i = 0; i < original.length; i++) drag.current[i] != original[i]].any((c) => c);
-      if (changed) widget.onReshaped(drag.shapeId, drag.current);
+      final changed = points.length != original.length ||
+          [for (var i = 0; i < original.length; i++) points[i] != original[i]].any((c) => c);
+      if (changed) widget.onReshaped(drag.shapeId, points);
     }
 
     // the parent updates its shapes synchronously (optimistic update) : no flicker
@@ -615,6 +619,8 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
             _GrabRecognizer: GestureRecognizerFactoryWithHandlers<_GrabRecognizer>(
               _GrabRecognizer.new,
               (r) => r
+                // the touch slop of the phone, like the viewer : else the viewer starts moving the plan first
+                ..gestureSettings = MediaQuery.maybeGestureSettingsOf(context)
                 ..grabs = ((local) => _grab(local, world, ppm) != null)
                 // the drag starts where the finger touched : the shape follows the finger exactly
                 ..dragStartBehavior = DragStartBehavior.down

@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -346,6 +347,53 @@ void main() {
       final (_, changes) = services.parcels.updates.single;
       expect(changes.keys, ['shape']);
       expect(shapeFromJson(changes['shape']), const [Offset(0, 0), Offset(2, 0), Offset(3, 2), Offset(0, 2)]);
+    });
+
+    testWidgets('on a phone (its own touch slop) : the finger drags the "+" of the selected parcel, not the plan', (tester) async {
+      // a phone gives its touch slop to the app : the plan and the parcel must both use it
+      tester.view.gestureSettings = ui.GestureSettings(physicalTouchSlop: 8 * tester.view.devicePixelRatio);
+      addTearDown(tester.view.resetGestureSettings);
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+      await tapAt(tester, const Offset(2, 2));
+
+      // middle of the right side, pulled to the right slowly like a finger
+      final from = toScreen(tester, const Offset(3, 2));
+      final to = toScreen(tester, const Offset(4, 2));
+      final finger = await tester.startGesture(from);
+      for (var i = 1; i <= 20; i++) {
+        await finger.moveTo(Offset.lerp(from, to, i / 20)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await finger.up();
+      await tester.pumpAndSettle();
+
+      final (_, changes) = services.parcels.updates.single;
+      expect(shapeFromJson(changes['shape']), const [Offset(0, 0), Offset(2, 0), Offset(3, 1), Offset(2, 2), Offset(0, 2)]);
+    });
+
+    testWidgets('a corner dropped on the line between its neighbors goes away', (tester) async {
+      // a roof : its top corner (2, 1) is 1 m above the line between (1, 2) and (3, 2)
+      services.parcels.parcels = [
+        Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: const [Offset(0, 1), Offset(1, 0), Offset(2, 1), Offset(2, 3), Offset(0, 3)]),
+      ];
+      await pumpApp(tester, services);
+
+      await tapAt(tester, const Offset(2, 3));
+      await dragAt(tester, const Offset(2, 1), const Offset(0, 1)); // pushed down onto the line
+
+      final (_, changes) = services.parcels.updates.single;
+      expect(shapeFromJson(changes['shape']), const [Offset(0, 1), Offset(2, 1), Offset(2, 3), Offset(0, 3)]);
+    });
+
+    testWidgets('a "+" pulled but dropped back on its side : nothing changes', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
+      await pumpApp(tester, services);
+
+      await tapAt(tester, const Offset(2, 2));
+      await dragAt(tester, const Offset(2, 1), const Offset(0.5, 0)); // along the top side
+
+      expect(services.parcels.updates, isEmpty);
     });
 
     testWidgets('long press on a corner removes it', (tester) async {

@@ -114,6 +114,15 @@ class PlanGeometry {
     return corner ?? onSide;
   }
 
+  /// The corner [index] is on the side between its two neighbors (within [onBorderTolerance], the cm rounding
+  /// moves the points of slanted sides a bit) : the shape is the same without it.
+  static bool isAligned(List<Offset> points, int index) {
+    if (points.length < 3) return false;
+    final previous = points[(index - 1 + points.length) % points.length];
+    final next = points[(index + 1) % points.length];
+    return Geometry.distanceToSegment(points[index], previous, next) <= onBorderTolerance;
+  }
+
   /// [point] is on a side of one of the [shapes].
   static bool isOnBorder(Iterable<List<Offset>> shapes, Offset point) =>
       shapes.any((s) => s.length >= 2 && Geometry.distanceToBorder(s, point) <= onBorderTolerance);
