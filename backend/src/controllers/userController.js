@@ -3,6 +3,7 @@ const AppError = require('../utils/AppError');
 const { hashPassword, comparePassword } = require('../utils/hash');
 const { removePhoto, checkPhoto } = require('../utils/photoStorage');
 const { computeLevel } = require('../services/levelService');
+const { sendVerificationEmail } = require('../services/emailVerification');
 
 /** Updates a user and turns a duplicate email into a clear error. */
 const updateUser = async (id, data) => {
@@ -23,14 +24,22 @@ exports.getMe = async (req, res) => {
   res.json(await User.findById(req.user.id));
 };
 
-/** PATCH /users/me - username, email, birthdate, avatar (not the role). An avatar replaces the photo. */
+/**
+ * PATCH /users/me - username, email, birthdate, avatar (not the role). An avatar replaces the photo.
+ * A new email must be verified again (link sent to the new address) before the next login.
+ */
 exports.updateMe = async (req, res) => {
-  const data = { ...req.valid.body };
-  const previous = data.avatar ? await User.findById(req.user.id) : null;
+  const { lang, ...data } = req.valid.body;
+  const previous = await User.findById(req.user.id);
   if (data.avatar) data.photo = null;
 
-  const user = await updateUser(req.user.id, data);
-  await removePhoto(previous?.photo);
+  let user = await updateUser(req.user.id, data);
+  if (data.avatar) await removePhoto(previous.photo);
+
+  if (user.email !== previous.email) {
+    await sendVerificationEmail(user, lang);
+    user = await User.findById(req.user.id);
+  }
 
   res.json(user);
 };

@@ -34,6 +34,12 @@ CREATE TABLE user (
     username      VARCHAR(50)  NOT NULL,
     email         VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    -- NULL until the link sent by email is opened : login is refused before
+    email_verified_at       DATETIME NULL,
+    -- SHA-256 of the token of the link (the token itself is only in the email), kept after the
+    -- verification so that the link keeps showing "email verified"
+    verification_token      CHAR(64) NULL UNIQUE,
+    verification_expires_at DATETIME NULL,
     birthdate     DATE NULL,
     role          ENUM('user', 'admin') NOT NULL DEFAULT 'user',
     avatar        VARCHAR(30)  NULL,

@@ -82,7 +82,7 @@ function logRequest(req, res, next) {
     console.log(
       `${colors.gray}[${timestamp}]${colors.reset} ` +
       `${getMethodColor(req.method)}${req.method.padEnd(6)}${colors.reset} ` +
-      `${colors.white}${req.originalUrl.padEnd(50)}${colors.reset} ` +
+      `${colors.white}${req.originalUrl.replace(/token=[^&]+/, 'token=***').padEnd(50)}${colors.reset} ` +
       `${getStatusColor(statusCode)}${statusCode.toString().padStart(3)}${colors.reset} ` +
       `${colors.gray}${duration.toString().padStart(4)}ms${colors.reset}`
     );

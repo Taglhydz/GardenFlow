@@ -3,8 +3,18 @@ const { ROLES, AVATARS, requiredText, optionalDate, nonEmpty, today } = require(
 
 const email = z.string().trim().toLowerCase().pipe(z.email().max(255));
 
-// bcrypt only uses the first 72 bytes of a password
-const password = z.string().min(8, 'Password must contain at least 8 characters').max(72);
+// bcrypt only uses the first 72 bytes of a password.
+// Same rules in the app (frontend/lib/utils/validators.dart) : must stay in sync
+const password = z.string()
+  .min(10, 'Password must contain at least 10 characters')
+  .max(72)
+  .regex(/\p{Ll}/u, 'Password must contain a lowercase letter')
+  .regex(/\p{Lu}/u, 'Password must contain an uppercase letter')
+  .regex(/\p{Nd}/u, 'Password must contain a digit')
+  .regex(/[^\p{L}\p{Nd}\s]/u, 'Password must contain a symbol');
+
+// language of the emails sent to the user
+const lang = z.enum(['fr', 'en']).optional();
 
 // stored in lowercase ('Tom le plus Beau' -> 'tom le plus beau'), the app capitalizes it for display
 const username = requiredText(50).min(3, 'Username must contain at least 3 characters').toLowerCase();
@@ -16,6 +26,12 @@ const registerSchema = z.object({
   email,
   password,
   birthdate,
+  lang,
+});
+
+const resendVerificationSchema = z.object({
+  email,
+  lang,
 });
 
 const loginSchema = z.object({
@@ -29,6 +45,7 @@ const updateMeSchema = nonEmpty(z.object({
   email   : email.optional(),
   birthdate,
   avatar  : z.enum(AVATARS).nullable().optional(),
+  lang,
 }));
 
 const changePasswordSchema = z.object({
@@ -50,6 +67,7 @@ const plantColorSchema = z.object({
 module.exports = {
   plantColorSchema,
   registerSchema,
+  resendVerificationSchema,
   loginSchema,
   updateMeSchema,
   changePasswordSchema,

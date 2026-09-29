@@ -9,13 +9,31 @@ const { resetDatabase } = require('../scripts/db-reset');
 const fs   = require('fs');
 const path = require('path');
 const { PHOTOS_DIR } = require('../src/utils/photoStorage');
+const mailer = require('../src/utils/mailer');
 
 const api = request(app);
 
+const PASSWORD = 'Password123!';
+
+// the emails are not sent : each one is kept here (emptied before each test)
+let sentEmails = [];
+jest.spyOn(mailer, 'sendVerificationEmail').mockImplementation(async (mail) => { sentEmails.push(mail); });
+beforeEach(() => { sentEmails = []; });
+
+/** Path of the verification link of the last email sent to `email` */
+const verificationLink = (email) => {
+  const url = sentEmails.filter((m) => m.to === email).at(-1)?.url;
+  return url && url.slice(url.indexOf('/api/'));
+};
+
+/** Register, open the link of the email, log in */
 const register = async (email, extra = {}) => {
-  const res = await api.post('/api/auth/register').send({ username: 'tester', email, password: 'password123', ...extra });
+  const res = await api.post('/api/auth/register').send({ username: 'tester', email, password: PASSWORD, ...extra });
   expect(res.status).toBe(201);
-  return { token: res.body.token, user: res.body.user };
+  expect((await api.get(verificationLink(email))).status).toBe(200);
+  const login = await api.post('/api/auth/login').send({ email, password: PASSWORD });
+  expect(login.status).toBe(200);
+  return { token: login.body.token, user: login.body.user };
 };
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
@@ -59,7 +77,7 @@ describe('health and errors', () => {
 describe('auth', () => {
   test('register ignores a role sent by the client', async () => {
     const res = await api.post('/api/auth/register')
-      .send({ username: 'hacker', email: 'hacker@test.dev', password: 'password123', role: 'admin' });
+      .send({ username: 'hacker', email: 'hacker@test.dev', password: PASSWORD, role: 'admin' });
     expect(res.status).toBe(201);
     expect(res.body.user.role).toBe('user');
     expect(res.body.user.password_hash).toBeUndefined();
@@ -67,7 +85,7 @@ describe('auth', () => {
 
   test('register normalizes the email and keeps the birthdate as YYYY-MM-DD', async () => {
     const res = await api.post('/api/auth/register')
-      .send({ username: ' Carol la Plus Belle ', email: '  Carol@Test.DEV ', password: 'password123', birthdate: '2000-01-01' });
+      .send({ username: ' Carol la Plus Belle ', email: '  Carol@Test.DEV ', password: PASSWORD, birthdate: '2000-01-01' });
     expect(res.status).toBe(201);
     expect(res.body.user.username).toBe('carol la plus belle'); // the app capitalizes it for display
     expect(res.body.user.email).toBe('carol@test.dev');
@@ -75,13 +93,13 @@ describe('auth', () => {
   });
 
   test('register without birthdate works (optional)', async () => {
-    const res = await api.post('/api/auth/register').send({ username: 'dave', email: 'dave@test.dev', password: 'password123' });
+    const res = await api.post('/api/auth/register').send({ username: 'dave', email: 'dave@test.dev', password: PASSWORD });
     expect(res.status).toBe(201);
     expect(res.body.user.birthdate).toBeNull();
   });
 
   test('register with an existing email -> 409 EMAIL_ALREADY_USED', async () => {
-    const res = await api.post('/api/auth/register').send({ username: 'alice2', email: 'ALICE@test.dev', password: 'password123' });
+    const res = await api.post('/api/auth/register').send({ username: 'alice2', email: 'ALICE@test.dev', password: PASSWORD });
     expect(res.status).toBe(409);
     expect(res.body.code).toBe('EMAIL_ALREADY_USED');
   });
@@ -93,21 +111,103 @@ describe('auth', () => {
     expect(res.body.details.map((d) => d.field).sort()).toEqual(['email', 'password', 'username']);
   });
 
+  test('register refuses a password without lowercase, uppercase, digit, symbol or 10 characters', async () => {
+    for (const password of ['password123!', 'PASSWORD123!', 'Password!!!', 'Password123', 'Pass1!']) {
+      const res = await api.post('/api/auth/register').send({ username: 'weak', email: 'weak@test.dev', password });
+      expect(res.status).toBe(400);
+      expect(res.body.details.map((d) => d.field)).toEqual(['password']);
+    }
+  });
+
   test('register with a birthdate in the future -> 400', async () => {
-    const res = await api.post('/api/auth/register').send({ username: 'future', email: 'future@test.dev', password: 'password123', birthdate: '2999-01-01' });
+    const res = await api.post('/api/auth/register').send({ username: 'future', email: 'future@test.dev', password: PASSWORD, birthdate: '2999-01-01' });
     expect(res.status).toBe(400);
   });
 
   test('login OK', async () => {
-    const res = await api.post('/api/auth/login').send({ email: 'alice@test.dev', password: 'password123' });
+    const res = await api.post('/api/auth/login').send({ email: 'alice@test.dev', password: PASSWORD });
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
     expect(res.body.user.password_hash).toBeUndefined();
   });
 
+  test('register gives no token and sends a verification email in the chosen language', async () => {
+    const res = await api.post('/api/auth/register').send({ username: 'frank', email: 'frank@test.dev', password: PASSWORD, lang: 'en' });
+    expect(res.status).toBe(201);
+    expect(res.body.token).toBeUndefined();
+    expect(res.body.user.email_verified_at).toBeNull();
+    expect(sentEmails).toHaveLength(1);
+    expect(sentEmails[0]).toMatchObject({ to: 'frank@test.dev', username: 'frank', lang: 'en' });
+    expect(sentEmails[0].url).toMatch(/\/api\/auth\/verify-email\?token=[0-9a-f]{64}$/);
+  });
+
+  test('login is refused until the email is verified, the link then only shows that it is verified', async () => {
+    await api.post('/api/auth/register').send({ username: 'grace', email: 'grace@test.dev', password: PASSWORD });
+
+    const before = await api.post('/api/auth/login').send({ email: 'grace@test.dev', password: PASSWORD });
+    expect(before.status).toBe(403);
+    expect(before.body.code).toBe('EMAIL_NOT_VERIFIED');
+
+    // a wrong password doesn't tell that the email is not verified
+    const wrong = await api.post('/api/auth/login').send({ email: 'grace@test.dev', password: 'wrongpassword' });
+    expect(wrong.body.code).toBe('INVALID_CREDENTIALS');
+
+    const link  = verificationLink('grace@test.dev');
+    const first = await api.get(link).set('Accept-Language', 'fr');
+    expect(first.status).toBe(200);
+    expect(first.type).toBe('text/html');
+    expect(first.text).toContain('Email vérifié !');
+
+    const again = await api.get(link).set('Accept-Language', 'en');
+    expect(again.status).toBe(200);
+    expect(again.text).toContain('Email already verified');
+
+    const after = await api.post('/api/auth/login').send({ email: 'grace@test.dev', password: PASSWORD });
+    expect(after.status).toBe(200);
+    expect(after.body.user.email_verified_at).not.toBeNull();
+  });
+
+  test('an unknown or malformed verification link -> 400 page', async () => {
+    expect((await api.get(`/api/auth/verify-email?token=${'a'.repeat(64)}`)).status).toBe(400);
+    expect((await api.get('/api/auth/verify-email?token=nope')).status).toBe(400);
+    expect((await api.get('/api/auth/verify-email')).status).toBe(400);
+  });
+
+  test('an expired link is refused, a new email can be asked and the old link stops working', async () => {
+    await api.post('/api/auth/register').send({ username: 'henry', email: 'henry@test.dev', password: PASSWORD });
+    const oldLink = verificationLink('henry@test.dev');
+
+    // just sent : no new email for 1 minute
+    const tooSoon = await api.post('/api/auth/resend-verification').send({ email: 'henry@test.dev' });
+    expect(tooSoon.status).toBe(204);
+    expect(sentEmails).toHaveLength(1);
+
+    await db.query("UPDATE user SET verification_expires_at = NOW() - INTERVAL 1 HOUR WHERE email = 'henry@test.dev'");
+    const expired = await api.get(oldLink);
+    expect(expired.status).toBe(400);
+    expect(expired.text).toContain('Lien expiré');
+
+    expect((await api.post('/api/auth/resend-verification').send({ email: 'Henry@test.dev', lang: 'en' })).status).toBe(204);
+    await new Promise((resolve) => setTimeout(resolve, 50)); // the email is sent after the answer
+    expect(sentEmails).toHaveLength(2);
+    expect(sentEmails[1].lang).toBe('en');
+
+    expect((await api.get(oldLink)).status).toBe(400);
+    expect((await api.get(verificationLink('henry@test.dev'))).status).toBe(200);
+  });
+
+  test('resend-verification says nothing about unknown or verified emails', async () => {
+    const unknown  = await api.post('/api/auth/resend-verification').send({ email: 'nobody@test.dev' });
+    const verified = await api.post('/api/auth/resend-verification').send({ email: 'alice@test.dev' });
+    expect(unknown.status).toBe(204);
+    expect(verified.status).toBe(204);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sentEmails).toHaveLength(0);
+  });
+
   test('wrong password and unknown email give the same error', async () => {
     const wrong   = await api.post('/api/auth/login').send({ email: 'alice@test.dev',   password: 'wrongpassword' });
-    const unknown = await api.post('/api/auth/login').send({ email: 'unknown@test.dev', password: 'password123' });
+    const unknown = await api.post('/api/auth/login').send({ email: 'unknown@test.dev', password: PASSWORD });
     expect(wrong.status).toBe(401);
     expect(unknown.status).toBe(401);
     expect(wrong.body).toEqual(unknown.body);
@@ -803,17 +903,37 @@ describe('users', () => {
     expect(res.body.code).toBe('EMAIL_ALREADY_USED');
   });
 
+  test('PATCH /users/me with a new email : it must be verified again before the next login', async () => {
+    const ivy = await register('ivy@test.dev');
+
+    const res = await api.patch('/api/users/me').set(auth(ivy.token)).send({ email: 'ivy2@test.dev', lang: 'en' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ email: 'ivy2@test.dev', email_verified_at: null });
+    expect(sentEmails.at(-1)).toMatchObject({ to: 'ivy2@test.dev', lang: 'en' });
+
+    // still logged in, but the next login waits for the new link
+    expect((await api.get('/api/users/me').set(auth(ivy.token))).status).toBe(200);
+    expect((await api.post('/api/auth/login').send({ email: 'ivy2@test.dev', password: PASSWORD })).status).toBe(403);
+    expect((await api.get(verificationLink('ivy2@test.dev'))).status).toBe(200);
+    expect((await api.post('/api/auth/login').send({ email: 'ivy2@test.dev', password: PASSWORD })).status).toBe(200);
+
+    // same email or other fields : nothing sent
+    sentEmails = [];
+    await api.patch('/api/users/me').set(auth(ivy.token)).send({ email: 'IVY2@test.dev', username: 'ivy' });
+    expect(sentEmails).toHaveLength(0);
+  });
+
   test('change password', async () => {
     const wrong = await api.patch('/api/users/me/password').set(auth(alice.token))
-      .send({ current_password: 'nope', new_password: 'newpassword123' });
+      .send({ current_password: 'nope', new_password: 'NewPassword456?' });
     expect(wrong.status).toBe(400);
     expect(wrong.body.code).toBe('WRONG_PASSWORD');
 
     const ok = await api.patch('/api/users/me/password').set(auth(alice.token))
-      .send({ current_password: 'password123', new_password: 'newpassword123' });
+      .send({ current_password: PASSWORD, new_password: 'NewPassword456?' });
     expect(ok.status).toBe(204);
 
-    const login = await api.post('/api/auth/login').send({ email: 'alice@test.dev', password: 'newpassword123' });
+    const login = await api.post('/api/auth/login').send({ email: 'alice@test.dev', password: 'NewPassword456?' });
     expect(login.status).toBe(200);
   });
 

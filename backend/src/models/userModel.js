@@ -2,7 +2,7 @@ const db = require('../database/db');
 const { buildUpdateSet } = require('../utils/sql');
 
 // password_hash is never selected, except by findByEmailWithPassword / findPasswordHash
-const PUBLIC_COLUMNS = 'id, username, email, birthdate, role, avatar, photo, created_at, updated_at';
+const PUBLIC_COLUMNS = 'id, username, email, email_verified_at, birthdate, role, avatar, photo, created_at, updated_at';
 const UPDATABLE      = ['username', 'email', 'birthdate', 'role', 'avatar', 'photo'];
 
 const User = {
@@ -32,6 +32,35 @@ const User = {
       [username, email, passwordHash, birthdate ?? null]
     );
     return User.findById(result.insertId);
+  },
+
+  /** New link to verify the email : the address is unverified until it is opened. */
+  startEmailVerification: async (id, tokenHash, expiresAt) => {
+    await db.query(
+      'UPDATE user SET email_verified_at = NULL, verification_token = ?, verification_expires_at = ? WHERE id = ?',
+      [tokenHash, expiresAt, id]
+    );
+  },
+
+  findByVerificationToken: async (tokenHash) => {
+    const [rows] = await db.query(
+      'SELECT id, email_verified_at, verification_expires_at FROM user WHERE verification_token = ?',
+      [tokenHash]
+    );
+    return rows[0] || null;
+  },
+
+  /** For the "resend the email" cooldown */
+  findVerificationByEmail: async (email) => {
+    const [rows] = await db.query(
+      'SELECT id, username, email, email_verified_at, verification_expires_at FROM user WHERE email = ?',
+      [email]
+    );
+    return rows[0] || null;
+  },
+
+  markEmailVerified: async (id) => {
+    await db.query('UPDATE user SET email_verified_at = NOW() WHERE id = ?', [id]);
   },
 
   update: async (id, data) => {
