@@ -98,9 +98,12 @@ void main() {
       });
     });
 
-    test('the garden plan opens on the parcels plus a margin, with a minimum size', () {
+    test('the garden plan opens on the parcels plus a margin, with a minimum size around them', () {
       expect(PlanGeometry.gardenView(const []), const Rect.fromLTWH(0, 0, 6, 6));
-      expect(PlanGeometry.gardenView([rect(2, 1, 7, 3)]), const Rect.fromLTWH(0, 0, 9 + PlanGeometry.margin, 6));
+      // 2 x 1 m at (7, 3) + 2 m of margin : 6 x 5 m, made 6 m high around its center
+      expect(PlanGeometry.gardenView([rect(2, 1, 7, 3)]), const Rect.fromLTRB(5, 0.5, 11, 6.5));
+      // far from (0, 0) : only the parcels are shown
+      expect(PlanGeometry.gardenView([rect(10, 8, 50, 40)]), const Rect.fromLTRB(48, 38, 62, 50));
     });
 
     test('the garden plan goes on for hundreds of meters beyond the farthest parcel', () {

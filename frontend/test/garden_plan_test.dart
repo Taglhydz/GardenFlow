@@ -132,12 +132,22 @@ void main() {
       expect(services.parcels.created.single['pos_x'], 3);
     });
 
+    testWidgets('the plan opens centered on the parcels, even far from the corner of the garden', (tester) async {
+      services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 40, posY: 30, shape: rect(4, 2))];
+      await pumpApp(tester, services);
+
+      final box = tester.getRect(find.byType(ShapeCanvas));
+      final center = toScreen(tester, const Offset(42, 31));
+      expect(center.dx, closeTo(box.center.dx, 1));
+      expect(center.dy, closeTo(box.center.dy, 1));
+    });
+
     testWidgets('the plan moved far away comes back with the recenter button', (tester) async {
       services.parcels.parcels = [Parcel(id: 1, gardenId: 7, name: 'Carré A', posX: 1, posY: 1, shape: rect(2, 2))];
       await pumpApp(tester, services);
 
       final parcel = toScreen(tester, const Offset(2, 2));
-      await tester.dragFrom(toScreen(tester, const Offset(5, 5)), const Offset(-600, -400));
+      await tester.dragFrom(toScreen(tester, const Offset(4, 4)), const Offset(-600, -400));
       await tester.pumpAndSettle();
       expect(toScreen(tester, const Offset(2, 2)), isNot(parcel)); // the plan moved
 

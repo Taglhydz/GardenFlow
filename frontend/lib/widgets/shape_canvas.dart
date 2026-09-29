@@ -166,6 +166,11 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
   /// Pixels per meter computed for this screen size, kept when [ShapeCanvas.view] is given
   (Size, double)? _ppm;
 
+  /// Screen size the plan was last centered for : it opens centered, and stays centered when
+  /// the screen changes size (help closed...) until the user moves or zooms it.
+  Size? _centeredFor;
+  bool _movedByUser = false;
+
   @override
   void dispose() {
     _viewer.dispose();
@@ -368,6 +373,17 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
         final (world, ppm) = _frozen ?? (widget.world, _pixelsPerMeter(screen));
         final editing = widget.selectedId != null && !_isDrawing;
 
+        if (_centeredFor == null) {
+          // first layout : nothing listens to the viewer yet, it can be set right away
+          _centeredFor = screen;
+          _recenter(screen, ppm);
+        } else if (_centeredFor != screen && !_movedByUser) {
+          _centeredFor = screen;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_movedByUser) _recenter(screen, ppm);
+          });
+        }
+
         return Stack(
           children: [
             // the grid fills the whole screen wherever the plan is moved : the background is infinite
@@ -388,7 +404,10 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
                   icon: const Icon(Icons.center_focus_strong_outlined, color: AppColors.primaryDark),
                   tooltip: 'plan.recenter'.tr(),
                   visualDensity: VisualDensity.compact,
-                  onPressed: () => _recenter(screen, ppm),
+                  onPressed: () {
+                    _movedByUser = false;
+                    _recenter(screen, ppm);
+                  },
                 ),
               ),
             ),
@@ -420,6 +439,7 @@ class _ShapeCanvasState extends State<ShapeCanvas> {
       maxScale: 6,
       // the plan can be moved anywhere, the recenter button brings it back
       boundaryMargin: const EdgeInsets.all(double.infinity),
+      onInteractionStart: (_) => _movedByUser = true,
       // while a shape is selected, the finger edits the shape, not the plan
       panEnabled: !editing,
       scaleEnabled: !editing,

@@ -68,24 +68,24 @@ class PlanGeometry {
     return [for (final p in points) roundCm(along(p) >= current - tolerance ? p + shift : p)];
   }
 
-  /// Part of the garden plan shown when it opens : from (0, 0) to the farthest parcel + [margin],
-  /// at least [minWorldSize].
+  /// Part of the garden plan shown when it opens and by the recenter button : the parcels + [margin],
+  /// at least [minWorldSize] around their center ; from (0, 0) when the garden is empty.
   static Rect gardenView(Iterable<List<Offset>> shapes) {
-    var maxX = 0.0;
-    var maxY = 0.0;
-    for (final shape in shapes) {
-      for (final p in shape) {
-        maxX = math.max(maxX, p.dx);
-        maxY = math.max(maxY, p.dy);
-      }
-    }
-    return Rect.fromLTWH(0, 0, math.max(minWorldSize, maxX + margin), math.max(minWorldSize, maxY + margin));
+    final points = [for (final shape in shapes) ...shape];
+    if (points.isEmpty) return const Rect.fromLTWH(0, 0, minWorldSize, minWorldSize);
+
+    final bounds = Geometry.bounds(points).inflate(margin);
+    return Rect.fromCenter(
+      center: bounds.center,
+      width: math.max(minWorldSize, bounds.width),
+      height: math.max(minWorldSize, bounds.height),
+    );
   }
 
   /// The whole garden plan : from (0, 0) to [gardenExtent] meters beyond the farthest parcel.
   static Rect gardenWorld(Iterable<List<Offset>> shapes) {
     final view = gardenView(shapes);
-    return Rect.fromLTWH(0, 0, view.width + gardenExtent, view.height + gardenExtent);
+    return Rect.fromLTWH(0, 0, view.right + gardenExtent, view.bottom + gardenExtent);
   }
 
   /// Point of a side of [shapes] near [point] (closer than [maxDistance] m), or null : a corner when one is
