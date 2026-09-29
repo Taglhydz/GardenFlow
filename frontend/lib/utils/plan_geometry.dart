@@ -153,6 +153,26 @@ class PlanGeometry {
     return '$prefix $n';
   }
 
+  /// Where the name ([size]) of a shape with the [bounds] is written, [gap] away from it : above its top-left
+  /// corner, else above its top-right one, below it, and inside its top-left corner when all around it is
+  /// taken. A place is taken when it touches one of the [others] shapes or [taken] names.
+  static Rect tagRect(Rect bounds, Size size, double gap, Iterable<List<Offset>> others, Iterable<Rect> taken) {
+    final above = bounds.top - gap - size.height;
+    final below = bounds.bottom + gap;
+    final candidates = [
+      Offset(bounds.left, above),
+      Offset(bounds.right - size.width, above),
+      Offset(bounds.left, below),
+      Offset(bounds.right - size.width, below),
+    ];
+    for (final topLeft in candidates) {
+      final rect = topLeft & size;
+      final corners = [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
+      if (!others.any((s) => s.length >= 3 && Geometry.overlap(corners, s)) && !taken.any(rect.overlaps)) return rect;
+    }
+    return Offset(bounds.left + gap, bounds.top + gap) & size;
+  }
+
   /// Top-most shape containing [point] : the last one drawn wins.
   static int? shapeAt(List<(int, List<Offset>)> shapes, Offset point) {
     for (final (id, points) in shapes.reversed) {

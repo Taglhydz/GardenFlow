@@ -323,7 +323,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
                                 id: p.id,
                                 points: p.absoluteShape,
                                 fill: soilColor(p.soilType),
-                                labels: [p.name],
+                                tag: p.name,
                               ),
                           ],
                           overlay: _zoneShapes(parcels, zones, crops, plantsById, plantColors),

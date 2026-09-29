@@ -153,6 +153,26 @@ void main() {
       expect(PlanGeometry.nextName('Zone', const ['Zone 2']), 'Zone 3');
     });
 
+    test('the name of a shape goes above its top-left corner, else to the first free place around it', () {
+      final bounds = const Rect.fromLTWH(10, 10, 20, 10);
+      const size = Size(8, 2);
+      Rect place(List<List<Offset>> others, [List<Rect> taken = const []]) =>
+          PlanGeometry.tagRect(bounds, size, 1, others, taken);
+
+      expect(place(const []), const Rect.fromLTWH(10, 7, 8, 2));
+      // a shape above-left of it : above its top-right corner
+      final aboveLeft = rect(10, 5, 2, 3);
+      expect(place([aboveLeft]), const Rect.fromLTWH(22, 7, 8, 2));
+      // a shape all along its top : below it
+      expect(place([rect(30, 5, 5, 3)]), const Rect.fromLTWH(10, 21, 8, 2));
+      // the place above-left is taken by another name
+      expect(place(const [], [const Rect.fromLTWH(5, 6, 8, 2)]), const Rect.fromLTWH(22, 7, 8, 2));
+      // shapes all around : inside its top-left corner
+      expect(place([rect(40, 5, 0, 3), rect(40, 5, 0, 22)]), const Rect.fromLTWH(11, 11, 8, 2));
+      // a shape only touching the place (shared side) doesn't take it
+      expect(place([rect(10, 3, 0, 4)]), const Rect.fromLTWH(10, 7, 8, 2));
+    });
+
     test('top-most shape at a point', () {
       final shapes = [(1, rect(3, 3)), (2, rect(1, 1, 1, 1))];
       expect(PlanGeometry.shapeAt(shapes, const Offset(1.5, 1.5)), 2);

@@ -17,6 +17,7 @@ class CanvasShape {
     this.border = AppColors.parcels,
     this.labels = const [],
     this.labelColors = const [],
+    this.tag,
   });
 
   final int id;
@@ -30,9 +31,20 @@ class CanvasShape {
   /// Color of each label (same order), dark brown when missing
   final List<Color> labelColors;
 
+  /// Written above the top-left corner, outside the shape (e.g. the name of a parcel) : the inside stays
+  /// free for the labels of the overlay
+  final String? tag;
+
   /// Same shape somewhere else (moved, reshaped)
-  CanvasShape withPoints(List<Offset> points) =>
-      CanvasShape(id: id, points: points, fill: fill, border: border, labels: labels, labelColors: labelColors);
+  CanvasShape withPoints(List<Offset> points) => CanvasShape(
+    id: id,
+    points: points,
+    fill: fill,
+    border: border,
+    labels: labels,
+    labelColors: labelColors,
+    tag: tag,
+  );
 }
 
 /// Why a point touched while drawing is not added.
@@ -68,7 +80,9 @@ class _Drag {
 /// - no shape selected : tap a shape to select it, pan and pinch to move / zoom the plan
 /// - a shape selected : drag it to move it, drag a corner to move the corner, drag a "+" (middle
 ///   of a side) to add a corner, long press a corner to remove it. Tap it again to open it,
-///   tap outside to deselect.
+///   tap outside to deselect. A drag or a pinch outside of it still moves / zooms the plan.
+///   When the bar at the bottom hides part of it, the plan glides to show it ; a shape just drawn
+///   is always brought to the center.
 ///
 /// The length of the sides is written along the shape being drawn and the selected shape,
 /// whose corners are named A, B, C… (same names as in the dimensions sheet).
@@ -165,8 +179,12 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
   final _viewer = TransformationController();
 
   /// Pixels per meter, computed for a screen width and a [ShapeCanvas.view]. Kept when only the height of
-  /// the plan changes (help banner...) : the plan doesn't jump, the zoom of the viewer adapts smoothly.
+  /// the plan changes (help banner...) or when its view grows (a parcel added) : the plan doesn't jump,
+  /// the zoom of the viewer adapts smoothly.
   (double, Rect, double)? _ppm;
+
+  /// Part of the plan above the bottom bar, at the last layout : a selected shape must be seen in it
+  Size? _visible;
 
   /// Screen size and bottom bar the plan was last centered for : it opens centered, and stays centered when
   /// the screen changes size (help banner...) or a bar comes up at the bottom, until the user moves or zooms it.
@@ -187,6 +205,24 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
 
   void _onRecenterTick() => _viewer.value = _recenterTween.evaluate(_recenterCurve);
 
+  /// Space kept between a shape brought into view and the edges of the plan (px)
+  static const _revealMargin = 32.0;
+
+  /// Shape the plan was centered on, until the user moves it : it stays centered when the bars change
+  int? _centeredOn;
+
+  @override
+  void didUpdateWidget(ShapeCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final id = widget.selectedId;
+    if (id == null || id == oldWidget.selectedId || _isDrawing) return;
+    // after the layout : the bar of the selected shape is at the bottom
+    final drawn = oldWidget.draft != null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reveal(id, center: drawn, duration: _recenterDuration);
+    });
+  }
+
   @override
   void dispose() {
     _recenterAnimation.dispose();
@@ -197,7 +233,7 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
   double _pixelsPerMeter(Size screen) {
     final view = widget.view ?? widget.world;
     final cached = _ppm;
-    if (cached != null && cached.$1 == screen.width && cached.$2 == view) return cached.$3;
+    if (cached != null && cached.$1 == screen.width && (widget.view != null || cached.$2 == view)) return cached.$3;
     final ppm = math.min(screen.width / view.width, screen.height / view.height);
     _ppm = (screen.width, view, ppm);
     return ppm;
@@ -331,9 +367,11 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
   // ======
   // Drags
   // ======
-  void _onPanStart(Offset local, Rect world, double ppm) {
+  /// What the finger touching [local] takes on the selected shape : a corner, a "+" (a new corner)
+  /// or the whole shape. Null elsewhere : the finger moves the plan.
+  _Drag? _grab(Offset local, Rect world, double ppm) {
     final selected = _selected;
-    if (selected == null || _isDrawing) return;
+    if (selected == null || _isDrawing) return null;
 
     final point = world.topLeft + local / ppm;
     final points = selected.points;
@@ -355,6 +393,11 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
         drag = _Drag(mode: _DragMode.move, shapeId: selected.id, startPoint: point, original: points);
       }
     }
+    return drag;
+  }
+
+  void _onPanStart(Offset local, Rect world, double ppm) {
+    final drag = _grab(local, world, ppm);
     if (drag == null) return;
 
     setState(() {
@@ -419,17 +462,25 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
         // part of the plan that is not behind the bottom bar
         final visible = Size(screen.width, math.max(1, screen.height - inset));
 
+        _visible = visible;
         if (_centeredFor == null) {
           // first layout : nothing listens to the viewer yet, it can be set right away
           _centeredFor = screen;
           _centeredInset = inset;
           _recenter(visible, ppm);
-        } else if ((_centeredFor != screen || _centeredInset != inset) && !_movedByUser) {
-          // a bar at the bottom, the help banner changing size : the plan follows it quickly
+        } else if (_centeredFor != screen || _centeredInset != inset) {
+          // a bar at the bottom, the help banner changing size : the plan follows it quickly, or only
+          // shows the selected shape again when the bar hides part of it
           _centeredFor = screen;
           _centeredInset = inset;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && !_movedByUser) _recenter(visible, ppm, duration: _followDuration);
+            if (!mounted) return;
+            final id = _isDrawing ? null : _selected?.id;
+            if (id != null) {
+              _reveal(id, center: id == _centeredOn, duration: _followDuration);
+            } else if (!_movedByUser) {
+              _recenter(visible, ppm, duration: _followDuration);
+            }
           });
         }
 
@@ -492,13 +543,51 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
     final topLeft = (view.topLeft - widget.world.topLeft) * ppm * scale;
     final centered = Matrix4.diagonal3Values(scale, scale, 1)
       ..setTranslationRaw((screen.width - width * scale) / 2 - topLeft.dx, (screen.height - height * scale) / 2 - topLeft.dy, 0);
+    _centeredOn = null;
+    _moveTo(centered, duration);
+  }
 
+  /// Brings the shape [id] into the part of the plan above the bottom bar : to its center when [center],
+  /// else only when part of it is hidden. The zoom is kept, unless the shape is too big to be seen whole.
+  void _reveal(int id, {bool center = false, required Duration duration}) {
+    final shape = widget.shapes.where((s) => s.id == id).firstOrNull;
+    final (visible, ppm) = (_visible, _ppm?.$3);
+    if (shape == null || visible == null || ppm == null) return;
+
+    final bounds = Geometry.bounds(shape.points);
+    final rect = Rect.fromPoints((bounds.topLeft - widget.world.topLeft) * ppm, (bounds.bottomRight - widget.world.topLeft) * ppm);
+    // where the plan is going when it is already gliding
+    final current = _recenterAnimation.isAnimating ? _recenterTween.end! : _viewer.value;
+    if (!center) {
+      final onScreen = MatrixUtils.transformRect(current, rect);
+      if (onScreen.left >= 0 && onScreen.top >= 0 && onScreen.right <= visible.width && onScreen.bottom <= visible.height) {
+        return;
+      }
+    }
+
+    final room = Rect.fromLTWH(
+      _revealMargin,
+      _revealMargin,
+      math.max(1, visible.width - 2 * _revealMargin),
+      math.max(1, visible.height - 2 * _revealMargin),
+    );
+    final fit = math.min(room.width / math.max(rect.width, 1e-6), room.height / math.max(rect.height, 1e-6));
+    final scale = math.min(current.getMaxScaleOnAxis(), fit).clamp(_minScale, 6.0);
+    final translation = room.center - rect.center * scale;
+    // the plan stays there afterwards : no jump back when the bar goes down
+    _movedByUser = true;
+    _centeredOn = id;
+    _moveTo(Matrix4.diagonal3Values(scale, scale, 1)..setTranslationRaw(translation.dx, translation.dy, 0), duration);
+  }
+
+  /// Puts the plan at [target], right away or with a move + zoom animation lasting [duration].
+  void _moveTo(Matrix4 target, Duration? duration) {
     _recenterAnimation.stop();
     if (duration == null) {
-      _viewer.value = centered;
+      _viewer.value = target;
       return;
     }
-    _recenterTween = Matrix4Tween(begin: _viewer.value.clone(), end: centered);
+    _recenterTween = Matrix4Tween(begin: _viewer.value.clone(), end: target);
     _recenterAnimation
       ..duration = duration
       ..forward(from: 0);
@@ -516,36 +605,46 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
         // the finger takes the plan back, even in the middle of the recenter animation
         _recenterAnimation.stop();
         _movedByUser = true;
+        _centeredOn = null;
       },
-      // while a shape is selected, the finger edits the shape, not the plan
-      panEnabled: !editing,
-      scaleEnabled: !editing,
-      child: GestureDetector(
+      // a shape selected : the finger edits it when it touches it, else it moves the plan
+      child: RawGestureDetector(
         behavior: HitTestBehavior.opaque,
-        // the drag starts where the finger touched : the shape follows the finger exactly
-        dragStartBehavior: DragStartBehavior.down,
-        onTapUp: (d) => _onTapUp(d.localPosition, world, ppm),
-        onLongPressStart: editing ? (d) => _onLongPress(d.localPosition, world, ppm) : null,
-        onPanStart: editing ? (d) => _onPanStart(d.localPosition, world, ppm) : null,
-        onPanUpdate: editing ? (d) => _onPanUpdate(d.localPosition, world, ppm) : null,
-        onPanEnd: editing ? (_) => _onPanEnd() : null,
-        onPanCancel: editing ? _onPanEnd : null,
-        child: CustomPaint(
-          size: world.size * ppm,
-          painter: _PlanPainter(
-            viewer: _viewer,
-            world: world,
-            ppm: ppm,
-            borders: _isDrawing ? _borders() : const [],
-            background: widget.background,
-            shapes: [
-              for (final s in widget.shapes)
-                s.id == _drag?.shapeId ? s.withPoints(_drag!.current) : s,
-            ],
-            overlay: _drag?.mode == _DragMode.move || _drag == null ? _movedOverlay() : widget.overlay,
-            selectedId: widget.selectedId,
-            selectedPoints: editing ? _selectedPoints : null,
-            draft: widget.draft,
+        gestures: {
+          if (editing)
+            _GrabRecognizer: GestureRecognizerFactoryWithHandlers<_GrabRecognizer>(
+              _GrabRecognizer.new,
+              (r) => r
+                ..grabs = ((local) => _grab(local, world, ppm) != null)
+                // the drag starts where the finger touched : the shape follows the finger exactly
+                ..dragStartBehavior = DragStartBehavior.down
+                ..onStart = ((d) => _onPanStart(d.localPosition, world, ppm))
+                ..onUpdate = ((d) => _onPanUpdate(d.localPosition, world, ppm))
+                ..onEnd = ((_) => _onPanEnd())
+                ..onCancel = _onPanEnd,
+            ),
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: (d) => _onTapUp(d.localPosition, world, ppm),
+          onLongPressStart: editing ? (d) => _onLongPress(d.localPosition, world, ppm) : null,
+          child: CustomPaint(
+            size: world.size * ppm,
+            painter: _PlanPainter(
+              viewer: _viewer,
+              world: world,
+              ppm: ppm,
+              borders: _isDrawing ? _borders() : const [],
+              background: widget.background,
+              shapes: [
+                for (final s in widget.shapes)
+                  s.id == _drag?.shapeId ? s.withPoints(_drag!.current) : s,
+              ],
+              overlay: _drag?.mode == _DragMode.move || _drag == null ? _movedOverlay() : widget.overlay,
+              selectedId: widget.selectedId,
+              selectedPoints: editing ? _selectedPoints : null,
+              draft: widget.draft,
+            ),
           ),
         ),
       ),
@@ -565,6 +664,15 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
             : o,
     ];
   }
+}
+
+/// Drag of the selected shape : only takes the fingers that touch it (a corner, a "+", the shape),
+/// the others go to the viewer and move the plan.
+class _GrabRecognizer extends PanGestureRecognizer {
+  bool Function(Offset local) grabs = (_) => false;
+
+  @override
+  bool isPointerAllowed(PointerEvent event) => super.isPointerAllowed(event) && grabs(event.localPosition);
 }
 
 class _PlanPainter extends CustomPainter {
@@ -623,6 +731,11 @@ class _PlanPainter extends CustomPainter {
     for (final s in [...shapes, ...overlay]) {
       _paintLabels(canvas, s);
     }
+    final tags = <Rect>[];
+    for (final s in shapes) {
+      final tag = _paintTag(canvas, s, selected: s.id == selectedId && selectedPoints != null, taken: tags);
+      if (tag != null) tags.add(tag);
+    }
 
     if (selectedPoints != null) {
       _paintHandles(canvas, selectedPoints!);
@@ -675,6 +788,42 @@ class _PlanPainter extends CustomPainter {
       p.paint(canvas, position.translate(-p.width / 2, 0));
       position = position.translate(0, p.height);
     }
+  }
+
+  /// The tag next to the shape (above its top-left corner when that place is free, see [PlanGeometry.tagRect]),
+  /// not on the other shapes nor on the tags already [taken]. Farther on the selected shape : away from its
+  /// corners and the lengths of its sides. Returns where it is written.
+  Rect? _paintTag(Canvas canvas, CanvasShape s, {required bool selected, required List<Rect> taken}) {
+    final tag = s.tag;
+    if (tag == null || s.points.length < 3) return null;
+    final bounds = Geometry.bounds(s.points);
+    final painter = TextPainter(
+      text: TextSpan(
+        text: tag,
+        style: TextStyle(
+          fontSize: 12 * _u,
+          fontWeight: FontWeight.bold,
+          color: selected ? AppColors.primaryDark : const Color(0xFF3E2723),
+          // readable on the grid and on a parcel above
+          shadows: [Shadow(color: AppColors.white, blurRadius: 3 * _u)],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+      ellipsis: '…',
+    )..layout(maxWidth: math.max(bounds.width * ppm, 60 * _u));
+    final place = PlanGeometry.tagRect(
+      Rect.fromPoints(_px(bounds.topLeft), _px(bounds.bottomRight)),
+      painter.size,
+      (selected ? 26 : 3) * _u,
+      [
+        for (final other in shapes)
+          if (other.id != s.id) [for (final p in other.points) _px(p)],
+      ],
+      taken,
+    );
+    painter.paint(canvas, place.topLeft);
+    return place;
   }
 
   void _paintHandles(Canvas canvas, List<Offset> points) {
