@@ -179,8 +179,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  /// Picture of the user in the header, with its green ring
-  static const _pictureSize = 40.0;
+  /// Button of the picture of the user in the header (same as on the garden page)
+  static const _pictureButtonSize = kMinInteractiveDimension;
 
   /// "GardenFlow" and the rank of the gardener in the middle, their picture on the right (opens the profile).
   Widget _buildHeader() {
@@ -192,7 +192,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       child: Row(
         children: [
           // same width as the picture on the right : the title stays in the middle
-          const SizedBox(width: _pictureSize),
+          const SizedBox(width: _pictureButtonSize),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -209,19 +209,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               ],
             ),
           ),
-          Tooltip(
-            message: 'profile.title'.tr(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: _openProfile,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                child: user == null
-                    ? const SizedBox.square(dimension: _pictureSize - 4, child: Icon(Icons.person_outline, color: AppColors.white))
-                    : UserAvatar(user: user, size: _pictureSize - 4),
-              ),
-            ),
+          IconButton(
+            icon: user == null ? const Icon(Icons.person_outline) : UserAvatar(user: user, size: 32),
+            color: AppColors.primary,
+            onPressed: _openProfile,
+            tooltip: 'profile.title'.tr(),
           ),
         ],
       ),
