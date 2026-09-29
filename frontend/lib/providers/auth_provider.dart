@@ -31,27 +31,38 @@ class AuthNotifier extends AsyncNotifier<User?> {
     }
   }
 
-  /// Throws an [ApiException] on failure, the auth state is left unchanged.
+  /// Throws an [ApiException] on failure (EMAIL_NOT_VERIFIED until the link of the email is opened),
+  /// the auth state is left unchanged.
   Future<void> login({required String email, required String password}) async {
     final user = await ref.read(authServiceProvider).login(email: email, password: password);
+
+    // first login of the account created on this device : welcome dialog
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (prefs.getString(AppConstants.welcomeEmailKey) == user.email) {
+      await prefs.remove(AppConstants.welcomeEmailKey);
+      ref.read(welcomePendingProvider.notifier).raise();
+    }
+
     state = AsyncData(user);
   }
 
-  /// Throws an [ApiException] on failure, the auth state is left unchanged.
+  /// Creates the account without logging in : the user must first open the link sent by email.
+  /// Throws an [ApiException] on failure.
   Future<void> register({
     required String username,
     required String email,
     required String password,
     DateTime? birthdate,
+    required String lang,
   }) async {
     final user = await ref.read(authServiceProvider).register(
       username: username,
       email: email,
       password: password,
       birthdate: birthdate,
+      lang: lang,
     );
-    ref.read(welcomePendingProvider.notifier).raise();
-    state = AsyncData(user);
+    await ref.read(sharedPreferencesProvider).setString(AppConstants.welcomeEmailKey, user.email);
   }
 
   Future<void> logout() async {
@@ -80,7 +91,7 @@ class AuthNotifier extends AsyncNotifier<User?> {
   void updateUser(User user) => state = AsyncData(user);
 }
 
-/// true right after a registration : the home screen shows a welcome dialog once.
+/// true at the first login after a registration : the home screen shows a welcome dialog once.
 final welcomePendingProvider = NotifierProvider<FlagNotifier, bool>(FlagNotifier.new);
 
 /// true when the user was logged out because the session expired : the login screen tells them why.

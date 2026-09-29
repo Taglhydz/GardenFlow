@@ -34,16 +34,34 @@ class FakeAuthService implements AuthService {
     return result as User?;
   }
 
+  /// Accounts whose verification link was not opened : login refused
+  final unverifiedEmails = <String>{};
+
+  /// Emails asked with resendVerification
+  final resentTo = <String>[];
+
   @override
   Future<User> login({required String email, required String password}) async {
     if (password != 'good') {
       throw ApiException(statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'wrong');
     }
+    if (unverifiedEmails.contains(email)) {
+      throw ApiException(statusCode: 403, code: 'EMAIL_NOT_VERIFIED', message: 'not verified');
+    }
     return alice;
   }
 
   @override
-  Future<User> register({required String username, required String email, required String password, DateTime? birthdate}) async => alice;
+  Future<User> register({
+    required String username,
+    required String email,
+    required String password,
+    DateTime? birthdate,
+    required String lang,
+  }) async => alice;
+
+  @override
+  Future<void> resendVerification({required String email, required String lang}) async => resentTo.add(email);
 
   @override
   Future<void> logout() async => loggedOut = true;

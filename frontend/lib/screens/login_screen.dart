@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_localizations.dart';
 import '../config/constants.dart';
 import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
 import '../utils/validators.dart';
 import '../widgets/custom_button.dart';
 import 'register_screen.dart';
+import 'verify_email_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -34,14 +36,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     setState(() => _isLoading = true);
 
+    final email = _emailController.text.trim();
     try {
       // on success, AuthGate replaces this screen with the home screen
       await ref.read(authProvider.notifier).login(
-        email: _emailController.text.trim(),
+        email: email,
         password: _passwordController.text,
       );
     } catch (e) {
-      if (mounted) {
+      if (!mounted) return;
+      if (e is ApiException && e.code == 'EMAIL_NOT_VERIFIED') {
+        // right password but the link of the email was not opened yet
+        Navigator.push(context, MaterialPageRoute(builder: (_) => VerifyEmailScreen(email: email)));
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.errorMessage(e)),
@@ -154,13 +161,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     children: [
                       Text('auth.no_account'.tr()),
                       TextButton(
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          // email of the account just created : ready to log in after the verification
+                          final email = await Navigator.push<String>(
                             context,
                             MaterialPageRoute(
                               builder: (context) => const RegisterScreen(),
                             ),
                           );
+                          if (email != null) {
+                            _emailController.text = email;
+                            _passwordController.clear();
+                          }
                         },
                         child: Text(
                           'auth.register_button'.tr(),

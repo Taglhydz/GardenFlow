@@ -101,15 +101,24 @@ void main() {
       expect(container.read(sessionExpiredProvider), isTrue);
     });
 
-    test('register raises the welcome flag once', () async {
+    test('register does not log in, the first login raises the welcome flag once', () async {
       final container = await createContainer();
       await container.read(authProvider.future);
 
-      await container.read(authProvider.notifier).register(username: 'alice', email: 'a@b.c', password: 'password123');
+      await container.read(authProvider.notifier)
+          .register(username: 'alice', email: alice.email, password: 'Password123!', lang: 'fr');
+      expect(container.read(authProvider).value, isNull);
+      expect(container.read(welcomePendingProvider), isFalse);
 
+      await container.read(authProvider.notifier).login(email: alice.email, password: 'good');
       final welcome = container.read(welcomePendingProvider.notifier);
       expect(welcome.consume(), isTrue);
       expect(welcome.consume(), isFalse);
+
+      // next logins : no welcome
+      await container.read(authProvider.notifier).logout();
+      await container.read(authProvider.notifier).login(email: alice.email, password: 'good');
+      expect(container.read(welcomePendingProvider), isFalse);
     });
   });
 

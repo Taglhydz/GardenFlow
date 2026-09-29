@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:GardenFlow/config/constants.dart';
 import 'package:GardenFlow/models/garden.dart';
 import 'package:GardenFlow/screens/garden_view.dart';
 import 'package:GardenFlow/services/api_service.dart';
@@ -112,7 +113,7 @@ void main() {
     expect(tester.getRect(find.byType(GardenMiniMap).last), miniMap);
   });
 
-  testWidgets('register from the login screen -> home with welcome dialog', (tester) async {
+  testWidgets('register -> check your emails -> login with the email filled in -> welcome dialog', (tester) async {
     await pumpApp(tester, services);
 
     await tester.tap(find.text("S'inscrire"));
@@ -121,16 +122,90 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'alice');
     await tester.enterText(fields.at(1), 'alice@test.dev');
-    await tester.enterText(fields.at(2), 'password123');
-    await tester.enterText(fields.at(3), 'password123');
+    await tester.enterText(fields.at(2), '12051990');
+    await tester.enterText(fields.at(3), 'Password123!');
+    await tester.enterText(fields.at(4), 'Password123!');
     await tester.ensureVisible(find.text("S'inscrire").last);
     await tester.tap(find.text("S'inscrire").last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vérifiez vos emails'), findsOneWidget);
+    expect(find.text('alice@test.dev'), findsOneWidget);
+    // an email was just sent : "resend" waits
+    expect(find.text("Renvoyer l'email (60 s)"), findsOneWidget);
+
+    await tester.tap(find.text('Retour à la connexion'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('alice@test.dev'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField).at(1), 'good');
+    await tester.tap(find.text('Se connecter'));
     await tester.pumpAndSettle();
 
     expect(find.text('Bienvenue dans GardenFlow !'), findsOneWidget);
     await tester.tap(find.text('Commencer'));
     await tester.pumpAndSettle();
     expect(find.text('Aucun jardin pour le moment'), findsOneWidget);
+  });
+
+  testWidgets('register : the missing password rules are shown in red while typing', (tester) async {
+    await pumpApp(tester, services);
+    await tester.tap(find.text("S'inscrire"));
+    await tester.pumpAndSettle();
+
+    final password = find.byType(TextFormField).at(3);
+    expect(find.text('Une lettre majuscule'), findsNothing);
+
+    await tester.enterText(password, 'abc1');
+    await tester.pump();
+    Color colorOf(String text) => tester.widget<Text>(find.text(text)).style!.color!;
+    expect(colorOf('Une lettre minuscule'), AppColors.success);
+    expect(colorOf('Un chiffre'), AppColors.success);
+    expect(colorOf('Une lettre majuscule'), AppColors.error);
+    expect(colorOf('Un symbole (!, ?, @, #...)'), AppColors.error);
+    expect(colorOf('Au moins 10 caractères'), AppColors.error);
+
+    await tester.enterText(password, 'Abcdefgh1!');
+    await tester.pump();
+    for (final rule in ['Au moins 10 caractères', 'Une lettre minuscule', 'Une lettre majuscule', 'Un chiffre', 'Un symbole (!, ?, @, #...)']) {
+      expect(colorOf(rule), AppColors.success);
+    }
+
+    // nothing under the confirmation
+    await tester.enterText(find.byType(TextFormField).at(4), 'x');
+    await tester.pump();
+    expect(find.text('Un chiffre'), findsOneWidget);
+  });
+
+  testWidgets('birthdate : typed digits get fixed slashes', (tester) async {
+    await pumpApp(tester, services);
+    await tester.tap(find.text("S'inscrire"));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField).at(2), '12051990');
+    await tester.pump();
+    expect(find.text('12/05/1990'), findsOneWidget);
+  });
+
+  testWidgets('login with an unverified email -> verification screen, a new email can be sent', (tester) async {
+    services.auth.unverifiedEmails.add('alice@test.dev');
+    await pumpApp(tester, services);
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'alice@test.dev');
+    await tester.enterText(find.byType(TextFormField).at(1), 'good');
+    await tester.tap(find.text('Se connecter'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Email non vérifié'), findsOneWidget);
+    await tester.tap(find.text("Renvoyer l'email"));
+    await tester.pump();
+    expect(services.auth.resentTo, ['alice@test.dev']);
+    expect(find.text('Email envoyé !'), findsOneWidget);
+    expect(find.text("Renvoyer l'email (60 s)"), findsOneWidget);
+
+    // closing the screen stops the countdown
+    await tester.tap(find.text('Retour à la connexion'));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('server unreachable at startup -> retry screen', (tester) async {

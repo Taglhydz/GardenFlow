@@ -22,9 +22,10 @@ class AppConstants {
   static const String lastGardenIdKey = 'last_garden_id'; // shared preferences
   static const String snapKey         = 'snap_cm'       ; // shared preferences (0 = magnet off)
   static const String hiddenHelpKey   = 'hidden_help'   ; // shared preferences (help banners closed)
+  static const String welcomeEmailKey = 'welcome_email' ; // shared preferences (account created, welcome shown at its first login)
 
   // Validation rules (must match the backend validators)
-  static const int passwordMinLength = 8;
+  static const int passwordMinLength = 10;
   static const int usernameMinLength = 3;
 
   // App Info

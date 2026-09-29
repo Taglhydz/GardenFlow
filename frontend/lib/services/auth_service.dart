@@ -11,19 +11,28 @@ class AuthService {
   final ApiService _api;
   final TokenStorage _tokenStorage;
 
+  /// No session : the server sends a verification email, login is possible once its link is opened.
+  /// [lang] : language of the email ('fr' / 'en').
   Future<User> register({
     required String username,
     required String email,
     required String password,
     DateTime? birthdate,
+    required String lang,
   }) async {
     final response = await _api.post('${AppConstants.authEndpoint}/register', {
       'username': username,
       'email': email,
       'password': password,
       if (birthdate != null) 'birthdate': JsonUtils.formatDate(birthdate),
+      'lang': lang,
     });
-    return _saveSession(response);
+    return User.fromJson(response['user']);
+  }
+
+  /// Sends a new verification email (the server answers the same way whether the email exists or not).
+  Future<void> resendVerification({required String email, required String lang}) async {
+    await _api.post('${AppConstants.authEndpoint}/resend-verification', {'email': email, 'lang': lang});
   }
 
   Future<User> login({required String email, required String password}) async {

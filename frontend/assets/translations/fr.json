@@ -75,6 +75,7 @@
   "success": "Succès",
   "loading": "Chargement...",
   "no_data": "Aucune donnée disponible",
+  "date_format_hint": "jj/mm/aaaa",
   "required_field": "Ce champ est requis",
   "settings": "Paramètres",
   "language": "Langue",
@@ -136,16 +137,34 @@
     "welcome_start": "Commencer",
     "session_expired": "Votre session a expiré, veuillez vous reconnecter."
   },
+  "verify_email": {
+    "title_sent": "Vérifiez vos emails",
+    "title_not_verified": "Email non vérifié",
+    "message_sent": "Votre compte a été créé ! Nous avons envoyé un lien de vérification à :",
+    "message_not_verified": "Ouvrez le lien de vérification envoyé à cette adresse avant de vous connecter :",
+    "spam_hint": "Pensez à regarder dans vos spams. Une fois l'email vérifié, revenez vous connecter.",
+    "go_to_login": "Retour à la connexion",
+    "resend": "Renvoyer l'email",
+    "resend_in": "Renvoyer l'email ({} s)",
+    "sent": "Email envoyé !"
+  },
   "validation": {
     "email_required": "Veuillez entrer votre email",
     "email_invalid": "Email invalide",
     "password_required": "Veuillez entrer un mot de passe",
-    "password_min": "Le mot de passe doit contenir au moins {} caractères",
     "username_required": "Veuillez entrer un nom d'utilisateur",
     "username_min": "Le nom doit contenir au moins {} caractères",
     "confirm_password_required": "Veuillez confirmer votre mot de passe",
     "passwords_dont_match": "Les mots de passe ne correspondent pas",
-    "name_required": "Le nom est obligatoire"
+    "name_required": "Le nom est obligatoire",
+    "password_weak": "Le mot de passe ne respecte pas toutes les règles",
+    "password_rule_length": "Au moins {} caractères",
+    "password_rule_lowercase": "Une lettre minuscule",
+    "password_rule_uppercase": "Une lettre majuscule",
+    "password_rule_digit": "Un chiffre",
+    "password_rule_symbol": "Un symbole (!, ?, @, #...)",
+    "date_invalid": "Date invalide (jj/mm/aaaa)",
+    "date_out_of_range": "La date doit être entre le {} et le {}"
   },
   "home": {
     "no_garden_title": "Aucun jardin pour le moment",
@@ -203,7 +222,8 @@
     "INVALID_ZONE": "Cette zone n'appartient pas à la parcelle.",
     "INVALID_IMAGE": "La photo doit être une image JPEG, PNG ou WebP.",
     "PHOTO_TOO_LARGE": "La photo est trop lourde.",
-    "PHOTO_REQUIRED": "Aucune photo n'a été envoyée."
+    "PHOTO_REQUIRED": "Aucune photo n'a été envoyée.",
+    "EMAIL_NOT_VERIFIED": "Votre email n'est pas encore vérifié."
   },
   "plant_family_solanaceae": "Solanacées",
   "plant_family_apiaceae": "Apiacées (ombellifères)",

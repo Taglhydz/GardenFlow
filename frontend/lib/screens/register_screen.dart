@@ -6,8 +6,12 @@ import '../config/constants.dart';
 import '../providers/auth_provider.dart';
 import '../utils/validators.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/date_input_field.dart';
+import '../widgets/password_rules.dart';
+import 'verify_email_screen.dart';
 
-/// Opened on top of the login screen. On success, AuthGate closes it and shows the home screen.
+/// Opened on top of the login screen. On success, it is replaced by the "check your emails" screen
+/// and the login screen receives the email (Navigator result) to fill it in.
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
@@ -35,33 +39,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super                     .dispose();
   }
 
-  Future<void> _selectBirthdate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedBirthdate ?? DateTime(2000),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      helpText: 'auth.birthdate_picker_help'.tr(),
-    );
-    if (picked != null && picked != _selectedBirthdate) {
-      setState(() {
-        _selectedBirthdate = picked;
-      });
-    }
-  }
-
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
+    final email = _emailController.text.trim();
     try {
       await ref.read(authProvider.notifier).register(
         username: _usernameController.text.trim(),
-        email: _emailController.text.trim(),
+        email: email,
         password: _passwordController.text,
         birthdate: _selectedBirthdate,
+        lang: context.locale.languageCode,
       );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => VerifyEmailScreen(email: email, justRegistered: true)),
+          result: email,
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -147,26 +145,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // birthdate
-                  InkWell(
-                    onTap: _selectBirthdate,
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: 'auth.birthdate_optional'.tr(),
-                        prefixIcon: const Icon(Icons.calendar_today),
-                        border: const OutlineInputBorder(),
-                      ),
-                      child: Text(
-                        _selectedBirthdate == null
-                            ? 'auth.select_date'.tr()
-                            : MaterialLocalizations.of(context).formatCompactDate(_selectedBirthdate!),
-                        style: TextStyle(
-                          color: _selectedBirthdate == null
-                              ? AppColors.grey
-                              : AppColors.black,
-                        ),
-                      ),
-                    ),
+                  // birthdate : typed (fixed slashes) or picked in the calendar
+                  DateInputField(
+                    label: 'auth.birthdate_optional'.tr(),
+                    value: _selectedBirthdate,
+                    onChanged: (date) => _selectedBirthdate = date,
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime.now(),
+                    initialPickerDate: DateTime(2000),
+                    pickerHelpText: 'auth.birthdate_picker_help'.tr(),
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
 
@@ -196,6 +184,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     validator: Validators.newPassword,
                   ),
+                  PasswordRules(controller: _passwordController),
                   const SizedBox(height: 16),
 
                   // password confirmation

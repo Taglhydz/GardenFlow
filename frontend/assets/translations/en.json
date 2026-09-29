@@ -75,6 +75,7 @@
   "success": "Success",
   "loading": "Loading...",
   "no_data": "No data available",
+  "date_format_hint": "dd/mm/yyyy",
   "required_field": "This field is required",
   "home": {
     "no_garden_title": "No garden yet",
@@ -167,16 +168,34 @@
     "welcome_start": "Get started",
     "session_expired": "Your session has expired, please log in again."
   },
+  "verify_email": {
+    "title_sent": "Check your emails",
+    "title_not_verified": "Email not verified",
+    "message_sent": "Your account has been created! We sent a verification link to:",
+    "message_not_verified": "Open the verification link sent to this address before logging in:",
+    "spam_hint": "Remember to check your spam folder. Once the email is verified, come back to log in.",
+    "go_to_login": "Back to login",
+    "resend": "Resend the email",
+    "resend_in": "Resend the email ({} s)",
+    "sent": "Email sent!"
+  },
   "validation": {
     "email_required": "Please enter your email",
     "email_invalid": "Invalid email",
     "password_required": "Please enter a password",
-    "password_min": "The password must contain at least {} characters",
     "username_required": "Please enter a username",
     "username_min": "The username must contain at least {} characters",
     "confirm_password_required": "Please confirm your password",
     "passwords_dont_match": "Passwords do not match",
-    "name_required": "The name is required"
+    "name_required": "The name is required",
+    "password_weak": "The password does not follow all the rules",
+    "password_rule_length": "At least {} characters",
+    "password_rule_lowercase": "A lowercase letter",
+    "password_rule_uppercase": "An uppercase letter",
+    "password_rule_digit": "A digit",
+    "password_rule_symbol": "A symbol (!, ?, @, #...)",
+    "date_invalid": "Invalid date (dd/mm/yyyy)",
+    "date_out_of_range": "The date must be between {} and {}"
   },
   "errors": {
     "NETWORK_ERROR": "Unable to reach the server. Check your connection.",
@@ -203,7 +222,8 @@
     "INVALID_ZONE": "This zone does not belong to the parcel.",
     "INVALID_IMAGE": "The photo must be a JPEG, PNG or WebP image.",
     "PHOTO_TOO_LARGE": "The photo is too large.",
-    "PHOTO_REQUIRED": "No photo was sent."
+    "PHOTO_REQUIRED": "No photo was sent.",
+    "EMAIL_NOT_VERIFIED": "Your email is not verified yet."
   },
   "plant_family_solanaceae": "Nightshade family",
   "plant_family_apiaceae": "Carrot family",
