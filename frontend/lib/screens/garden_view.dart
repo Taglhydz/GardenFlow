@@ -8,6 +8,7 @@ import '../models/garden.dart';
 import '../models/parcel.dart';
 import '../models/plant.dart';
 import '../models/zone.dart';
+import '../providers/auth_provider.dart';
 import '../providers/garden_providers.dart';
 import '../providers/plant_providers.dart';
 import '../providers/snap_provider.dart';
@@ -24,6 +25,7 @@ import '../widgets/plan_entrance.dart';
 import '../widgets/rename_dialog.dart';
 import '../widgets/shape_canvas.dart';
 import '../widgets/snap_button.dart';
+import '../widgets/user_avatar.dart';
 import 'parcel_screen.dart';
 
 enum _GardenAction { rename, delete }
@@ -233,6 +235,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
     final crops = ref.watch(gardenCropsProvider(_gardenId)).value ?? const <Crop>[];
     final plantsById = ref.watch(plantsByIdProvider);
     final plantColors = ref.watch(plantColorsProvider);
+    final user = ref.watch(authProvider).value;
 
     Parcel? selected;
     for (final p in parcels) {
@@ -267,7 +270,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
           ],
         ),
         IconButton(
-          icon: const Icon(Icons.person_outline),
+          icon: user == null ? const Icon(Icons.person_outline) : UserAvatar(user: user, size: 32),
           onPressed: widget.onProfile,
           tooltip: 'profile.title'.tr(),
         ),

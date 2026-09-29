@@ -10,6 +10,7 @@ import '../models/suggestion.dart';
 import '../models/zone.dart';
 import 'auth_provider.dart';
 import 'core_providers.dart';
+import 'profile_providers.dart';
 
 // ======
 // Gardens
@@ -60,6 +61,8 @@ class GardensNotifier extends AsyncNotifier<List<Garden>> {
     if (ref.read(selectedGardenIdProvider) == id) {
       ref.read(selectedGardenIdProvider.notifier).select(null);
     }
+    // its crops are gone
+    ref.invalidate(levelProvider);
   }
 }
 
@@ -201,8 +204,9 @@ class GardenCropsNotifier extends AsyncNotifier<List<Crop>> {
 
   void _changed(List<Crop> crops) {
     state = AsyncData(crops);
-    // companions and rotation depend on the crops
+    // companions and rotation depend on the crops, the level of the gardener too
     ref.invalidate(suggestionsProvider);
+    ref.invalidate(levelProvider);
   }
 
   Future<Crop> create(

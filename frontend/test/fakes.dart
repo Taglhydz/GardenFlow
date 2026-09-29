@@ -2,18 +2,21 @@
 import 'dart:ui';
 import 'package:GardenFlow/models/crop.dart';
 import 'package:GardenFlow/models/garden.dart';
+import 'package:GardenFlow/models/gardener_level.dart';
 import 'package:GardenFlow/models/parcel.dart';
 import 'package:GardenFlow/models/plant.dart';
 import 'package:GardenFlow/models/plant_association.dart';
 import 'package:GardenFlow/models/suggestion.dart';
 import 'package:GardenFlow/models/user.dart';
 import 'package:GardenFlow/models/zone.dart';
+import 'package:GardenFlow/providers/profile_providers.dart';
 import 'package:GardenFlow/services/api_service.dart';
 import 'package:GardenFlow/services/auth_service.dart';
 import 'package:GardenFlow/services/crop_service.dart';
 import 'package:GardenFlow/services/garden_service.dart';
 import 'package:GardenFlow/services/parcel_service.dart';
 import 'package:GardenFlow/services/plant_service.dart';
+import 'package:GardenFlow/services/user_service.dart';
 import 'package:GardenFlow/services/zone_service.dart';
 import 'package:GardenFlow/utils/geometry.dart';
 
@@ -228,4 +231,52 @@ class FakePlantService implements PlantService {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+class FakeUserService implements UserService {
+  GardenerLevel level = const GardenerLevel(rank: 'seedling', points: 176, rankMin: 150, nextRank: 'gardener', nextRankMin: 350, planted: 6);
+
+  /// Last photo sent (bytes)
+  List<int>? uploaded;
+
+  @override
+  Future<GardenerLevel> getMyLevel() async => level;
+
+  @override
+  Future<User> setAvatar(String avatar) async => User(id: alice.id, username: alice.username, email: alice.email, avatar: avatar);
+
+  @override
+  Future<User> uploadPhoto(List<int> bytes, {required String filename, required String contentType}) async {
+    uploaded = bytes;
+    return User(id: alice.id, username: alice.username, email: alice.email, photo: '1-abc.jpg');
+  }
+
+  @override
+  Future<User> removePicture(User user) async => alice;
+
+  bool deleted = false;
+
+  @override
+  Future<void> deleteMe() async => deleted = true;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+/// Camera and gallery without a device : returns [photo] (null = cancelled).
+class FakePhotoPicker implements PhotoPicker {
+  PickedPhoto? photo = const PickedPhoto(bytes: [1, 2, 3], filename: 'me.jpg', contentType: 'image/jpeg');
+  bool camera = true;
+
+  /// The source asked for the last photo (true = camera)
+  bool? usedCamera;
+
+  @override
+  bool get canUseCamera => camera;
+
+  @override
+  Future<PickedPhoto?> pick({required bool camera}) async {
+    usedCamera = camera;
+    return photo;
+  }
 }

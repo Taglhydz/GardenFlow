@@ -6,6 +6,9 @@ const request = require('supertest');
 const app     = require('../src/app');
 const db      = require('../src/database/db');
 const { resetDatabase } = require('../scripts/db-reset');
+const fs   = require('fs');
+const path = require('path');
+const { PHOTOS_DIR } = require('../src/utils/photoStorage');
 
 const api = request(app);
 
@@ -709,6 +712,74 @@ describe('plant colors', () => {
   test('invalid hue -> 400, unknown plant -> 404', async () => {
     expect((await api.put(`/api/users/me/plant-colors/${tomato.id}`).set(auth(alice.token)).send({ hue: 360 })).status).toBe(400);
     expect((await api.put('/api/users/me/plant-colors/99999').set(auth(alice.token)).send({ hue: 10 })).status).toBe(404);
+  });
+});
+
+describe('profile picture and level', () => {
+  // smallest valid PNG (1 x 1 px)
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  const photoFile = (name) => path.join(PHOTOS_DIR, name);
+
+  test('choose a plant avatar, an unknown one is refused', async () => {
+    const res = await api.patch('/api/users/me').set(auth(bob.token)).send({ avatar: 'tomato' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ avatar: 'tomato', photo: null });
+
+    expect((await api.patch('/api/users/me').set(auth(bob.token)).send({ avatar: 'dragon' })).status).toBe(400);
+  });
+
+  test('upload a photo : it replaces the avatar, is served, and the old file is deleted when replaced', async () => {
+    const first = await api.post('/api/users/me/photo').set(auth(bob.token)).attach('photo', png, { filename: 'me.png', contentType: 'image/png' });
+    expect(first.status).toBe(200);
+    expect(first.body.avatar).toBeNull();
+    expect(first.body.photo).toMatch(new RegExp(`^${bob.user.id}-.+\\.png$`));
+    expect(fs.existsSync(photoFile(first.body.photo))).toBe(true);
+
+    const served = await api.get(`/api/uploads/photos/${first.body.photo}`);
+    expect(served.status).toBe(200);
+    expect(served.headers['content-type']).toBe('image/png');
+
+    const second = await api.post('/api/users/me/photo').set(auth(bob.token)).attach('photo', png, { filename: 'me.png', contentType: 'image/png' });
+    expect(second.body.photo).not.toBe(first.body.photo);
+    expect(fs.existsSync(photoFile(first.body.photo))).toBe(false);
+
+    // an avatar replaces the photo and deletes it
+    const avatar = await api.patch('/api/users/me').set(auth(bob.token)).send({ avatar: 'carrot' });
+    expect(avatar.body).toMatchObject({ avatar: 'carrot', photo: null });
+    expect(fs.existsSync(photoFile(second.body.photo))).toBe(false);
+  });
+
+  test('a file that is not an image is refused, even with an image type', async () => {
+    const res = await api.post('/api/users/me/photo').set(auth(bob.token))
+      .attach('photo', Buffer.from('<script>alert(1)</script>'), { filename: 'me.png', contentType: 'image/png' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_IMAGE');
+
+    const gif = await api.post('/api/users/me/photo').set(auth(bob.token)).attach('photo', png, { filename: 'me.gif', contentType: 'image/gif' });
+    expect(gif.body.code).toBe('INVALID_IMAGE');
+
+    const none = await api.post('/api/users/me/photo').set(auth(bob.token)).field('name', 'x');
+    expect(none.body.code).toBe('PHOTO_REQUIRED');
+  });
+
+  test('remove the photo', async () => {
+    const up = await api.post('/api/users/me/photo').set(auth(bob.token)).attach('photo', png, { filename: 'me.png', contentType: 'image/png' });
+    const res = await api.delete('/api/users/me/photo').set(auth(bob.token));
+    expect(res.status).toBe(200);
+    expect(res.body.photo).toBeNull();
+    expect(fs.existsSync(photoFile(up.body.photo))).toBe(false);
+    expect((await api.get(`/api/uploads/photos/${up.body.photo}`)).status).toBe(404);
+  });
+
+  test('level : computed from the crops of all my gardens', async () => {
+    const before = await api.get('/api/users/me/level').set(auth(alice.token));
+    expect(before.status).toBe(200);
+    expect(before.body).toHaveProperty('rank');
+    expect(before.body.stats.planted).toBeGreaterThan(0); // alice planted crops in the tests above
+
+    const fresh = await register('newbie@test.dev');
+    const level = await api.get('/api/users/me/level').set(auth(fresh.token));
+    expect(level.body).toMatchObject({ rank: 'seed', points: 0, next_rank: 'sprout' });
   });
 });
 

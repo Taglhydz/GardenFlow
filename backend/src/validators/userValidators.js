@@ -1,5 +1,5 @@
 const { z } = require('zod');
-const { ROLES, requiredText, optionalDate, nonEmpty, today } = require('./common');
+const { ROLES, AVATARS, requiredText, optionalDate, nonEmpty, today } = require('./common');
 
 const email = z.string().trim().toLowerCase().pipe(z.email().max(255));
 
@@ -23,10 +23,12 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+// avatar : a plant avatar (it replaces the photo), null = none
 const updateMeSchema = nonEmpty(z.object({
   username: username.optional(),
   email   : email.optional(),
   birthdate,
+  avatar  : z.enum(AVATARS).nullable().optional(),
 }));
 
 const changePasswordSchema = z.object({

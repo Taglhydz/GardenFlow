@@ -1,6 +1,8 @@
 const User     = require('../models/userModel');
 const AppError = require('../utils/AppError');
 const { hashPassword, comparePassword } = require('../utils/hash');
+const { removePhoto, checkPhoto } = require('../utils/photoStorage');
+const { computeLevel } = require('../services/levelService');
 
 /** Updates a user and turns a duplicate email into a clear error. */
 const updateUser = async (id, data) => {
@@ -21,9 +23,44 @@ exports.getMe = async (req, res) => {
   res.json(await User.findById(req.user.id));
 };
 
-/** PATCH /users/me - username, email, birthdate (not the role) */
+/** PATCH /users/me - username, email, birthdate, avatar (not the role). An avatar replaces the photo. */
 exports.updateMe = async (req, res) => {
-  res.json(await updateUser(req.user.id, req.valid.body));
+  const data = { ...req.valid.body };
+  const previous = data.avatar ? await User.findById(req.user.id) : null;
+  if (data.avatar) data.photo = null;
+
+  const user = await updateUser(req.user.id, data);
+  await removePhoto(previous?.photo);
+
+  res.json(user);
+};
+
+/** POST /users/me/photo (multipart, field `photo`) - replaces the photo and the avatar */
+exports.uploadMyPhoto = async (req, res) => {
+  // check photo sent
+  if (!req.file) { throw AppError.badRequest('PHOTO_REQUIRED', 'Send the image in the `photo` field'); }
+
+  await checkPhoto(req.file);
+
+  const previous = await User.findById(req.user.id);
+  const user = await User.update(req.user.id, { photo: req.file.filename, avatar: null });
+  await removePhoto(previous.photo);
+
+  res.json(user);
+};
+
+/** DELETE /users/me/photo - back to the first letter of the name */
+exports.deleteMyPhoto = async (req, res) => {
+  const previous = await User.findById(req.user.id);
+  const user = await User.update(req.user.id, { photo: null });
+  await removePhoto(previous.photo);
+
+  res.json(user);
+};
+
+/** GET /users/me/level - seniority and mastery of the garden (see services/levelService.js) */
+exports.getMyLevel = async (req, res) => {
+  res.json(computeLevel(await User.levelStats(req.user.id)));
 };
 
 /** PATCH /users/me/password */
@@ -42,7 +79,9 @@ exports.changePassword = async (req, res) => {
 
 /** DELETE /users/me - deletes the account and all its gardens */
 exports.deleteMe = async (req, res) => {
+  const user = await User.findById(req.user.id);
   await User.delete(req.user.id);
+  await removePhoto(user?.photo);
 
   res.status(204).end();
 };
@@ -85,8 +124,12 @@ exports.deleteUserById = async (req, res) => {
 
   if (id === req.user.id) { throw AppError.forbidden('Use DELETE /users/me to delete your own account'); }
 
+  const user = await User.findById(id);
+
   // check user deleted
   if (!(await User.delete(id))) { throw AppError.notFound('User'); }
+
+  await removePhoto(user?.photo);
 
   res.status(204).end();
 };

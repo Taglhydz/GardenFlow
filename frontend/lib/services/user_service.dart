@@ -1,4 +1,5 @@
 import '../config/constants.dart';
+import '../models/gardener_level.dart';
 import '../models/json_utils.dart';
 import '../models/user.dart';
 import 'api_service.dart';
@@ -30,4 +31,22 @@ class UserService {
 
   /// Deletes the account and all its gardens.
   Future<void> deleteMe() => _api.delete(_me);
+
+  /// Plant avatar (Avatars.codes) : it replaces the photo.
+  Future<User> setAvatar(String avatar) async => User.fromJson(await _api.patch(_me, {'avatar': avatar}));
+
+  /// Profile photo (JPEG, PNG or WebP, 2 MB max) : it replaces the avatar.
+  Future<User> uploadPhoto(List<int> bytes, {required String filename, required String contentType}) async {
+    return User.fromJson(
+      await _api.upload('$_me/photo', field: 'photo', bytes: bytes, filename: filename, contentType: contentType),
+    );
+  }
+
+  /// No photo or avatar anymore : the first letter of the name is shown.
+  Future<User> removePicture(User user) async {
+    if (user.photo != null) return User.fromJson(await _api.delete('$_me/photo'));
+    return User.fromJson(await _api.patch(_me, {'avatar': null}));
+  }
+
+  Future<GardenerLevel> getMyLevel() async => GardenerLevel.fromJson(await _api.get('$_me/level'));
 }

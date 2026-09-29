@@ -6,6 +6,10 @@ import '../config/constants.dart';
 import '../models/user.dart';
 import '../providers/auth_provider.dart';
 import '../providers/garden_providers.dart';
+import '../providers/profile_providers.dart';
+import '../widgets/level_badge.dart';
+import '../widgets/profile_picture_sheet.dart';
+import '../widgets/user_avatar.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -33,6 +37,41 @@ class ProfileScreen extends ConsumerWidget {
     // AuthGate closes this screen and shows the login screen
     if (confirm == true) {
       await ref.read(authProvider.notifier).logout();
+    }
+  }
+
+  /// Everything is deleted for good : the dialog says it clearly, the red button is the only way to confirm.
+  Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 40),
+        title: Text('profile.delete_account_title'.tr()),
+        content: Text('profile.delete_account_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: Text('profile.delete_account_action'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+
+    // AuthGate closes this screen and shows the login screen
+    try {
+      await ref.read(authProvider.notifier).deleteAccount();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.errorMessage(e)), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 
@@ -73,177 +112,191 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).value;
     final gardenCount = ref.watch(gardensProvider).value?.length ?? 0;
+    final level = ref.watch(levelProvider).value;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          // Contenu principal
-          user == null
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 120, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Photo de profil à gauche avec username et nombre de jardins à droite
-                      Row(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Barre du haut : reste en place, le contenu défile en dessous
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                children: [
+                  // Flèche retour
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: AppColors.primary, size: 28),
+                    onPressed: () => Navigator.pop(context),
+                    tooltip: 'back'.tr(),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'profile.title'.tr(),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Icône paramètres : choix de la langue
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.primary,
+                        width: 2,
+                      ),
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.settings_outlined, color: AppColors.primary, size: 18),
+                      onPressed: () => _chooseLanguage(context),
+                      tooltip: 'settings'.tr(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Contenu principal
+            Expanded(
+              child: user == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Photo de profil avec icône crayon
-                          Stack(
+                          // Photo de profil à gauche avec username et nombre de jardins à droite
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 40,
-                                  color: AppColors.primary,
+                              // Photo de profil avec icône crayon : la touche change la photo ou l'avatar
+                              Tooltip(
+                                message: 'profile_picture.title'.tr(),
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: () => ProfilePictureSheet.show(context),
+                                  child: Stack(
+                                    children: [
+                                      UserAvatar(user: user, size: 80),
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          width: 28,
+                                          height: 28,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: AppColors.white,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.edit,
+                                            size: 14,
+                                            color: AppColors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: AppColors.white,
-                                      width: 2,
+                              const SizedBox(width: 16),
+                              // Username et nombre de jardins
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user.displayName,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.edit,
-                                    size: 14,
-                                    color: AppColors.white,
-                                  ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.yard,
+                                          size: 18,
+                                          color: AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'profile.garden_count'.plural(gardenCount),
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(width: 16),
-                          // Username et nombre de jardins
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  user.displayName,
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                          const SizedBox(height: 32),
+
+                          // Niveau : ancienneté et maîtrise du jardin
+                          if (level != null) ...[
+                            LevelCard(level: level),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // Informations
+                          _buildInfoCard(context, user),
+                          const SizedBox(height: 16),
+
+                          // Bouton de déconnexion
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _logout(context, ref),
+                              icon: const Icon(Icons.logout),
+                              label: Text('logout'.tr()),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.error,
+                                foregroundColor: AppColors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.yard,
-                                      size: 18,
-                                      color: AppColors.primary,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'profile.garden_count'.plural(gardenCount),
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Suppression du compte : discrète, sous la déconnexion
+                          SizedBox(
+                            width: double.infinity,
+                            child: TextButton.icon(
+                              onPressed: () => _deleteAccount(context, ref),
+                              icon: const Icon(Icons.delete_forever_outlined),
+                              label: Text('profile.delete_account'.tr()),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 32),
-
-                      // Informations
-                      _buildInfoCard(context, user),
-                      const SizedBox(height: 16),
-
-                      // Bouton de déconnexion
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _logout(context, ref),
-                          icon: const Icon(Icons.logout),
-                          label: Text('logout'.tr()),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.error,
-                            foregroundColor: AppColors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-          // Barre de navigation personnalisée en haut
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Row(
-                  children: [
-                    // Flèche retour
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: AppColors.primary, size: 28),
-                      onPressed: () => Navigator.pop(context),
-                      tooltip: 'back'.tr(),
                     ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          'profile.title'.tr(),
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Icône paramètres : choix de la langue
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.settings_outlined, color: AppColors.primary, size: 18),
-                        onPressed: () => _chooseLanguage(context),
-                        tooltip: 'settings'.tr(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

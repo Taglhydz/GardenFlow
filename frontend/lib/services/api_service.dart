@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 import '../config/constants.dart';
 import 'token_storage.dart';
 
@@ -55,21 +56,41 @@ class ApiService {
 
   Future<dynamic> delete(String endpoint) => _send('DELETE', endpoint);
 
-  Future<dynamic> _send(String method, String endpoint, [Map<String, dynamic>? data]) async {
-    final token = await _tokenStorage.read();
+  /// Sends a file (multipart/form-data, in the field [field]), e.g. a profile photo.
+  Future<dynamic> upload(
+    String endpoint, {
+    required String field,
+    required List<int> bytes,
+    required String filename,
+    required String contentType,
+  }) {
+    final request = http.MultipartRequest('POST', Uri.parse('${AppConstants.baseUrl}$endpoint'))
+      ..files.add(http.MultipartFile.fromBytes(field, bytes, filename: filename, contentType: MediaType.parse(contentType)));
+    return _sendRequest(request, timeout: _uploadTimeout);
+  }
+
+  /// A file takes longer to send than JSON
+  static const _uploadTimeout = Duration(seconds: 60);
+
+  Future<dynamic> _send(String method, String endpoint, [Map<String, dynamic>? data]) {
     final request = http.Request(method, Uri.parse('${AppConstants.baseUrl}$endpoint'))
-      ..headers.addAll({
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        // skips the ngrok warning page when the API is exposed with ngrok
-        'ngrok-skip-browser-warning': 'true',
-        if (token != null) 'Authorization': 'Bearer $token',
-      });
+      ..headers['Content-Type'] = 'application/json';
     if (data != null) request.body = json.encode(data);
+    return _sendRequest(request);
+  }
+
+  Future<dynamic> _sendRequest(http.BaseRequest request, {Duration timeout = _timeout}) async {
+    final token = await _tokenStorage.read();
+    request.headers.addAll({
+      'Accept': 'application/json',
+      // skips the ngrok warning page when the API is exposed with ngrok
+      'ngrok-skip-browser-warning': 'true',
+      if (token != null) 'Authorization': 'Bearer $token',
+    });
 
     final http.Response response;
     try {
-      response = await http.Response.fromStream(await _client.send(request).timeout(_timeout));
+      response = await http.Response.fromStream(await _client.send(request).timeout(timeout));
     } on TimeoutException {
       throw ApiException(statusCode: 0, code: ApiException.networkError, message: 'Request timed out');
     } catch (e) {

@@ -77,7 +77,6 @@
   "no_data": "No data available",
   "required_field": "This field is required",
   "home": {
-    "title": "Home",
     "no_garden_title": "No garden yet",
     "no_garden_subtitle": "Create your first garden to get started",
     "create_garden": "Create a garden",
@@ -102,7 +101,11 @@
     "logout_title": "Log out",
     "logout_confirm": "Do you really want to log out?",
     "logout_action": "Log out",
-    "choose_language": "Choose the language"
+    "choose_language": "Choose the language",
+    "delete_account": "Delete my account",
+    "delete_account_title": "Delete your account?",
+    "delete_account_confirm": "Your account will be deleted for good, with all your gardens, parcels, zones, crops and your photo. This cannot be undone.",
+    "delete_account_action": "Delete for good"
   },
   "settings": "Settings",
   "language": "Language",
@@ -197,7 +200,10 @@
     "ZONE_OUTSIDE_PARCEL": "The zone must be inside the parcel.",
     "ZONES_OVERLAP": "The zone overlaps another zone.",
     "ZONES_OUTSIDE_PARCEL": "This shape would leave zones outside the parcel.",
-    "INVALID_ZONE": "This zone does not belong to the parcel."
+    "INVALID_ZONE": "This zone does not belong to the parcel.",
+    "INVALID_IMAGE": "The photo must be a JPEG, PNG or WebP image.",
+    "PHOTO_TOO_LARGE": "The photo is too large.",
+    "PHOTO_REQUIRED": "No photo was sent."
   },
   "plant_family_solanaceae": "Nightshade family",
   "plant_family_apiaceae": "Carrot family",
@@ -512,5 +518,66 @@
     "cucumber__potato": "Cucumber is said to encourage potato blight.",
     "cabbage__strawberry": "Cabbage hinders the development of strawberries.",
     "carrot__dill": "Same family (umbellifers): flowering dill can slow down carrots."
+  },
+  "level": {
+    "title": "Gardener level",
+    "points": {
+      "one": "{} point",
+      "other": "{} points"
+    },
+    "points_to_next": "{} more points to become {}",
+    "top_rank": "Highest rank reached, well done!",
+    "how": "Your rank grows with your seniority and with everything you grow: plantings, harvests, variety and seasons.",
+    "ranks": {
+      "seed": "Seed",
+      "sprout": "Sprout",
+      "seedling": "Seedling",
+      "gardener": "Gardener",
+      "skilled_gardener": "Skilled gardener",
+      "master_gardener": "Master gardener"
+    },
+    "stats": {
+      "days": {
+        "one": "{} day",
+        "other": "{} days"
+      },
+      "planted": {
+        "one": "{} crop",
+        "other": "{} crops"
+      },
+      "harvested": {
+        "one": "{} harvest",
+        "other": "{} harvests"
+      },
+      "plants": {
+        "one": "{} different plant",
+        "other": "{} different plants"
+      },
+      "seasons": {
+        "one": "{} season",
+        "other": "{} seasons"
+      }
+    }
+  },
+  "profile_picture": {
+    "title": "Profile picture",
+    "take_photo": "Take a photo",
+    "from_gallery": "Choose from the gallery",
+    "choose_avatar": "Or choose an avatar",
+    "remove": "Remove the photo or avatar"
+  },
+  "avatars": {
+    "tomato": "Tomato",
+    "carrot": "Carrot",
+    "sunflower": "Sunflower",
+    "basil": "Basil",
+    "strawberry": "Strawberry",
+    "pumpkin": "Pumpkin",
+    "eggplant": "Eggplant",
+    "radish": "Radish",
+    "lettuce": "Lettuce",
+    "pepper": "Pepper",
+    "corn": "Corn",
+    "pea": "Pea"
   }
 }

@@ -148,7 +148,6 @@
     "name_required": "Le nom est obligatoire"
   },
   "home": {
-    "title": "Accueil",
     "no_garden_title": "Aucun jardin pour le moment",
     "no_garden_subtitle": "Créez votre premier jardin pour commencer",
     "create_garden": "Créer un jardin",
@@ -173,7 +172,11 @@
     "logout_title": "Déconnexion",
     "logout_confirm": "Voulez-vous vraiment vous déconnecter ?",
     "logout_action": "Déconnexion",
-    "choose_language": "Choisir la langue"
+    "choose_language": "Choisir la langue",
+    "delete_account": "Supprimer mon compte",
+    "delete_account_title": "Supprimer votre compte ?",
+    "delete_account_confirm": "Votre compte sera supprimé définitivement, avec tous vos jardins, parcelles, zones, cultures et votre photo. Cette action est irréversible.",
+    "delete_account_action": "Supprimer définitivement"
   },
   "errors": {
     "NETWORK_ERROR": "Impossible de joindre le serveur. Vérifiez votre connexion.",
@@ -197,7 +200,10 @@
     "ZONE_OUTSIDE_PARCEL": "La zone doit être à l'intérieur de la parcelle.",
     "ZONES_OVERLAP": "La zone chevauche une autre zone.",
     "ZONES_OUTSIDE_PARCEL": "Cette forme laisserait des zones en dehors de la parcelle.",
-    "INVALID_ZONE": "Cette zone n'appartient pas à la parcelle."
+    "INVALID_ZONE": "Cette zone n'appartient pas à la parcelle.",
+    "INVALID_IMAGE": "La photo doit être une image JPEG, PNG ou WebP.",
+    "PHOTO_TOO_LARGE": "La photo est trop lourde.",
+    "PHOTO_REQUIRED": "Aucune photo n'a été envoyée."
   },
   "plant_family_solanaceae": "Solanacées",
   "plant_family_apiaceae": "Apiacées (ombellifères)",
@@ -340,5 +346,66 @@
     "done": "Terminé",
     "hint": "C'est la couleur de cette plante sur les plans de tous vos jardins.",
     "same_as": "Même couleur que {} dans ce jardin : choisissez-en une autre pour les distinguer sur le plan."
+  },
+  "level": {
+    "title": "Niveau de jardinier",
+    "points": {
+      "one": "{} point",
+      "other": "{} points"
+    },
+    "points_to_next": "Encore {} points pour devenir {}",
+    "top_rank": "Rang maximum atteint, bravo !",
+    "how": "Votre rang grandit avec votre ancienneté et avec tout ce que vous cultivez : plantations, récoltes, variété et saisons.",
+    "ranks": {
+      "seed": "Graine",
+      "sprout": "Pousse",
+      "seedling": "Jeune plant",
+      "gardener": "Jardinier",
+      "skilled_gardener": "Jardinier confirmé",
+      "master_gardener": "Maître jardinier"
+    },
+    "stats": {
+      "days": {
+        "one": "{} jour",
+        "other": "{} jours"
+      },
+      "planted": {
+        "one": "{} culture",
+        "other": "{} cultures"
+      },
+      "harvested": {
+        "one": "{} récolte",
+        "other": "{} récoltes"
+      },
+      "plants": {
+        "one": "{} plante différente",
+        "other": "{} plantes différentes"
+      },
+      "seasons": {
+        "one": "{} saison",
+        "other": "{} saisons"
+      }
+    }
+  },
+  "profile_picture": {
+    "title": "Photo de profil",
+    "take_photo": "Prendre une photo",
+    "from_gallery": "Choisir dans la galerie",
+    "choose_avatar": "Ou choisissez un avatar",
+    "remove": "Retirer la photo ou l'avatar"
+  },
+  "avatars": {
+    "tomato": "Tomate",
+    "carrot": "Carotte",
+    "sunflower": "Tournesol",
+    "basil": "Basilic",
+    "strawberry": "Fraise",
+    "pumpkin": "Citrouille",
+    "eggplant": "Aubergine",
+    "radish": "Radis",
+    "lettuce": "Laitue",
+    "pepper": "Poivron",
+    "corn": "Maïs",
+    "pea": "Petit pois"
   }
 }

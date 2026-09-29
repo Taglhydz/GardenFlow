@@ -60,6 +60,12 @@ class AuthNotifier extends AsyncNotifier<User?> {
     state = const AsyncData(null);
   }
 
+  /// Deletes the account on the server (gardens, crops and photo too), then logs out.
+  Future<void> deleteAccount() async {
+    await ref.read(userServiceProvider).deleteMe();
+    await logout();
+  }
+
   /// Called by ApiService when the server rejects the token.
   void onSessionExpired() {
     // nothing to do if already logged out, or while restoring the session (handled in build)

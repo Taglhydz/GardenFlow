@@ -1,11 +1,13 @@
 // Builds the real app (AuthGate, screens, translations) with in-memory services.
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:GardenFlow/main.dart';
 import 'package:GardenFlow/providers/core_providers.dart';
+import 'package:GardenFlow/providers/profile_providers.dart';
 import 'fakes.dart';
 
 class FakeServices {
@@ -15,12 +17,16 @@ class FakeServices {
   final crops = FakeCropService();
   final plants = FakePlantService();
   final zones = FakeZoneService();
+  final users = FakeUserService();
+  final photoPicker = FakePhotoPicker();
 }
 
 /// Call once per test file (setUpAll).
 Future<void> initTestApp() async {
   SharedPreferences.setMockInitialValues({});
   await EasyLocalization.ensureInitialized();
+  // no .env file in the tests : the API address used to build URLs (profile photos)
+  dotenv.loadFromString(envString: 'API_BASE_URL=http://api.test/api');
 }
 
 Future<void> pumpApp(WidgetTester tester, FakeServices services) async {
@@ -38,6 +44,8 @@ Future<void> pumpApp(WidgetTester tester, FakeServices services) async {
         cropServiceProvider.overrideWithValue(services.crops),
         plantServiceProvider.overrideWithValue(services.plants),
         zoneServiceProvider.overrideWithValue(services.zones),
+        userServiceProvider.overrideWithValue(services.users),
+        photoPickerProvider.overrideWithValue(services.photoPicker),
       ],
       child: EasyLocalization(
         supportedLocales: const [Locale('fr'), Locale('en')],

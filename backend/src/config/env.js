@@ -1,4 +1,6 @@
 require('dotenv').config({ quiet: true });
+const os   = require('os');
+const path = require('path');
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const isTest   = NODE_ENV === 'test';
@@ -33,4 +35,7 @@ module.exports = {
   },
   corsOrigins    : (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
   logResponseData: process.env.LOG_RESPONSE_DATA === 'true',
+  // files sent by the users (profile photos) ; the tests use a temporary folder
+  uploadsDir: process.env.UPLOADS_DIR
+    || (isTest ? path.join(os.tmpdir(), 'gardenflow-test-uploads') : path.resolve(__dirname, '../../uploads')),
 };

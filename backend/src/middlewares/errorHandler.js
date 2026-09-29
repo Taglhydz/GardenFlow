@@ -24,8 +24,13 @@ const errorHandler = (err, req, res, next) => {
       error = AppError.badRequest('INVALID_JSON', 'Malformed JSON body');
     } else if (err.type === 'entity.too.large') {
       error = new AppError(413, 'PAYLOAD_TOO_LARGE', 'Request body is too large');
+    } else if (err.name === 'MulterError' && err.code === 'LIMIT_FILE_SIZE') {
+      error = new AppError(413, 'PHOTO_TOO_LARGE', 'The photo is too large');
     } else if (err.name === 'MulterError') {
       error = AppError.badRequest('INVALID_FORM_DATA', err.message);
+    } else if (err.status === 404 && err.expose) {
+      // express.static : unknown photo
+      error = AppError.notFound('Photo');
     } else {
       // unexpected error : log it and never leak its details to the client
       if (!config.isTest) console.error(err);

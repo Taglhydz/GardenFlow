@@ -9,6 +9,12 @@ const RELATION_TYPES = ['positive', 'negative'];
 const ROLES          = ['user', 'admin'];
 const PERIOD_TYPES   = ['sow_indoor', 'sow_outdoor', 'plant_out', 'harvest'];
 
+// Plant avatars drawn in the app (frontend/assets/avatars/<code>.svg) : must stay in sync
+const AVATARS = [
+  'tomato', 'carrot', 'sunflower', 'basil', 'strawberry', 'pumpkin',
+  'eggplant', 'radish', 'lettuce', 'pepper', 'corn', 'pea',
+];
+
 /** Positive integer id, accepts '12' (URL params) as well as 12. */
 const id = z.coerce.number().int().positive();
 
@@ -61,6 +67,7 @@ module.exports = {
   RELATION_TYPES,
   ROLES,
   PERIOD_TYPES,
+  AVATARS,
   id,
   idParam,
   requiredText,

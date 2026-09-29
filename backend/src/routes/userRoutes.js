@@ -5,6 +5,7 @@ const plantColorController = require('../controllers/plantColorController');
 const validate       = require('../middlewares/validate');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { idParam } = require('../validators/common');
+const { uploadPhoto } = require('../utils/photoStorage');
 const { updateMeSchema, changePasswordSchema, adminUpdateUserSchema, plantColorSchema } = require('../validators/userValidators');
 
 router.use(authenticate);
@@ -14,6 +15,11 @@ router.get   ('/me'         , userController.getMe);
 router.patch ('/me'         , validate({ body: updateMeSchema       }), userController.updateMe      );
 router.patch ('/me/password', validate({ body: changePasswordSchema }), userController.changePassword);
 router.delete('/me'         , userController.deleteMe);
+
+// picture and level of the current user
+router.post  ('/me/photo'   , uploadPhoto, userController.uploadMyPhoto);
+router.delete('/me/photo'   , userController.deleteMyPhoto);
+router.get   ('/me/level'   , userController.getMyLevel);
 
 // colors chosen for the plants on the plans
 router.get   ('/me/plant-colors'          , plantColorController.getMyPlantColors);

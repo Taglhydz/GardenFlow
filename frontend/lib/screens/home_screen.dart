@@ -5,9 +5,12 @@ import '../config/constants.dart';
 import '../models/garden.dart';
 import '../providers/auth_provider.dart';
 import '../providers/garden_providers.dart';
+import '../providers/profile_providers.dart';
 import '../widgets/create_garden_dialog.dart';
 import '../widgets/plan_entrance.dart';
+import '../widgets/user_avatar.dart';
 import '../widgets/garden_mini_map.dart';
+import '../widgets/level_badge.dart';
 import '../widgets/welcome_dialog.dart';
 import 'garden_view.dart';
 import 'profile_screen.dart';
@@ -176,38 +179,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  /// House icon on the left (already on the home page : does nothing), "GardenFlow" in the middle,
-  /// profile on the right.
+  /// Picture of the user in the header, with its green ring
+  static const _pictureSize = 40.0;
+
+  /// "GardenFlow" and the rank of the gardener in the middle, their picture on the right (opens the profile).
   Widget _buildHeader() {
+    final user = ref.watch(authProvider).value;
+    final level = ref.watch(levelProvider).value;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.home_outlined, color: AppColors.primary, size: 28),
-            onPressed: () {},
-            tooltip: 'home.title'.tr(),
-          ),
+          // same width as the picture on the right : the title stays in the middle
+          const SizedBox(width: _pictureSize),
           Expanded(
-            child: Text(
-              'app_name'.tr(),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'app_name'.tr(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary),
+                ),
+                if (level != null) ...[
+                  const SizedBox(height: 4),
+                  LevelBadge(level: level),
+                ],
+              ],
             ),
           ),
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.primary, width: 2),
-            ),
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              icon: const Icon(Icons.person_outline, color: AppColors.primary, size: 20),
-              onPressed: _openProfile,
-              tooltip: 'profile.title'.tr(),
+          Tooltip(
+            message: 'profile.title'.tr(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _openProfile,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                child: user == null
+                    ? const SizedBox.square(dimension: _pictureSize - 4, child: Icon(Icons.person_outline, color: AppColors.white))
+                    : UserAvatar(user: user, size: _pictureSize - 4),
+              ),
             ),
           ),
         ],
