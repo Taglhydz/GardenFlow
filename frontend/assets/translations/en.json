@@ -106,7 +106,20 @@
     "delete_account": "Delete my account",
     "delete_account_title": "Delete your account?",
     "delete_account_confirm": "Your account will be deleted for good, with all your gardens, parcels, zones, crops and your photo. This cannot be undone.",
-    "delete_account_action": "Delete for good"
+    "delete_account_action": "Delete for good",
+    "edit_username": "Edit username",
+    "edit_email": "Change email address",
+    "new_email": "New email address",
+    "current_password": "Current password",
+    "email_change_help": "A link will be sent to the new address. It will replace the current one once you open it: until then, log in with the current address.",
+    "send_link": "Send the link",
+    "email_change_sent": "Link sent to {}. Open it to confirm the new address.",
+    "email_pending": "Waiting for confirmation: {}",
+    "email_pending_help": "Open the link received at this address. The link is valid for 24 hours.",
+    "cancel_email_change": "Cancel the change",
+    "check_email_change": "I opened the link",
+    "google_email": "Address of your Google account",
+    "username_saved": "Username changed"
   },
   "settings": "Settings",
   "language": "Language",
@@ -229,7 +242,9 @@
     "INVALID_GOOGLE_TOKEN": "Google sign-in failed, try again.",
     "GOOGLE_EMAIL_NOT_VERIFIED": "The email of this Google account is not verified.",
     "GOOGLE_NOT_CONFIGURED": "Google sign-in is not available at the moment.",
-    "GOOGLE_SIGN_IN_FAILED": "Google sign-in failed, try again."
+    "GOOGLE_SIGN_IN_FAILED": "Google sign-in failed, try again.",
+    "GOOGLE_ACCOUNT": "The address of an account created with Google cannot be changed.",
+    "SAME_EMAIL": "This is already your email address."
   },
   "plant_family_solanaceae": "Nightshade family",
   "plant_family_apiaceae": "Carrot family",

@@ -197,7 +197,20 @@
     "delete_account": "Supprimer mon compte",
     "delete_account_title": "Supprimer votre compte ?",
     "delete_account_confirm": "Votre compte sera supprimé définitivement, avec tous vos jardins, parcelles, zones, cultures et votre photo. Cette action est irréversible.",
-    "delete_account_action": "Supprimer définitivement"
+    "delete_account_action": "Supprimer définitivement",
+    "edit_username": "Modifier le nom d'utilisateur",
+    "edit_email": "Modifier l'adresse email",
+    "new_email": "Nouvelle adresse email",
+    "current_password": "Mot de passe actuel",
+    "email_change_help": "Un lien sera envoyé à la nouvelle adresse. Elle remplacera l'actuelle quand vous l'ouvrirez : d'ici là, connectez-vous avec l'adresse actuelle.",
+    "send_link": "Envoyer le lien",
+    "email_change_sent": "Lien envoyé à {}. Ouvrez-le pour confirmer la nouvelle adresse.",
+    "email_pending": "En attente de confirmation : {}",
+    "email_pending_help": "Ouvrez le lien reçu à cette adresse. Le lien est valable 24 heures.",
+    "cancel_email_change": "Annuler le changement",
+    "check_email_change": "J'ai ouvert le lien",
+    "google_email": "Adresse de votre compte Google",
+    "username_saved": "Nom d'utilisateur modifié"
   },
   "errors": {
     "NETWORK_ERROR": "Impossible de joindre le serveur. Vérifiez votre connexion.",
@@ -229,7 +242,9 @@
     "INVALID_GOOGLE_TOKEN": "La connexion Google a échoué, réessayez.",
     "GOOGLE_EMAIL_NOT_VERIFIED": "L'email de ce compte Google n'est pas vérifié.",
     "GOOGLE_NOT_CONFIGURED": "La connexion Google n'est pas disponible pour le moment.",
-    "GOOGLE_SIGN_IN_FAILED": "La connexion Google a échoué, réessayez."
+    "GOOGLE_SIGN_IN_FAILED": "La connexion Google a échoué, réessayez.",
+    "GOOGLE_ACCOUNT": "L'adresse d'un compte créé avec Google ne peut pas être modifiée.",
+    "SAME_EMAIL": "C'est déjà votre adresse email."
   },
   "plant_family_solanaceae": "Solanacées",
   "plant_family_apiaceae": "Apiacées (ombellifères)",

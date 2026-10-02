@@ -7,6 +7,7 @@ import '../models/user.dart';
 import '../providers/auth_provider.dart';
 import '../providers/garden_providers.dart';
 import '../providers/profile_providers.dart';
+import '../widgets/account_dialogs.dart';
 import '../widgets/level_badge.dart';
 import '../widgets/profile_picture_sheet.dart';
 import '../widgets/user_avatar.dart';
@@ -72,6 +73,47 @@ class ProfileScreen extends ConsumerWidget {
           SnackBar(content: Text(AppLocalizations.errorMessage(e)), backgroundColor: AppColors.error),
         );
       }
+    }
+  }
+
+  void _showMessage(BuildContext context, String message, {bool error = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: error ? AppColors.error : AppColors.success),
+      );
+  }
+
+  // =======
+  // Account
+  // =======
+  Future<void> _editUsername(BuildContext context, User user) async {
+    if (await showUsernameDialog(context, user) && context.mounted) {
+      _showMessage(context, 'profile.username_saved'.tr());
+    }
+  }
+
+  Future<void> _changeEmail(BuildContext context, User user) async {
+    final email = await showEmailDialog(context, user);
+    if (email != null && context.mounted) {
+      _showMessage(context, 'profile.email_change_sent'.tr(args: [email]));
+    }
+  }
+
+  /// The link is opened in the browser : the app asks the server for the new email.
+  Future<void> _refreshEmail(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(accountProvider).refresh();
+    } catch (e) {
+      if (context.mounted) _showMessage(context, AppLocalizations.errorMessage(e), error: true);
+    }
+  }
+
+  Future<void> _cancelEmailChange(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(accountProvider).cancelEmailChange();
+    } catch (e) {
+      if (context.mounted) _showMessage(context, AppLocalizations.errorMessage(e), error: true);
     }
   }
 
@@ -256,7 +298,7 @@ class ProfileScreen extends ConsumerWidget {
                           ],
 
                           // Informations
-                          _buildInfoCard(context, user),
+                          _buildInfoCard(context, ref, user),
                           const SizedBox(height: 16),
 
                           // Bouton de déconnexion
@@ -301,7 +343,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, User user) {
+  Widget _buildInfoCard(BuildContext context, WidgetRef ref, User user) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -324,13 +366,23 @@ class ProfileScreen extends ConsumerWidget {
               icon: Icons.person,
               label: 'username'.tr(),
               value: user.displayName,
+              trailing: _editButton('profile.edit_username'.tr(), () => _editUsername(context, user)),
             ),
             const Divider(height: 24),
+            // the email of an account created with Google is the one of the Google account
             _buildInfoRow(
               icon: Icons.email,
               label: 'email'.tr(),
               value: user.email,
+              helper: user.hasPassword ? null : 'profile.google_email'.tr(),
+              trailing: user.hasPassword
+                  ? _editButton('profile.edit_email'.tr(), () => _changeEmail(context, user))
+                  : null,
             ),
+            if (user.pendingEmail != null) ...[
+              const SizedBox(height: 12),
+              _buildPendingEmail(context, ref, user.pendingEmail!),
+            ],
             if (user.birthdate != null) ...[
               const Divider(height: 24),
               _buildInfoRow(
@@ -353,10 +405,68 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  Widget _editButton(String tooltip, VoidCallback onPressed) {
+    return IconButton(
+      icon: const Icon(Icons.edit_outlined, color: AppColors.primary, size: 20),
+      tooltip: tooltip,
+      onPressed: onPressed,
+    );
+  }
+
+  /// New email waiting for its link : the current email stays the login email until then.
+  Widget _buildPendingEmail(BuildContext context, WidgetRef ref, String pendingEmail) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.schedule, color: AppColors.primaryDark, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'profile.email_pending'.tr(args: [pendingEmail]),
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'profile.email_pending_help'.tr(),
+            style: const TextStyle(fontSize: 12, color: AppColors.greyDark),
+          ),
+          Wrap(
+            alignment: WrapAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => _cancelEmailChange(context, ref),
+                style: TextButton.styleFrom(foregroundColor: AppColors.greyDark),
+                child: Text('profile.cancel_email_change'.tr()),
+              ),
+              TextButton(
+                onPressed: () => _refreshEmail(context, ref),
+                child: Text('profile.check_email_change'.tr()),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInfoRow({
     required IconData icon,
     required String label,
     required String value,
+    String? helper,
+    Widget? trailing,
   }) {
     return Row(
       children: [
@@ -381,9 +491,14 @@ class ProfileScreen extends ConsumerWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
+              if (helper != null) ...[
+                const SizedBox(height: 2),
+                Text(helper, style: const TextStyle(fontSize: 12, color: AppColors.greyDark)),
+              ],
             ],
           ),
         ),
+        if (trailing != null) trailing,
       ],
     );
   }

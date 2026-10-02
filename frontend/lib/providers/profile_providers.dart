@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/gardener_level.dart';
+import '../models/user.dart';
 import 'auth_provider.dart';
 import 'core_providers.dart';
 
@@ -48,6 +49,29 @@ class PhotoPicker {
 }
 
 final photoPickerProvider = Provider<PhotoPicker>((ref) => const PhotoPicker());
+
+/// Changes the username and the email of the logged in user : the new user replaces the old one everywhere.
+final accountProvider = Provider<Account>(Account.new);
+
+class Account {
+  Account(this._ref);
+
+  final Ref _ref;
+
+  void _update(User user) => _ref.read(authProvider.notifier).updateUser(user);
+
+  Future<void> rename(String username) async => _update(await _ref.read(userServiceProvider).updateMe(username: username));
+
+  /// The email changes once the link sent to [email] is opened (see User.pendingEmail).
+  Future<void> changeEmail({required String email, required String currentPassword, required String lang}) async {
+    _update(await _ref.read(userServiceProvider).changeEmail(email: email, currentPassword: currentPassword, lang: lang));
+  }
+
+  Future<void> cancelEmailChange() async => _update(await _ref.read(userServiceProvider).cancelEmailChange());
+
+  /// After the link was opened (in the browser) : the new email is shown.
+  Future<void> refresh() async => _update(await _ref.read(userServiceProvider).getMe());
+}
 
 /// Changes the picture of the logged in user : the new user replaces the old one everywhere.
 final profilePictureProvider = Provider<ProfilePicture>(ProfilePicture.new);

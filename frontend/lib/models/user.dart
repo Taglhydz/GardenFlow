@@ -5,6 +5,12 @@ class User {
   final int id;
   final String username;
   final String email;
+
+  /// New email waiting for the link sent to it : [email] stays the login email until it is opened
+  final String? pendingEmail;
+
+  /// false for an account created with Google : no password, its email can't be changed
+  final bool hasPassword;
   final DateTime? birthdate;
   final String role;
 
@@ -18,6 +24,8 @@ class User {
     required this.id,
     required this.username,
     required this.email,
+    this.pendingEmail,
+    this.hasPassword = true,
     this.birthdate,
     this.role = 'user',
     this.avatar,
@@ -41,6 +49,9 @@ class User {
       id: JsonUtils.toInt(json['id'])!,
       username: json['username'] as String,
       email: json['email'] as String,
+      pendingEmail: json['pending_email'] as String?,
+      // MySQL sends 1 / 0
+      hasPassword: json['has_password'] == true || json['has_password'] == 1,
       birthdate: JsonUtils.toDate(json['birthdate']),
       role: json['role'] as String? ?? 'user',
       avatar: json['avatar'] as String?,
