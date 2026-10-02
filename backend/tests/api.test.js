@@ -19,6 +19,7 @@ const PASSWORD = 'Password123!';
 // the emails are not sent : each one is kept here (emptied before each test)
 let sentEmails = [];
 jest.spyOn(mailer, 'sendVerificationEmail').mockImplementation(async (mail) => { sentEmails.push(mail); });
+jest.spyOn(mailer, 'sendEmailChangeEmail').mockImplementation(async (mail) => { sentEmails.push(mail); });
 
 // Google is not called : the "ID token" sent by the tests is the JSON of the Google profile, 'bad' is refused
 jest.spyOn(googleAuth, 'verifyIdToken').mockImplementation(async (idToken) => {
@@ -972,30 +973,91 @@ describe('users', () => {
     expect(res.body).toMatchObject({ username: 'alice', role: 'user' });
   });
 
-  test('PATCH /users/me with the email of another user -> 409', async () => {
-    const res = await api.patch('/api/users/me').set(auth(alice.token)).send({ email: 'bob@test.dev' });
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe('EMAIL_ALREADY_USED');
+  test('PATCH /users/me changes the username, not the email', async () => {
+    const res = await api.patch('/api/users/me').set(auth(alice.token)).send({ username: '  Alice Jardin ' });
+    expect(res.status).toBe(200);
+    expect(res.body.username).toBe('alice jardin');
+
+    expect((await api.patch('/api/users/me').set(auth(alice.token)).send({ email: 'other@test.dev' })).status).toBe(400);
+    expect((await api.patch('/api/users/me').set(auth(alice.token)).send({ username: 'ab' })).status).toBe(400);
   });
 
-  test('PATCH /users/me with a new email : it must be verified again before the next login', async () => {
+  test('PATCH /users/me/email : the new email replaces the old one once its link is opened', async () => {
     const ivy = await register('ivy@test.dev');
+    expect(ivy.user.has_password).toBe(1);
 
-    const res = await api.patch('/api/users/me').set(auth(ivy.token)).send({ email: 'ivy2@test.dev', lang: 'en' });
+    const res = await api.patch('/api/users/me/email').set(auth(ivy.token))
+      .send({ email: 'Ivy2@test.dev', current_password: PASSWORD, lang: 'en' });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ email: 'ivy2@test.dev', email_verified_at: null });
+    expect(res.body).toMatchObject({ email: 'ivy@test.dev', pending_email: 'ivy2@test.dev' });
     expect(sentEmails.at(-1)).toMatchObject({ to: 'ivy2@test.dev', lang: 'en' });
 
-    // still logged in, but the next login waits for the new link
-    expect((await api.get('/api/users/me').set(auth(ivy.token))).status).toBe(200);
-    expect((await api.post('/api/auth/login').send({ email: 'ivy2@test.dev', password: PASSWORD })).status).toBe(403);
-    expect((await api.get(verificationLink('ivy2@test.dev'))).status).toBe(200);
-    expect((await api.post('/api/auth/login').send({ email: 'ivy2@test.dev', password: PASSWORD })).status).toBe(200);
+    // until the link is opened, the account logs in with the old email
+    expect((await api.post('/api/auth/login').send({ email: 'ivy@test.dev', password: PASSWORD })).status).toBe(200);
+    expect((await api.post('/api/auth/login').send({ email: 'ivy2@test.dev', password: PASSWORD })).status).toBe(401);
 
-    // same email or other fields : nothing sent
-    sentEmails = [];
-    await api.patch('/api/users/me').set(auth(ivy.token)).send({ email: 'IVY2@test.dev', username: 'ivy' });
+    const link = verificationLink('ivy2@test.dev');
+    expect(link).toMatch(/^\/api\/auth\/confirm-email\?token=/);
+    expect((await api.get(link)).status).toBe(200);
+    // opened again : still "email changed"
+    expect((await api.get(link)).status).toBe(200);
+
+    const me = await api.get('/api/users/me').set(auth(ivy.token));
+    expect(me.body).toMatchObject({ email: 'ivy2@test.dev', pending_email: null });
+    expect(me.body.email_verified_at).not.toBeNull();
+    expect((await api.post('/api/auth/login').send({ email: 'ivy2@test.dev', password: PASSWORD })).status).toBe(200);
+    expect((await api.post('/api/auth/login').send({ email: 'ivy@test.dev', password: PASSWORD })).status).toBe(401);
+  });
+
+  test('PATCH /users/me/email refuses a wrong password, the same email, an email already used', async () => {
+    const send = (body) => api.patch('/api/users/me/email').set(auth(bob.token)).send({ current_password: PASSWORD, ...body });
+
+    const wrong = await send({ email: 'bob2@test.dev', current_password: 'nope' });
+    expect(wrong.status).toBe(400);
+    expect(wrong.body.code).toBe('WRONG_PASSWORD');
+
+    expect((await send({ email: 'BOB@test.dev' })).body.code).toBe('SAME_EMAIL');
+
+    const used = await send({ email: 'admin@test.dev' });
+    expect(used.status).toBe(409);
+    expect(used.body.code).toBe('EMAIL_ALREADY_USED');
+
     expect(sentEmails).toHaveLength(0);
+  });
+
+  test('a new request replaces the previous link, DELETE /users/me/email cancels it', async () => {
+    const jules = await register('jules@test.dev');
+    const ask = (email) => api.patch('/api/users/me/email').set(auth(jules.token)).send({ email, current_password: PASSWORD });
+
+    await ask('jules-typo@test.dev');
+    const oldLink = verificationLink('jules-typo@test.dev');
+    expect((await ask('jules2@test.dev')).body.pending_email).toBe('jules2@test.dev');
+    expect((await api.get(oldLink)).status).toBe(400);
+
+    const cancel = await api.delete('/api/users/me/email').set(auth(jules.token));
+    expect(cancel.body).toMatchObject({ email: 'jules@test.dev', pending_email: null });
+    expect((await api.get(verificationLink('jules2@test.dev'))).status).toBe(400);
+  });
+
+  test('confirming an email taken meanwhile by another account changes nothing', async () => {
+    const kate = await register('kate@test.dev');
+    await api.patch('/api/users/me/email').set(auth(kate.token)).send({ email: 'kate2@test.dev', current_password: PASSWORD });
+    const link = verificationLink('kate2@test.dev');
+
+    await register('kate2@test.dev');
+
+    expect((await api.get(link)).status).toBe(400);
+    expect((await api.get('/api/users/me').set(auth(kate.token))).body.email).toBe('kate@test.dev');
+  });
+
+  test('the email of an account created with Google cannot be changed', async () => {
+    const google = await googleLogin({ sub: 'g-lou', email: 'lou@gmail.com', name: 'Lou' });
+    expect(google.body.user.has_password).toBe(0);
+
+    const res = await api.patch('/api/users/me/email').set(auth(google.body.token))
+      .send({ email: 'lou@test.dev', current_password: 'anything' });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('GOOGLE_ACCOUNT');
   });
 
   test('change password', async () => {

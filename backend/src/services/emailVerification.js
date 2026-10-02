@@ -45,4 +45,39 @@ const verifyToken = async (token) => {
   return 'verified';
 };
 
-module.exports = { sendVerificationEmail, sentRecently, verifyToken };
+/** Puts newEmail on hold (the previous link stops working) and sends it a link to confirm the change. */
+const sendEmailChangeEmail = async (user, newEmail, lang) => {
+  const token = crypto.randomBytes(32).toString('hex');
+  await User.startEmailChange(user.id, newEmail, hashToken(token), new Date(Date.now() + TOKEN_TTL_MS));
+
+  await mailer.sendEmailChangeEmail({
+    to      : newEmail,
+    username: user.username,
+    url     : `${config.publicUrl}/api/auth/confirm-email?token=${token}`,
+    lang,
+  });
+};
+
+/**
+ * Opens a change link : 'email_changed' the first time and each time the link is opened again,
+ * 'email_taken' if another account took the address meanwhile, 'change_expired' / 'invalid' otherwise.
+ */
+const confirmEmailChange = async (token) => {
+  if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) return 'invalid';
+
+  const user = await User.findByEmailChangeToken(hashToken(token));
+
+  if (!user) return 'invalid';
+  if (!user.pending_email) return 'email_changed';
+  if (new Date(user.email_change_expires_at).getTime() < Date.now()) return 'change_expired';
+
+  try {
+    await User.applyEmailChange(user.id);
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return 'email_taken';
+    throw err;
+  }
+  return 'email_changed';
+};
+
+module.exports = { sendVerificationEmail, sentRecently, verifyToken, sendEmailChangeEmail, confirmEmailChange };

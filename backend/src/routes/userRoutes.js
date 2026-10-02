@@ -6,7 +6,9 @@ const validate       = require('../middlewares/validate');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { idParam } = require('../validators/common');
 const { uploadPhoto } = require('../utils/photoStorage');
-const { updateMeSchema, changePasswordSchema, adminUpdateUserSchema, plantColorSchema } = require('../validators/userValidators');
+const {
+  updateMeSchema, changeEmailSchema, changePasswordSchema, adminUpdateUserSchema, plantColorSchema,
+} = require('../validators/userValidators');
 
 router.use(authenticate);
 
@@ -14,6 +16,8 @@ router.use(authenticate);
 router.get   ('/me'         , userController.getMe);
 router.patch ('/me'         , validate({ body: updateMeSchema       }), userController.updateMe      );
 router.patch ('/me/password', validate({ body: changePasswordSchema }), userController.changePassword);
+router.patch ('/me/email'   , validate({ body: changeEmailSchema    }), userController.changeEmail   );
+router.delete('/me/email'   , userController.cancelEmailChange);
 router.delete('/me'         , userController.deleteMe);
 
 // picture and level of the current user

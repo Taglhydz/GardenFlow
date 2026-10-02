@@ -28,5 +28,6 @@ router.post('/resend-verification', emailLimiter, validate({ body: resendVerific
 
 // opened in a browser from the verification email
 router.get ('/verify-email'       , authController.verifyEmail);
+router.get ('/confirm-email'      , authController.confirmEmail);
 
 module.exports = router;

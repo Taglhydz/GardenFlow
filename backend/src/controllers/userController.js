@@ -3,7 +3,7 @@ const AppError = require('../utils/AppError');
 const { hashPassword, comparePassword } = require('../utils/hash');
 const { removePhoto, checkPhoto } = require('../utils/photoStorage');
 const { computeLevel } = require('../services/levelService');
-const { sendVerificationEmail } = require('../services/emailVerification');
+const { sendEmailChangeEmail } = require('../services/emailVerification');
 
 /** Updates a user and turns a duplicate email into a clear error. */
 const updateUser = async (id, data) => {
@@ -24,24 +24,48 @@ exports.getMe = async (req, res) => {
   res.json(await User.findById(req.user.id));
 };
 
-/**
- * PATCH /users/me - username, email, birthdate, avatar (not the role). An avatar replaces the photo.
- * A new email must be verified again (link sent to the new address) before the next login.
- */
+/** PATCH /users/me - username, birthdate, avatar (not the role, nor the email). An avatar replaces the photo. */
 exports.updateMe = async (req, res) => {
-  const { lang, ...data } = req.valid.body;
+  const data = req.valid.body;
   const previous = await User.findById(req.user.id);
   if (data.avatar) data.photo = null;
 
-  let user = await updateUser(req.user.id, data);
+  const user = await User.update(req.user.id, data);
   if (data.avatar) await removePhoto(previous.photo);
 
-  if (user.email !== previous.email) {
-    await sendVerificationEmail(user, lang);
-    user = await User.findById(req.user.id);
-  }
-
   res.json(user);
+};
+
+/**
+ * PATCH /users/me/email - the new address is kept in pending_email and receives a link : it replaces the email
+ * only once the link is opened (GET /auth/confirm-email), so a typo can't lock the account out.
+ * Asked again : the previous link stops working. Needs the password, so not possible for an account created with Google.
+ */
+exports.changeEmail = async (req, res) => {
+  const { email, current_password, lang } = req.valid.body;
+
+  const hash = await User.findPasswordHash(req.user.id);
+
+  // check password (an account created with Google has none : its email is the Google one)
+  if (!hash) { throw new AppError(403, 'GOOGLE_ACCOUNT', 'The email of an account created with Google cannot be changed'); }
+  if (!(await comparePassword(current_password, hash))) { throw AppError.badRequest('WRONG_PASSWORD', 'Current password is incorrect'); }
+
+  const user = await User.findById(req.user.id);
+
+  // check email
+  if (email === user.email) { throw AppError.badRequest('SAME_EMAIL', 'This is already your email'); }
+  if (await User.findByEmailWithPassword(email)) { throw AppError.conflict('EMAIL_ALREADY_USED', 'Email already in use'); }
+
+  await sendEmailChangeEmail(user, email, lang);
+
+  res.json(await User.findById(req.user.id));
+};
+
+/** DELETE /users/me/email - forgets the pending address, its link stops working */
+exports.cancelEmailChange = async (req, res) => {
+  await User.cancelEmailChange(req.user.id);
+
+  res.json(await User.findById(req.user.id));
 };
 
 /** POST /users/me/photo (multipart, field `photo`) - replaces the photo and the avatar */

@@ -2,8 +2,8 @@ const User     = require('../models/userModel');
 const AppError = require('../utils/AppError');
 const { hashPassword, comparePassword } = require('../utils/hash');
 const { signToken } = require('../middlewares/authMiddleware');
-const { sendVerificationEmail, sentRecently, verifyToken } = require('../services/emailVerification');
-const { verifyEmailPage } = require('../views/verifyEmailPage');
+const { sendVerificationEmail, sentRecently, verifyToken, confirmEmailChange } = require('../services/emailVerification');
+const { verifyEmailPage, isSuccess } = require('../views/verifyEmailPage');
 const googleAuth = require('../services/googleAuth');
 
 // Compared when the email doesn't exist, so that a login takes the same time
@@ -68,14 +68,23 @@ exports.resendVerification = async (req, res) => {
   res.status(204).end();
 };
 
-/** GET /auth/verify-email?token=... - web page opened from the email */
-exports.verifyEmail = async (req, res) => {
-  const status = await verifyToken(req.query.token);
-  const lang   = req.acceptsLanguages('fr', 'en') || 'fr';
+/** Web page showing the result of a link opened from an email */
+const sendLinkPage = (req, res, status) => {
+  const lang = req.acceptsLanguages('fr', 'en') || 'fr';
 
-  res.status(status === 'verified' || status === 'already_verified' ? 200 : 400)
+  res.status(isSuccess(status) ? 200 : 400)
     .type('html')
     .send(verifyEmailPage(status, lang));
+};
+
+/** GET /auth/verify-email?token=... - web page opened from the email */
+exports.verifyEmail = async (req, res) => {
+  sendLinkPage(req, res, await verifyToken(req.query.token));
+};
+
+/** GET /auth/confirm-email?token=... - web page opened from the email sent to the new address (PATCH /users/me/email) */
+exports.confirmEmail = async (req, res) => {
+  sendLinkPage(req, res, await confirmEmailChange(req.query.token));
 };
 
 /** Username of a new Google account : its Google name, else the start of the email ('Tom Vaillant' -> 'tom vaillant') */

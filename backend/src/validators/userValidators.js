@@ -44,14 +44,19 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-// avatar : a plant avatar (it replaces the photo), null = none
+// avatar : a plant avatar (it replaces the photo), null = none. The email is changed with changeEmailSchema.
 const updateMeSchema = nonEmpty(z.object({
   username: username.optional(),
-  email   : email.optional(),
   birthdate,
   avatar  : z.enum(AVATARS).nullable().optional(),
-  lang,
 }));
+
+// lang : language of the email sent to the new address
+const changeEmailSchema = z.object({
+  email,
+  current_password: z.string().min(1),
+  lang,
+});
 
 const changePasswordSchema = z.object({
   current_password: z.string().min(1),
@@ -76,6 +81,7 @@ module.exports = {
   loginSchema,
   googleLoginSchema,
   updateMeSchema,
+  changeEmailSchema,
   changePasswordSchema,
   adminUpdateUserSchema,
 };

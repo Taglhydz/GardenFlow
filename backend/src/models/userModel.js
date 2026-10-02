@@ -1,8 +1,10 @@
 const db = require('../database/db');
 const { buildUpdateSet } = require('../utils/sql');
 
-// password_hash is never selected, except by findByEmailWithPassword / findPasswordHash
-const PUBLIC_COLUMNS = 'id, username, email, email_verified_at, birthdate, role, avatar, photo, created_at, updated_at';
+// password_hash is never selected, except by findByEmailWithPassword / findPasswordHash.
+// has_password : false for an account created with Google (1 / 0)
+const PUBLIC_COLUMNS = `id, username, email, email_verified_at, pending_email, birthdate, role, avatar, photo,
+  created_at, updated_at, password_hash IS NOT NULL AS has_password`;
 const UPDATABLE      = ['username', 'email', 'birthdate', 'role', 'avatar', 'photo'];
 
 const User = {
@@ -39,9 +41,8 @@ const User = {
   /** User linked to an external account (provider : 'google') */
   findByIdentity: async (provider, providerUserId) => {
     const [rows] = await db.query(
-      `SELECT ${PUBLIC_COLUMNS.replace(/(\w+)/g, 'u.$1')} FROM user u
-       JOIN user_identity i ON i.user_id = u.id
-       WHERE i.provider = ? AND i.provider_user_id = ?`,
+      `SELECT ${PUBLIC_COLUMNS} FROM user
+       WHERE id = (SELECT user_id FROM user_identity WHERE provider = ? AND provider_user_id = ?)`,
       [provider, providerUserId]
     );
     return rows[0] || null;
@@ -81,6 +82,38 @@ const User = {
 
   markEmailVerified: async (id) => {
     await db.query('UPDATE user SET email_verified_at = NOW() WHERE id = ?', [id]);
+  },
+
+  /** New address waiting for its link : the previous link stops working, `email` doesn't change yet. */
+  startEmailChange: async (id, pendingEmail, tokenHash, expiresAt) => {
+    await db.query(
+      'UPDATE user SET pending_email = ?, email_change_token = ?, email_change_expires_at = ? WHERE id = ?',
+      [pendingEmail, tokenHash, expiresAt, id]
+    );
+  },
+
+  cancelEmailChange: async (id) => {
+    await db.query('UPDATE user SET pending_email = NULL, email_change_token = NULL, email_change_expires_at = NULL WHERE id = ?', [id]);
+  },
+
+  findByEmailChangeToken: async (tokenHash) => {
+    const [rows] = await db.query(
+      'SELECT id, pending_email, email_change_expires_at FROM user WHERE email_change_token = ?',
+      [tokenHash]
+    );
+    return rows[0] || null;
+  },
+
+  /**
+   * The pending address becomes the email (verified : the link was opened from it).
+   * The token is kept so that the link keeps showing "email changed". Throws ER_DUP_ENTRY if the address was taken meanwhile.
+   */
+  applyEmailChange: async (id) => {
+    await db.query(
+      `UPDATE user SET email = pending_email, pending_email = NULL, email_verified_at = NOW()
+       WHERE id = ? AND pending_email IS NOT NULL`,
+      [id]
+    );
   },
 
   update: async (id, data) => {

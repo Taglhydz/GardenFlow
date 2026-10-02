@@ -42,6 +42,11 @@ CREATE TABLE user (
     -- verification so that the link keeps showing "email verified"
     verification_token      CHAR(64) NULL UNIQUE,
     verification_expires_at DATETIME NULL,
+    -- new address asked from the profile : it replaces `email` once the link sent to it is opened,
+    -- until then the account keeps logging in with `email`. Same token rules as above.
+    pending_email           VARCHAR(255) NULL,
+    email_change_token      CHAR(64) NULL UNIQUE,
+    email_change_expires_at DATETIME NULL,
     birthdate     DATE NULL,
     role          ENUM('user', 'admin') NOT NULL DEFAULT 'user',
     avatar        VARCHAR(30)  NULL,
