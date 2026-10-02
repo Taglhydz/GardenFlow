@@ -257,7 +257,6 @@
     "point_on_parcel": "This point is on an existing parcel.",
     "parcels_overlap": "The parcel overlaps another parcel.",
     "open_parcel": "Open",
-    "rename_garden": "Rename the garden",
     "delete_garden_confirm": "Delete \"{}\" and all its parcels and crops?",
     "load_error": "Unable to load the plan"
   },

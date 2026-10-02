@@ -3,29 +3,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_localizations.dart';
 import '../config/constants.dart';
+import '../models/garden.dart';
 import '../providers/garden_providers.dart';
 import '../utils/validators.dart';
 
-/// Creates a garden and selects it. Returns true when a garden was created.
-///   final created = await CreateGardenDialog.show(context);
-class CreateGardenDialog extends ConsumerStatefulWidget {
-  const CreateGardenDialog({super.key});
+/// Creates a garden and selects it, or edits the name, location and description of [garden].
+/// Returns true when the garden was saved.
+///   final created = await GardenFormDialog.show(context);
+///   final saved   = await GardenFormDialog.show(context, garden: garden);
+class GardenFormDialog extends ConsumerStatefulWidget {
+  const GardenFormDialog({super.key, this.garden});
 
-  static Future<bool> show(BuildContext context) async {
-    final created = await showDialog<bool>(context: context, builder: (_) => const CreateGardenDialog());
-    return created ?? false;
+  /// null = new garden
+  final Garden? garden;
+
+  static Future<bool> show(BuildContext context, {Garden? garden}) async {
+    final saved = await showDialog<bool>(context: context, builder: (_) => GardenFormDialog(garden: garden));
+    return saved ?? false;
   }
 
   @override
-  ConsumerState<CreateGardenDialog> createState() => _CreateGardenDialogState();
+  ConsumerState<GardenFormDialog> createState() => _GardenFormDialogState();
 }
 
-class _CreateGardenDialogState extends ConsumerState<CreateGardenDialog> {
-  final _formKey               = GlobalKey<FormState>();
-  final _nameController        = TextEditingController();
-  final _locationController    = TextEditingController();
-  final _descriptionController = TextEditingController();
+class _GardenFormDialogState extends ConsumerState<GardenFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _nameController        = TextEditingController(text: widget.garden?.name);
+  late final _locationController    = TextEditingController(text: widget.garden?.location);
+  late final _descriptionController = TextEditingController(text: widget.garden?.description);
   bool _isLoading = false;
+
+  bool get _isEdit => widget.garden != null;
 
   @override
   void dispose() {
@@ -40,17 +48,34 @@ class _CreateGardenDialogState extends ConsumerState<CreateGardenDialog> {
     return text.isEmpty ? null : text;
   }
 
-  Future<void> _create() async {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      await ref.read(gardensProvider.notifier).create(
-        name: _nameController.text.trim(),
-        location: _optional(_locationController),
-        description: _optional(_descriptionController),
-      );
+      final notifier = ref.read(gardensProvider.notifier);
+      final garden = widget.garden;
+      if (garden == null) {
+        await notifier.create(
+          name: _nameController.text.trim(),
+          location: _optional(_locationController),
+          description: _optional(_descriptionController),
+        );
+      } else {
+        // only what changed is sent, '' clears an optional field
+        final name = _nameController.text.trim();
+        final location = _locationController.text.trim();
+        final description = _descriptionController.text.trim();
+        if (name != garden.name || location != (garden.location ?? '') || description != (garden.description ?? '')) {
+          await notifier.updateGarden(
+            garden.id,
+            name: name != garden.name ? name : null,
+            location: location != (garden.location ?? '') ? location : null,
+            description: description != (garden.description ?? '') ? description : null,
+          );
+        }
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -65,7 +90,7 @@ class _CreateGardenDialogState extends ConsumerState<CreateGardenDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('home.create_garden'.tr()),
+      title: Text(_isEdit ? 'edit_garden'.tr() : 'home.create_garden'.tr()),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -80,7 +105,7 @@ class _CreateGardenDialogState extends ConsumerState<CreateGardenDialog> {
                   border: const OutlineInputBorder(),
                 ),
                 maxLength: 100,
-                autofocus: true,
+                autofocus: !_isEdit,
                 validator: Validators.requiredName,
               ),
               const SizedBox(height: 8),
@@ -103,6 +128,7 @@ class _CreateGardenDialogState extends ConsumerState<CreateGardenDialog> {
                   hintText: 'home.description_hint'.tr(),
                   border: const OutlineInputBorder(),
                 ),
+                maxLength: 2000,
                 maxLines: 3,
               ),
             ],
@@ -115,7 +141,7 @@ class _CreateGardenDialogState extends ConsumerState<CreateGardenDialog> {
           child: Text('cancel'.tr()),
         ),
         ElevatedButton(
-          onPressed: _isLoading ? null : _create,
+          onPressed: _isLoading ? null : _save,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.white,
@@ -126,7 +152,7 @@ class _CreateGardenDialogState extends ConsumerState<CreateGardenDialog> {
                   width: 18,
                   child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
                 )
-              : Text('create'.tr()),
+              : Text(_isEdit ? 'save'.tr() : 'create'.tr()),
         ),
       ],
     );

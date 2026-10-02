@@ -257,7 +257,6 @@
     "point_on_parcel": "Ce point est sur une parcelle existante.",
     "parcels_overlap": "La parcelle chevauche une autre parcelle.",
     "open_parcel": "Ouvrir",
-    "rename_garden": "Renommer le jardin",
     "delete_garden_confirm": "Supprimer « {} » ainsi que toutes ses parcelles et cultures ?",
     "load_error": "Impossible de charger le plan"
   },

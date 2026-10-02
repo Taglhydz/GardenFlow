@@ -6,7 +6,7 @@ import '../models/garden.dart';
 import '../providers/auth_provider.dart';
 import '../providers/garden_providers.dart';
 import '../providers/profile_providers.dart';
-import '../widgets/create_garden_dialog.dart';
+import '../widgets/garden_form_dialog.dart';
 import '../widgets/plan_entrance.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/garden_mini_map.dart';
@@ -65,7 +65,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _createGarden() async {
-    final created = await CreateGardenDialog.show(context);
+    final created = await GardenFormDialog.show(context);
     if (created && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

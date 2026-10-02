@@ -18,17 +18,17 @@ import '../utils/plant_colors.dart';
 import '../utils/zone_names.dart';
 import '../widgets/dimensions_sheet.dart';
 import '../widgets/drawing_bar.dart';
+import '../widgets/garden_form_dialog.dart';
 import '../widgets/help_banner.dart';
 import '../widgets/parcel_form_sheet.dart';
 import '../widgets/plan_bottom_slot.dart';
 import '../widgets/plan_entrance.dart';
-import '../widgets/rename_dialog.dart';
 import '../widgets/shape_canvas.dart';
 import '../widgets/snap_button.dart';
 import '../widgets/user_avatar.dart';
 import 'parcel_screen.dart';
 
-enum _GardenAction { rename, delete }
+enum _GardenAction { edit, delete }
 
 /// Opened garden : plan of its parcels, drawn with the finger.
 class GardenView extends ConsumerStatefulWidget {
@@ -175,27 +175,16 @@ class _GardenViewState extends ConsumerState<GardenView> {
   // ======
   Future<void> _onGardenAction(_GardenAction action) async {
     switch (action) {
-      case _GardenAction.rename:
-        await _renameGarden();
+      case _GardenAction.edit:
+        await _editGarden();
       case _GardenAction.delete:
         await _deleteGarden();
     }
   }
 
-  Future<void> _renameGarden() async {
-    final name = await showRenameDialog(
-      context,
-      title: 'garden_view.rename_garden'.tr(),
-      label: 'garden_name'.tr(),
-      name: widget.garden.name,
-    );
-
-    if (name == null || name.isEmpty || name == widget.garden.name) return;
-    try {
-      await ref.read(gardensProvider.notifier).updateGarden(_gardenId, name: name);
-    } catch (e) {
-      _showError(e);
-    }
+  Future<void> _editGarden() async {
+    // the dialog shows its own errors
+    await GardenFormDialog.show(context, garden: widget.garden);
   }
 
   Future<void> _deleteGarden() async {
@@ -262,7 +251,7 @@ class _GardenViewState extends ConsumerState<GardenView> {
         PopupMenuButton<_GardenAction>(
           onSelected: _onGardenAction,
           itemBuilder: (context) => [
-            PopupMenuItem(value: _GardenAction.rename, child: Text('garden_view.rename_garden'.tr())),
+            PopupMenuItem(value: _GardenAction.edit, child: Text('edit_garden'.tr())),
             PopupMenuItem(
               value: _GardenAction.delete,
               child: Text('delete_garden'.tr(), style: const TextStyle(color: AppColors.error)),
