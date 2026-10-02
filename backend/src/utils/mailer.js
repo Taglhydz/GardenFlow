@@ -17,14 +17,16 @@ const TEXTS = {
     hello  : (name) => `Bonjour ${name},`,
     body   : 'Bienvenue sur GardenFlow ! Cliquez sur le lien ci-dessous pour vérifier votre adresse email et pouvoir vous connecter.',
     button : 'Vérifier mon email',
-    expiry : 'Ce lien est valable 24 heures. Si vous n\'avez pas créé de compte, ignorez cet email.',
+    expiry : 'Ce lien est valable 24 heures.',
+    notMe  : 'Si vous n\'êtes pas à l\'origine de cette demande, merci de ne pas tenir compte de cet email.',
   },
   en: {
     subject: 'Verify your email address',
     hello  : (name) => `Hello ${name},`,
     body   : 'Welcome to GardenFlow! Click the link below to verify your email address and be able to log in.',
     button : 'Verify my email',
-    expiry : 'This link is valid for 24 hours. If you did not create an account, ignore this email.',
+    expiry : 'This link is valid for 24 hours.',
+    notMe  : 'If you did not make this request, please disregard this email.',
   },
 };
 
@@ -48,7 +50,7 @@ const mailer = {
     await send({
       to,
       subject: `GardenFlow - ${t.subject}`,
-      text   : `${t.hello(username)}\n\n${t.body}\n\n${url}\n\n${t.expiry}`,
+      text   : `${t.hello(username)}\n\n${t.body}\n\n${url}\n\n${t.expiry}\n${t.notMe}`,
       html   : `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; color: #333">
           <h2 style="color: #4CAF50">🌱 GardenFlow</h2>
@@ -58,6 +60,7 @@ const mailer = {
             <a href="${url}" style="background: #4CAF50; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold">${t.button}</a>
           </p>
           <p style="font-size: 12px; color: #888">${t.expiry}</p>
+          <p style="font-size: 12px; color: #888">${t.notMe}</p>
         </div>`,
     });
   },

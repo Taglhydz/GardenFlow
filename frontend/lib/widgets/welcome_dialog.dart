@@ -21,7 +21,7 @@ class WelcomeDialog extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.75),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
