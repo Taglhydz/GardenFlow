@@ -1,5 +1,5 @@
 name: GardenFlow
-description: "A new Flutter project."
+description: "GardenFlow: plan your garden and your crops."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -70,6 +70,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -113,3 +114,21 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# App icon generated from assets/logo/ : dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/logo/logo.png"
+  android: true
+  adaptive_icon_background: "assets/logo/logo_background.png"
+  adaptive_icon_foreground: "assets/logo/logo_foreground.png"
+  # the G already has its margin in logo_foreground.png
+  adaptive_icon_foreground_inset: 0
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    background_color: "#378D3C"
+    theme_color: "#378D3C"
+  windows:
+    generate: true
+    icon_size: 256
