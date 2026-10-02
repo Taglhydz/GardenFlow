@@ -26,12 +26,32 @@ const User = {
     return rows[0]?.password_hash || null;
   },
 
-  create: async ({ username, email, passwordHash, birthdate }) => {
+  /** passwordHash null + emailVerified : account created with Google */
+  create: async ({ username, email, passwordHash, birthdate, emailVerified = false }) => {
     const [result] = await db.query(
-      'INSERT INTO user (username, email, password_hash, birthdate) VALUES (?, ?, ?, ?)',
+      `INSERT INTO user (username, email, password_hash, birthdate, email_verified_at)
+       VALUES (?, ?, ?, ?, ${emailVerified ? 'NOW()' : 'NULL'})`,
       [username, email, passwordHash, birthdate ?? null]
     );
     return User.findById(result.insertId);
+  },
+
+  /** User linked to an external account (provider : 'google') */
+  findByIdentity: async (provider, providerUserId) => {
+    const [rows] = await db.query(
+      `SELECT ${PUBLIC_COLUMNS.replace(/(\w+)/g, 'u.$1')} FROM user u
+       JOIN user_identity i ON i.user_id = u.id
+       WHERE i.provider = ? AND i.provider_user_id = ?`,
+      [provider, providerUserId]
+    );
+    return rows[0] || null;
+  },
+
+  addIdentity: async (userId, provider, providerUserId) => {
+    await db.query(
+      'INSERT INTO user_identity (user_id, provider, provider_user_id) VALUES (?, ?, ?)',
+      [userId, provider, providerUserId]
+    );
   },
 
   /** New link to verify the email : the address is unverified until it is opened. */

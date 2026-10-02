@@ -43,6 +43,9 @@ module.exports = {
     pass: process.env.SMTP_PASSWORD,
     from: process.env.SMTP_FROM || 'GardenFlow <no-reply@gardenflow.local>',
   },
+  // OAuth client ids of the Google Cloud project (the "Web" one, comma separated if several) : the Google
+  // tokens sent by the app must be issued for one of them. Empty = Google sign-in disabled
+  googleClientIds: (process.env.GOOGLE_CLIENT_ID || '').split(',').map((id) => id.trim()).filter(Boolean),
   corsOrigins    : (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
   logResponseData: process.env.LOG_RESPONSE_DATA === 'true',
   // files sent by the users (profile photos) ; the tests use a temporary folder

@@ -15,7 +15,7 @@ const colors = {
 };
 
 // never print these fields, even in development
-const SENSITIVE_FIELDS = ['password', 'current_password', 'new_password', 'token'];
+const SENSITIVE_FIELDS = ['password', 'current_password', 'new_password', 'token', 'id_token'];
 
 function getStatusColor(status) {
   if (status >= 200 && status < 300) return colors.green;

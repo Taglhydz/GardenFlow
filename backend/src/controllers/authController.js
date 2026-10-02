@@ -4,6 +4,7 @@ const { hashPassword, comparePassword } = require('../utils/hash');
 const { signToken } = require('../middlewares/authMiddleware');
 const { sendVerificationEmail, sentRecently, verifyToken } = require('../services/emailVerification');
 const { verifyEmailPage } = require('../views/verifyEmailPage');
+const googleAuth = require('../services/googleAuth');
 
 // Compared when the email doesn't exist, so that a login takes the same time
 // whether the account exists or not (prevents guessing registered emails).
@@ -75,4 +76,52 @@ exports.verifyEmail = async (req, res) => {
   res.status(status === 'verified' || status === 'already_verified' ? 200 : 400)
     .type('html')
     .send(verifyEmailPage(status, lang));
+};
+
+/** Username of a new Google account : its Google name, else the start of the email ('Tom Vaillant' -> 'tom vaillant') */
+const usernameFromGoogle = ({ name, email }) => {
+  const fromName  = (name || '').trim().toLowerCase().slice(0, 50);
+  const fromEmail = email.split('@')[0].toLowerCase().slice(0, 50);
+  if (fromName.length >= 3) return fromName;
+  return fromEmail.length >= 3 ? fromEmail : 'gardener';
+};
+
+/**
+ * POST /auth/google - sign up or log in with the ID token given to the app by Google Sign-In.
+ *   - Google account already linked : log in
+ *   - an account exists with the same email : the Google account is linked to it
+ *   - otherwise : new account, without password, email already verified by Google
+ * 201 + created: true for a new account (the app shows the welcome dialog).
+ */
+exports.googleLogin = async (req, res) => {
+  const profile = await googleAuth.verifyIdToken(req.valid.body.id_token);
+
+  if (!profile.email || !profile.emailVerified) {
+    throw AppError.unauthorized('GOOGLE_EMAIL_NOT_VERIFIED', 'The email of this Google account is not verified');
+  }
+
+  let user    = await User.findByIdentity('google', profile.sub);
+  let created = false;
+
+  if (!user) {
+    const existing = await User.findByEmailWithPassword(profile.email);
+
+    if (existing) {
+      // Google proves the address belongs to this person. An unverified account may have been created by
+      // someone else with this email : its password is removed, so that only the owner can log in.
+      if (!existing.email_verified_at) {
+        await User.updatePassword(existing.id, null);
+        await User.markEmailVerified(existing.id);
+      }
+      user = existing;
+    } else {
+      user = await User.create({ username: usernameFromGoogle(profile), email: profile.email, passwordHash: null, emailVerified: true });
+      created = true;
+    }
+
+    await User.addIdentity(user.id, 'google', profile.sub);
+    user = await User.findById(user.id);
+  }
+
+  res.status(created ? 201 : 200).json({ token: signToken(user), user, created });
 };

@@ -10,6 +10,7 @@ const fs   = require('fs');
 const path = require('path');
 const { PHOTOS_DIR } = require('../src/utils/photoStorage');
 const mailer = require('../src/utils/mailer');
+const googleAuth = require('../src/services/googleAuth');
 
 const api = request(app);
 
@@ -18,6 +19,13 @@ const PASSWORD = 'Password123!';
 // the emails are not sent : each one is kept here (emptied before each test)
 let sentEmails = [];
 jest.spyOn(mailer, 'sendVerificationEmail').mockImplementation(async (mail) => { sentEmails.push(mail); });
+
+// Google is not called : the "ID token" sent by the tests is the JSON of the Google profile, 'bad' is refused
+jest.spyOn(googleAuth, 'verifyIdToken').mockImplementation(async (idToken) => {
+  if (idToken === 'bad') throw new (require('../src/utils/AppError'))(401, 'INVALID_GOOGLE_TOKEN', 'Invalid Google token');
+  return { emailVerified: true, name: null, ...JSON.parse(idToken) };
+});
+const googleLogin = (profile) => api.post('/api/auth/google').send({ id_token: JSON.stringify(profile) });
 beforeEach(() => { sentEmails = []; });
 
 /** Path of the verification link of the last email sent to `email` */
@@ -203,6 +211,73 @@ describe('auth', () => {
     expect(verified.status).toBe(204);
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(sentEmails).toHaveLength(0);
+  });
+
+  test('Google : a new account is created, verified, without password ; the next time it logs in', async () => {
+    const first = await googleLogin({ sub: 'g-jade', email: 'Jade@Gmail.com', name: 'Jade Martin' });
+    expect(first.status).toBe(201);
+    expect(first.body.created).toBe(true);
+    expect(first.body.token).toBeDefined();
+    expect(first.body.user).toMatchObject({ username: 'jade martin', email: 'jade@gmail.com', role: 'user' });
+    expect(first.body.user.email_verified_at).not.toBeNull();
+    expect(sentEmails).toHaveLength(0);
+
+    // the token works
+    expect((await api.get('/api/users/me').set(auth(first.body.token))).status).toBe(200);
+
+    // same Google account, even with another email : same GardenFlow account
+    const again = await googleLogin({ sub: 'g-jade', email: 'jade.new@gmail.com' });
+    expect(again.status).toBe(200);
+    expect(again.body.created).toBe(false);
+    expect(again.body.user.id).toBe(first.body.user.id);
+
+    // no password : the email + password login is refused, the email is taken
+    const login = await api.post('/api/auth/login').send({ email: 'jade@gmail.com', password: PASSWORD });
+    expect(login.body.code).toBe('INVALID_CREDENTIALS');
+    const register = await api.post('/api/auth/register').send({ username: 'jade', email: 'jade@gmail.com', password: PASSWORD });
+    expect(register.body.code).toBe('EMAIL_ALREADY_USED');
+    const change = await api.patch('/api/users/me/password').set(auth(first.body.token))
+      .send({ current_password: 'anything', new_password: 'NewPassword456?' });
+    expect(change.body.code).toBe('WRONG_PASSWORD');
+  });
+
+  test('Google : a verified account with the same email is linked and keeps its password', async () => {
+    const kim = await register('kim@test.dev');
+
+    const res = await googleLogin({ sub: 'g-kim', email: 'kim@test.dev', name: 'Kim' });
+    expect(res.status).toBe(200);
+    expect(res.body.created).toBe(false);
+    expect(res.body.user.id).toBe(kim.user.id);
+
+    expect((await api.post('/api/auth/login').send({ email: 'kim@test.dev', password: PASSWORD })).status).toBe(200);
+  });
+
+  test('Google : an unverified account with the same email is verified and loses its password (maybe not its owner)', async () => {
+    await api.post('/api/auth/register').send({ username: 'squatter', email: 'leo@test.dev', password: PASSWORD });
+
+    const res = await googleLogin({ sub: 'g-leo', email: 'leo@test.dev', name: 'Leo' });
+    expect(res.status).toBe(200);
+    expect(res.body.user.email_verified_at).not.toBeNull();
+
+    const login = await api.post('/api/auth/login').send({ email: 'leo@test.dev', password: PASSWORD });
+    expect(login.body.code).toBe('INVALID_CREDENTIALS');
+  });
+
+  test('Google : invalid token, unverified Google email, missing token', async () => {
+    const bad = await api.post('/api/auth/google').send({ id_token: 'bad' });
+    expect(bad.status).toBe(401);
+    expect(bad.body.code).toBe('INVALID_GOOGLE_TOKEN');
+
+    const unverified = await googleLogin({ sub: 'g-mia', email: 'mia@test.dev', emailVerified: false });
+    expect(unverified.status).toBe(401);
+    expect(unverified.body.code).toBe('GOOGLE_EMAIL_NOT_VERIFIED');
+
+    expect((await api.post('/api/auth/google').send({})).status).toBe(400);
+  });
+
+  test('Google : a short or missing name gives a username from the email', async () => {
+    const res = await googleLogin({ sub: 'g-noname', email: 'noa.petit@test.dev', name: 'N' });
+    expect(res.body.user.username).toBe('noa.petit');
   });
 
   test('wrong password and unknown email give the same error', async () => {

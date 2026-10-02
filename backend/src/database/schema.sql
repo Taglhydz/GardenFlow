@@ -20,6 +20,7 @@ DROP TABLE IF EXISTS zone;
 DROP TABLE IF EXISTS parcel;
 DROP TABLE IF EXISTS garden;
 DROP TABLE IF EXISTS plant;
+DROP TABLE IF EXISTS user_identity;
 DROP TABLE IF EXISTS user;
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -33,7 +34,8 @@ CREATE TABLE user (
     id            INT AUTO_INCREMENT PRIMARY KEY,
     username      VARCHAR(50)  NOT NULL,
     email         VARCHAR(255) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
+    -- NULL for an account created with Google (no password, see user_identity)
+    password_hash VARCHAR(255) NULL,
     -- NULL until the link sent by email is opened : login is refused before
     email_verified_at       DATETIME NULL,
     -- SHA-256 of the token of the link (the token itself is only in the email), kept after the
@@ -46,6 +48,18 @@ CREATE TABLE user (
     photo         VARCHAR(100) NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+-- External accounts linked to a user (sign in with Google) : provider_user_id = the stable id given
+-- by the provider ("sub" of the Google token), the email of the external account may change
+CREATE TABLE user_identity (
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    user_id          INT NOT NULL,
+    provider         ENUM('google') NOT NULL,
+    provider_user_id VARCHAR(255) NOT NULL,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (provider, provider_user_id),
+    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 -- =======

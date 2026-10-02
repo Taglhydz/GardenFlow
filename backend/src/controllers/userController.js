@@ -78,8 +78,8 @@ exports.changePassword = async (req, res) => {
 
   const hash = await User.findPasswordHash(req.user.id);
 
-  // check current password
-  if (!(await comparePassword(current_password, hash))) { throw AppError.badRequest('WRONG_PASSWORD', 'Current password is incorrect'); }
+  // check current password (an account created with Google has none)
+  if (!hash || !(await comparePassword(current_password, hash))) { throw AppError.badRequest('WRONG_PASSWORD', 'Current password is incorrect'); }
 
   await User.updatePassword(req.user.id, await hashPassword(new_password));
 
