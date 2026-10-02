@@ -166,7 +166,9 @@
     "welcome_title": "Welcome to GardenFlow!",
     "welcome_message": "Your account has been created 🌱",
     "welcome_start": "Get started",
-    "session_expired": "Your session has expired, please log in again."
+    "session_expired": "Your session has expired, please log in again.",
+    "or": "or",
+    "continue_with_google": "Continue with Google"
   },
   "verify_email": {
     "title_sent": "Check your emails",
@@ -223,7 +225,11 @@
     "INVALID_IMAGE": "The photo must be a JPEG, PNG or WebP image.",
     "PHOTO_TOO_LARGE": "The photo is too large.",
     "PHOTO_REQUIRED": "No photo was sent.",
-    "EMAIL_NOT_VERIFIED": "Your email is not verified yet."
+    "EMAIL_NOT_VERIFIED": "Your email is not verified yet.",
+    "INVALID_GOOGLE_TOKEN": "Google sign-in failed, try again.",
+    "GOOGLE_EMAIL_NOT_VERIFIED": "The email of this Google account is not verified.",
+    "GOOGLE_NOT_CONFIGURED": "Google sign-in is not available at the moment.",
+    "GOOGLE_SIGN_IN_FAILED": "Google sign-in failed, try again."
   },
   "plant_family_solanaceae": "Nightshade family",
   "plant_family_apiaceae": "Carrot family",

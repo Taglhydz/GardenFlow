@@ -46,6 +46,13 @@ class AuthNotifier extends AsyncNotifier<User?> {
     state = AsyncData(user);
   }
 
+  /// Sign up or log in with Google (the ID token comes from GoogleSignInService). Throws an [ApiException] on failure.
+  Future<void> loginWithGoogle(String idToken) async {
+    final result = await ref.read(authServiceProvider).loginWithGoogle(idToken);
+    if (result.created) ref.read(welcomePendingProvider.notifier).raise();
+    state = AsyncData(result.user);
+  }
+
   /// Creates the account without logging in : the user must first open the link sent by email.
   /// Throws an [ApiException] on failure.
   Future<void> register({
@@ -67,6 +74,10 @@ class AuthNotifier extends AsyncNotifier<User?> {
 
   Future<void> logout() async {
     await ref.read(authServiceProvider).logout();
+    // not blocking : the logout of GardenFlow must work even if Google fails
+    try {
+      await ref.read(googleSignInServiceProvider).signOut();
+    } catch (_) {}
     await ref.read(sharedPreferencesProvider).remove(AppConstants.lastGardenIdKey);
     state = const AsyncData(null);
   }

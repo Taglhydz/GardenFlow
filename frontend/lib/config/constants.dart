@@ -6,6 +6,9 @@ class AppConstants {
   static String get baseUrl   => dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000/api';
   static bool   get debugMode => dotenv.env['DEBUG_MODE'  ] == 'true';
 
+  // Google sign-in : OAuth client id of type "Web" (same as GOOGLE_CLIENT_ID of the backend), empty = no Google button
+  static String get googleClientId => dotenv.env['GOOGLE_CLIENT_ID'] ?? '';
+
   // API Endpoints
   static const String authEndpoint              = '/auth'              ;
   static const String usersEndpoint             = '/users'             ;

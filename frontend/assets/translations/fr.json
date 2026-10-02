@@ -135,7 +135,9 @@
     "welcome_title": "Bienvenue dans GardenFlow !",
     "welcome_message": "Votre compte a été créé avec succès 🌱",
     "welcome_start": "Commencer",
-    "session_expired": "Votre session a expiré, veuillez vous reconnecter."
+    "session_expired": "Votre session a expiré, veuillez vous reconnecter.",
+    "or": "ou",
+    "continue_with_google": "Continuer avec Google"
   },
   "verify_email": {
     "title_sent": "Vérifiez vos emails",
@@ -223,7 +225,11 @@
     "INVALID_IMAGE": "La photo doit être une image JPEG, PNG ou WebP.",
     "PHOTO_TOO_LARGE": "La photo est trop lourde.",
     "PHOTO_REQUIRED": "Aucune photo n'a été envoyée.",
-    "EMAIL_NOT_VERIFIED": "Votre email n'est pas encore vérifié."
+    "EMAIL_NOT_VERIFIED": "Votre email n'est pas encore vérifié.",
+    "INVALID_GOOGLE_TOKEN": "La connexion Google a échoué, réessayez.",
+    "GOOGLE_EMAIL_NOT_VERIFIED": "L'email de ce compte Google n'est pas vérifié.",
+    "GOOGLE_NOT_CONFIGURED": "La connexion Google n'est pas disponible pour le moment.",
+    "GOOGLE_SIGN_IN_FAILED": "La connexion Google a échoué, réessayez."
   },
   "plant_family_solanaceae": "Solanacées",
   "plant_family_apiaceae": "Apiacées (ombellifères)",

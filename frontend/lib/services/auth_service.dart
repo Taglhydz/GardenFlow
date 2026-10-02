@@ -43,6 +43,13 @@ class AuthService {
     return _saveSession(response);
   }
 
+  /// Sign up or log in with the ID token given by Google Sign-In.
+  /// created : true for a new account (the welcome dialog is shown).
+  Future<({User user, bool created})> loginWithGoogle(String idToken) async {
+    final response = await _api.post('${AppConstants.authEndpoint}/google', {'id_token': idToken});
+    return (user: await _saveSession(response), created: response['created'] == true);
+  }
+
   /// Current user, or null if no token is stored.
   Future<User?> restoreSession() async {
     if (await _tokenStorage.read() == null) return null;

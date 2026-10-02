@@ -14,6 +14,7 @@ import 'package:GardenFlow/services/api_service.dart';
 import 'package:GardenFlow/services/auth_service.dart';
 import 'package:GardenFlow/services/crop_service.dart';
 import 'package:GardenFlow/services/garden_service.dart';
+import 'package:GardenFlow/services/google_sign_in_service.dart';
 import 'package:GardenFlow/services/parcel_service.dart';
 import 'package:GardenFlow/services/plant_service.dart';
 import 'package:GardenFlow/services/user_service.dart';
@@ -63,8 +64,52 @@ class FakeAuthService implements AuthService {
   @override
   Future<void> resendVerification({required String email, required String lang}) async => resentTo.add(email);
 
+  /// ID tokens received by loginWithGoogle
+  final googleTokens = <String>[];
+
+  /// What loginWithGoogle says : new account or not
+  bool googleCreatesAccount = false;
+
+  @override
+  Future<({User user, bool created})> loginWithGoogle(String idToken) async {
+    googleTokens.add(idToken);
+    if (idToken == 'bad') throw ApiException(statusCode: 401, code: 'INVALID_GOOGLE_TOKEN', message: 'bad');
+    return (user: alice, created: googleCreatesAccount);
+  }
+
   @override
   Future<void> logout() async => loggedOut = true;
+}
+
+/// Google Sign-In without Google : hidden by default (like on Windows), [available] shows the button.
+class FakeGoogleSignIn implements GoogleSignInService {
+  bool available = false;
+
+  /// What the account chooser gives : an ID token, null (closed by the user) or an exception to throw
+  Object? result = 'google-id-token';
+  bool signedOut = false;
+
+  @override
+  String get clientId => 'test';
+
+  @override
+  bool get isAvailable => available;
+
+  @override
+  bool get usesGoogleButton => false;
+
+  @override
+  Future<String?> signIn() async {
+    final value = result;
+    if (value is Exception) throw value;
+    return value as String?;
+  }
+
+  @override
+  Stream<String> webIdTokens() => const Stream.empty();
+
+  @override
+  Future<void> signOut() async => signedOut = true;
 }
 
 class FakeGardenService implements GardenService {

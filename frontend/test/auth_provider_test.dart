@@ -12,6 +12,7 @@ import 'fakes.dart';
 void main() {
   late FakeAuthService authService;
   late FakeGardenService gardenService;
+  late FakeGoogleSignIn googleSignIn;
   late SharedPreferences prefs;
 
   Future<ProviderContainer> createContainer({Map<String, Object> prefsValues = const {}}) async {
@@ -21,6 +22,7 @@ void main() {
       sharedPreferencesProvider.overrideWithValue(prefs),
       authServiceProvider.overrideWithValue(authService),
       gardenServiceProvider.overrideWithValue(gardenService),
+      googleSignInServiceProvider.overrideWithValue(googleSignIn),
     ]);
     addTearDown(container.dispose);
     return container;
@@ -29,6 +31,7 @@ void main() {
   setUp(() {
     authService = FakeAuthService();
     gardenService = FakeGardenService();
+    googleSignIn = FakeGoogleSignIn();
   });
 
   group('auto-login', () {
@@ -99,6 +102,21 @@ void main() {
 
       expect(container.read(authProvider).value, isNull);
       expect(container.read(sessionExpiredProvider), isTrue);
+    });
+
+    test('Google : logs in, the welcome flag only for a new account', () async {
+      final container = await createContainer();
+      await container.read(authProvider.future);
+
+      await container.read(authProvider.notifier).loginWithGoogle('token');
+      expect(container.read(authProvider).value, alice);
+      expect(container.read(welcomePendingProvider), isFalse);
+
+      await container.read(authProvider.notifier).logout();
+      expect(googleSignIn.signedOut, isTrue); // the next time, Google asks which account
+      authService.googleCreatesAccount = true;
+      await container.read(authProvider.notifier).loginWithGoogle('token');
+      expect(container.read(welcomePendingProvider), isTrue);
     });
 
     test('register does not log in, the first login raises the welcome flag once', () async {

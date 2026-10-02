@@ -19,6 +19,7 @@ class FakeServices {
   final zones = FakeZoneService();
   final users = FakeUserService();
   final photoPicker = FakePhotoPicker();
+  final googleSignIn = FakeGoogleSignIn();
 }
 
 /// Call once per test file (setUpAll).
@@ -46,6 +47,7 @@ Future<void> pumpApp(WidgetTester tester, FakeServices services) async {
         zoneServiceProvider.overrideWithValue(services.zones),
         userServiceProvider.overrideWithValue(services.users),
         photoPickerProvider.overrideWithValue(services.photoPicker),
+        googleSignInServiceProvider.overrideWithValue(services.googleSignIn),
       ],
       child: EasyLocalization(
         supportedLocales: const [Locale('fr'), Locale('en')],

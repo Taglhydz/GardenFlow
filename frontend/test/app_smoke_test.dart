@@ -208,6 +208,64 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('no Google button where Google sign-in is not available (Windows, no client id)', (tester) async {
+    await pumpApp(tester, services);
+    expect(find.text('Continuer avec Google'), findsNothing);
+  });
+
+  testWidgets('Google from the login screen : new account -> home with the welcome dialog', (tester) async {
+    services.googleSignIn.available = true;
+    services.auth.googleCreatesAccount = true;
+    await pumpApp(tester, services);
+
+    await tester.tap(find.text('Continuer avec Google'));
+    await tester.pumpAndSettle();
+
+    expect(services.auth.googleTokens, ['google-id-token']);
+    expect(find.text('Bienvenue dans GardenFlow !'), findsOneWidget);
+  });
+
+  testWidgets('Google from the register screen : existing account -> home without welcome', (tester) async {
+    services.googleSignIn.available = true;
+    await pumpApp(tester, services);
+    await tester.tap(find.text("S'inscrire"));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Continuer avec Google'));
+    await tester.tap(find.text('Continuer avec Google'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bienvenue dans GardenFlow !'), findsNothing);
+    expect(find.text('Aucun jardin pour le moment'), findsOneWidget);
+  });
+
+  testWidgets('Google : chooser closed -> nothing ; refused by the server -> translated error', (tester) async {
+    services.googleSignIn.available = true;
+    services.googleSignIn.result = null;
+    await pumpApp(tester, services);
+
+    await tester.tap(find.text('Continuer avec Google'));
+    await tester.pumpAndSettle();
+    expect(services.auth.googleTokens, isEmpty);
+    expect(find.text('Se connecter'), findsOneWidget);
+
+    services.googleSignIn.result = 'bad';
+    await tester.tap(find.text('Continuer avec Google'));
+    await tester.pumpAndSettle();
+    expect(find.text('La connexion Google a échoué, réessayez.'), findsOneWidget);
+  });
+
+  testWidgets('Google : an error of Google itself -> generic message', (tester) async {
+    services.googleSignIn.available = true;
+    services.googleSignIn.result = Exception('clientConfigurationError');
+    await pumpApp(tester, services);
+
+    await tester.tap(find.text('Continuer avec Google'));
+    await tester.pumpAndSettle();
+    expect(find.text('La connexion Google a échoué, réessayez.'), findsOneWidget);
+    expect(find.text('Se connecter'), findsOneWidget);
+  });
+
   testWidgets('server unreachable at startup -> retry screen', (tester) async {
     services.auth.restoreResult = ApiException(statusCode: 0, code: ApiException.networkError, message: 'offline');
 

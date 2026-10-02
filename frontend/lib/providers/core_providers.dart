@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/constants.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/crop_service.dart';
 import '../services/garden_service.dart';
+import '../services/google_sign_in_service.dart';
 import '../services/parcel_service.dart';
 import '../services/plant_service.dart';
 import '../services/token_storage.dart';
@@ -35,6 +37,7 @@ final parcelServiceProvider = Provider((ref) => ParcelService(ref.watch(apiServi
 final cropServiceProvider   = Provider((ref) => CropService(ref.watch(apiServiceProvider)));
 final plantServiceProvider  = Provider((ref) => PlantService(ref.watch(apiServiceProvider)));
 final zoneServiceProvider   = Provider((ref) => ZoneService(ref.watch(apiServiceProvider)));
+final googleSignInServiceProvider = Provider((ref) => GoogleSignInService(clientId: AppConstants.googleClientId));
 
 /// Retry policy of the providers that fail (ProviderScope.retry) :
 /// network and server errors are retried 3 times, client errors (4xx) are not.

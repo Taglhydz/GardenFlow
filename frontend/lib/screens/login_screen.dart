@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/validators.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/google_sign_in_button.dart';
 import 'register_screen.dart';
 import 'verify_email_screen.dart';
 
@@ -153,6 +154,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: _login,
                     isLoading: _isLoading,
                   ),
+                  const GoogleSignInButton(),
                   const SizedBox(height: 16),
 
                   // Lien vers inscription

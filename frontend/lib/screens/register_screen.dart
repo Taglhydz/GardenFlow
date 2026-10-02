@@ -6,6 +6,7 @@ import '../config/constants.dart';
 import '../providers/auth_provider.dart';
 import '../utils/validators.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/google_sign_in_button.dart';
 import '../widgets/date_input_field.dart';
 import '../widgets/password_rules.dart';
 import 'verify_email_screen.dart';
@@ -230,6 +231,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     onPressed: _register,
                     isLoading: _isLoading,
                   ),
+                  const GoogleSignInButton(),
                   const SizedBox(height: 16),
 
                   // link to login
