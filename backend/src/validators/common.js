@@ -37,8 +37,8 @@ const optionalDate = z.iso.date().nullable().optional();
 
 const month = z.coerce.number().int().min(1).max(12);
 
-/** Positive decimal number (meters, m²...), 2 decimals are stored */
-const positiveDecimal = z.coerce.number().min(0).max(99999999);
+/** Coordinate on a plan (meters), negative too : the plans go as far as needed on every side of 0 */
+const coordinate = z.coerce.number().min(-10000).max(10000);
 
 /** For PATCH : a body with at least one field */
 const nonEmpty = (schema) => schema.refine((data) => Object.values(data).some((v) => v !== undefined), {
@@ -52,10 +52,7 @@ const MIN_SHAPE_AREA = 0.01;
  * Free shape drawn by the user : 3 to 50 points { x, y } in meters, rounded to the cm,
  * forming a simple polygon (no crossing edges).
  */
-const shape = z.array(z.object({
-  x: z.coerce.number().min(-10000).max(10000),
-  y: z.coerce.number().min(-10000).max(10000),
-}))
+const shape = z.array(z.object({ x: coordinate, y: coordinate }))
   .min(3).max(50)
   .transform((points) => points.map((p) => ({ x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100 })))
   .refine(isSimplePolygon, { message: 'The shape must be a simple polygon (no crossing edges, no duplicated point)' })
@@ -79,7 +76,7 @@ module.exports = {
   capitalizeFirst,
   optionalDate,
   month,
-  positiveDecimal,
+  coordinate,
   shape,
   nonEmpty,
   today,

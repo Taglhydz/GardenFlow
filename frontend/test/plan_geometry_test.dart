@@ -106,9 +106,11 @@ void main() {
       expect(PlanGeometry.gardenView([rect(10, 8, 50, 40)]), const Rect.fromLTRB(48, 38, 62, 50));
     });
 
-    test('the garden plan goes on for hundreds of meters beyond the farthest parcel', () {
-      expect(PlanGeometry.gardenWorld(const []).size, const Size(6 + PlanGeometry.gardenExtent, 6 + PlanGeometry.gardenExtent));
-      expect(PlanGeometry.gardenWorld([rect(2, 1, 300, 3)]).right, 302 + PlanGeometry.margin + PlanGeometry.gardenExtent);
+    test('the garden plan goes on for hundreds of meters on every side of 0', () {
+      const extent = PlanGeometry.gardenExtent;
+      expect(PlanGeometry.gardenWorld, const Rect.fromLTRB(-extent, -extent, extent, extent));
+      // a parcel left of and above 0 is in the garden plan
+      expect(PlanGeometry.gardenWorld.contains(const Offset(-120, -45.5)), isTrue);
     });
 
     group('sides', () {

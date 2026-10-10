@@ -300,12 +300,8 @@ class _GardenViewState extends ConsumerState<GardenView> {
                         child: ShapeCanvas(
                           key: _canvasKey,
                           snapCm: ref.watch(snapProvider).effectiveCm,
-                          world: PlanGeometry.gardenWorld([
-                            for (final p in parcels) p.absoluteShape,
-                            if (_draft != null) _draft!,
-                          ]),
+                          world: PlanGeometry.gardenWorld,
                           view: PlanGeometry.gardenView([for (final p in parcels) p.absoluteShape]),
-                          nonNegative: true,
                           shapes: [
                             for (final p in parcels)
                               CanvasShape(
@@ -493,7 +489,10 @@ Future<void> editParcelDimensions(BuildContext context, WidgetRef ref, Parcel pa
     shape: parcel.absoluteShape,
     positionLabel: 'dimensions.position_in_garden'.tr(),
     validate: (result) {
-      if (result.finalShape.any((p) => p.dx < 0 || p.dy < 0)) return 'dimensions.outside_garden'.tr();
+      if (result.finalShape.any((p) => !PlanGeometry.gardenWorld.contains(p))) {
+        final extent = PlanGeometry.gardenExtent.round().toString();
+        return 'dimensions.outside_garden'.tr(args: [extent, extent]);
+      }
       // the zones stay where they are in the parcel : they must still be inside its new shape
       final relative = Geometry.translate(result.shape, -parcel.position);
       if (zones.any((z) => !Geometry.isInside(z.shape, relative))) return 'errors.ZONES_OUTSIDE_PARCEL'.tr();

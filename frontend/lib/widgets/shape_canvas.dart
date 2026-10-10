@@ -107,7 +107,6 @@ class ShapeCanvas extends StatefulWidget {
     required this.onOpen,
     required this.onMoved,
     required this.onReshaped,
-    this.nonNegative = false,
     this.snapCm = PlanGeometry.defaultSnapCm,
     this.rulers = true,
   });
@@ -147,9 +146,6 @@ class ShapeCanvas extends StatefulWidget {
 
   /// New points of the shape (a corner moved, added or removed)
   final void Function(int id, List<Offset> points) onReshaped;
-
-  /// Points can't go below 0 (the garden plan starts at its top-left corner)
-  final bool nonNegative;
 
   /// Magnet grid (cm) of the points drawn or dragged, 1 = no magnet (neither the grid nor the sides)
   final int snapCm;
@@ -292,6 +288,12 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
     return (placed, null);
   }
 
+  /// Points stay on the plan ([ShapeCanvas.world])
+  Offset _clamp(Offset p) {
+    final world = widget.world;
+    return Offset(p.dx.clamp(world.left, world.right), p.dy.clamp(world.top, world.bottom));
+  }
+
   bool get _isDrawing => widget.draft != null;
 
   CanvasShape? get _selected {
@@ -307,8 +309,6 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
     if (drag != null && drag.shapeId == widget.selectedId) return drag.current;
     return _selected?.points;
   }
-
-  Offset _clamp(Offset p) => widget.nonNegative ? Offset(math.max(0, p.dx), math.max(0, p.dy)) : p;
 
   // ======
   // Taps
@@ -417,14 +417,15 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
         final (moved, _) = _place(drag.original[drag.vertex] + delta, ppm, except: drag.shapeId);
         if (moved != null) drag.current = [...drag.original]..[drag.vertex] = moved;
       } else {
-        var snapped = PlanGeometry.snapPoint(delta, widget.snapCm);
-        if (widget.nonNegative) {
-          // the shape stops at the top and left borders of the plan
-          final bounds = Geometry.bounds(drag.original);
-          snapped = Offset(math.max(snapped.dx, -bounds.left), math.max(snapped.dy, -bounds.top));
-        }
-        drag.delta = snapped;
-        drag.current = Geometry.translate(drag.original, snapped);
+        // the shape stops at the borders of the plan
+        final bounds = Geometry.bounds(drag.original);
+        final world = widget.world;
+        final snapped = PlanGeometry.snapPoint(delta, widget.snapCm);
+        drag.delta = Offset(
+          snapped.dx.clamp(world.left - bounds.left, math.max(world.left - bounds.left, world.right - bounds.right)),
+          snapped.dy.clamp(world.top - bounds.top, math.max(world.top - bounds.top, world.bottom - bounds.bottom)),
+        );
+        drag.current = Geometry.translate(drag.original, drag.delta);
       }
     });
   }

@@ -409,6 +409,14 @@ describe('parcels and crops', () => {
     expect(res.body.name).toBe('Carré 1');
   });
 
+  test('a parcel can be placed left of and above 0', async () => {
+    const res = await api.patch(`/api/parcels/${parcelId}`).set(auth(alice.token)).send({ pos_x: -3.5, pos_y: -12 });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ pos_x: -3.5, pos_y: -12 });
+    const back = await api.patch(`/api/parcels/${parcelId}`).set(auth(alice.token)).send({ pos_x: 1.5, pos_y: 0 });
+    expect(back.status).toBe(200);
+  });
+
   test('create a crop', async () => {
     const res = await api.post(`/api/parcels/${parcelId}/crops`).set(auth(alice.token))
       .send({ plant_id: tomatoId, sow_date: '2026-04-01', expected_harvest_date: '2026-08-01' });

@@ -21,7 +21,8 @@ class PlanGeometry {
   /// Smallest part of the garden plan shown when it opens (empty garden).
   static const double minWorldSize = 6;
 
-  /// Free space of the garden plan beyond the farthest parcel : the plan is "infinite" to the right and to the bottom.
+  /// The garden plan goes from -[gardenExtent] to +[gardenExtent] meters on both axes : the parcels can be
+  /// drawn on every side of the first ones.
   static const double gardenExtent = 500;
 
   /// Distance (px on the screen) under which a point sticks to a nearby side.
@@ -82,11 +83,8 @@ class PlanGeometry {
     );
   }
 
-  /// The whole garden plan : from (0, 0) to [gardenExtent] meters beyond the farthest parcel.
-  static Rect gardenWorld(Iterable<List<Offset>> shapes) {
-    final view = gardenView(shapes);
-    return Rect.fromLTWH(0, 0, view.right + gardenExtent, view.bottom + gardenExtent);
-  }
+  /// The whole garden plan, centered on 0. It never changes : the plan doesn't jump when a parcel is added far away.
+  static final Rect gardenWorld = Rect.fromCenter(center: Offset.zero, width: 2 * gardenExtent, height: 2 * gardenExtent);
 
   /// Point of a side of [shapes] near [point] (closer than [maxDistance] m), or null : a corner when one is
   /// close enough, else the nearest point of the side, on the magnet grid [stepCm] when the side goes through it.

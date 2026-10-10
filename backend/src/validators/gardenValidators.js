@@ -1,6 +1,6 @@
 const { z } = require('zod');
 const {
-  SOIL_TYPES, LEVELS, id, requiredText, optionalText, placeName, capitalizeFirst, optionalDate, positiveDecimal, month, shape, nonEmpty,
+  SOIL_TYPES, LEVELS, id, requiredText, optionalText, placeName, capitalizeFirst, optionalDate, coordinate, month, shape, nonEmpty,
 } = require('./common');
 
 // ======
@@ -20,11 +20,12 @@ const updateGardenSchema = nonEmpty(z.object(gardenFields).partial());
 // ======
 // garden_id is taken from the URL (POST /gardens/:gardenId/parcels) and can't be changed.
 // The shape points are relative to (pos_x, pos_y) : moving a parcel = changing pos_x / pos_y only.
+// The garden plan has no corner : a parcel can be placed left of or above 0 (negative pos_x / pos_y).
 // The area is computed from the shape.
 const parcelFields = {
   name     : requiredText(100).transform(capitalizeFirst),
-  pos_x    : positiveDecimal.optional(),
-  pos_y    : positiveDecimal.optional(),
+  pos_x    : coordinate.optional(),
+  pos_y    : coordinate.optional(),
   shape,
   soil_type: z.enum(SOIL_TYPES).optional(),
   sunlight : z.enum(LEVELS).optional(),

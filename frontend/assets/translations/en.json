@@ -361,7 +361,7 @@
     "position_in_parcel": "Position in the parcel (top-left corner)",
     "invalid_number": "Invalid number",
     "too_short": "1 cm minimum",
-    "outside_garden": "The parcel must stay in the garden: X and Y can't be negative."
+    "outside_garden": "The parcel must stay in the garden plan: X and Y go from -{} to {} m."
   },
   "zone_screen": {
     "whole_parcel": "All plants",

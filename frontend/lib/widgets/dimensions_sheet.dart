@@ -236,6 +236,7 @@ class _DimensionsSheetState extends State<DimensionsSheet> {
                       label: 'X',
                       controller: _x,
                       focusNode: _xFocus,
+                      signed: true,
                       error: _errorOf(-1),
                     ),
                   ),
@@ -246,6 +247,7 @@ class _DimensionsSheetState extends State<DimensionsSheet> {
                       label: 'Y',
                       controller: _y,
                       focusNode: _yFocus,
+                      signed: true,
                       error: _errorOf(-2),
                     ),
                   ),
@@ -280,19 +282,29 @@ class _DimensionsSheetState extends State<DimensionsSheet> {
 }
 
 class _MeterField extends StatelessWidget {
-  const _MeterField({super.key, required this.label, required this.controller, required this.focusNode, this.error});
+  const _MeterField({
+    super.key,
+    required this.label,
+    required this.controller,
+    required this.focusNode,
+    this.error,
+    this.signed = false,
+  });
 
   final String label;
   final TextEditingController controller;
   final FocusNode focusNode;
   final String? error;
 
+  /// A position can be negative : the keyboard has a minus key
+  final bool signed;
+
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       focusNode: focusNode,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      keyboardType: TextInputType.numberWithOptions(decimal: true, signed: signed),
       textInputAction: TextInputAction.next,
       onTap: () => controller.selection = TextSelection(baseOffset: 0, extentOffset: controller.text.length),
       decoration: InputDecoration(
