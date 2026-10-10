@@ -26,6 +26,9 @@ const requiredText = (max) => z.string().trim().min(1).max(max);
 /** Optional text : '' and whitespace-only strings are stored as NULL. */
 const optionalText = (max) => z.string().trim().max(max).transform((v) => v || null).nullable().optional();
 
+/** First letter in capital ('potager nord' -> 'Potager nord'), the rest is kept. */
+const capitalizeFirst = (v) => v && v.replace(/^\p{Ll}/u, (letter) => letter.toUpperCase());
+
 /** Place name : each word starts with a capital ('saint-étienne, france' -> 'Saint-Étienne, France'), the rest is kept. */
 const placeName = (max) => optionalText(max).transform((v) => v && v.replace(/(^|[\s-])(\p{Ll})/gu, (_, sep, letter) => sep + letter.toUpperCase()));
 
@@ -73,6 +76,7 @@ module.exports = {
   requiredText,
   optionalText,
   placeName,
+  capitalizeFirst,
   optionalDate,
   month,
   positiveDecimal,

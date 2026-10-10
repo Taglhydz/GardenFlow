@@ -48,6 +48,7 @@ class _RenameDialogState extends State<_RenameDialog> {
         controller: _controller,
         autofocus: true,
         maxLength: 100,
+        textCapitalization: TextCapitalization.sentences,
         decoration: InputDecoration(
           labelText: widget.label,
           helperText: widget.helper,

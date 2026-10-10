@@ -140,6 +140,8 @@ class _ParcelFormSheetState extends ConsumerState<ParcelFormSheet> {
               TextFormField(
                 controller: _nameController,
                 maxLength: 100,
+                // the server also puts a capital on the first letter
+                textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(labelText: 'parcel_name'.tr(), border: const OutlineInputBorder()),
                 validator: Validators.requiredName,
               ),

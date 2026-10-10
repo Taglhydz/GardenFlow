@@ -404,6 +404,11 @@ describe('parcels and crops', () => {
     expect(res.body).toMatchObject({ name: 'Carré 1', sunlight: 'high', soil_type: 'clay' });
   });
 
+  test('the parcel name starts with a capital', async () => {
+    const res = await api.patch(`/api/parcels/${parcelId}`).set(auth(alice.token)).send({ name: 'carré 1' });
+    expect(res.body.name).toBe('Carré 1');
+  });
+
   test('create a crop', async () => {
     const res = await api.post(`/api/parcels/${parcelId}/crops`).set(auth(alice.token))
       .send({ plant_id: tomatoId, sow_date: '2026-04-01', expected_harvest_date: '2026-08-01' });
@@ -727,7 +732,7 @@ describe('free shapes and zones', () => {
     const unnamed = await createZone({ shape: rect(1, 1, 1.5, 0.5) });
     expect(unnamed.body.code).toBe('ZONE_OUTSIDE_PARCEL');
 
-    const renamed = await api.patch(`/api/zones/${zoneB.id}`).set(auth(alice.token)).send({ name: 'Mes tomates' });
+    const renamed = await api.patch(`/api/zones/${zoneB.id}`).set(auth(alice.token)).send({ name: 'mes tomates' });
     expect(renamed.body.name).toBe('Mes tomates');
     const cleared = await api.patch(`/api/zones/${zoneB.id}`).set(auth(alice.token)).send({ name: '  ' });
     expect(cleared.status).toBe(200);

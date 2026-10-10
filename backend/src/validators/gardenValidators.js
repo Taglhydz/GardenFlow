@@ -1,6 +1,6 @@
 const { z } = require('zod');
 const {
-  SOIL_TYPES, LEVELS, id, requiredText, optionalText, placeName, optionalDate, positiveDecimal, month, shape, nonEmpty,
+  SOIL_TYPES, LEVELS, id, requiredText, optionalText, placeName, capitalizeFirst, optionalDate, positiveDecimal, month, shape, nonEmpty,
 } = require('./common');
 
 // ======
@@ -22,7 +22,7 @@ const updateGardenSchema = nonEmpty(z.object(gardenFields).partial());
 // The shape points are relative to (pos_x, pos_y) : moving a parcel = changing pos_x / pos_y only.
 // The area is computed from the shape.
 const parcelFields = {
-  name     : requiredText(100),
+  name     : requiredText(100).transform(capitalizeFirst),
   pos_x    : positiveDecimal.optional(),
   pos_y    : positiveDecimal.optional(),
   shape,
@@ -41,8 +41,9 @@ const updateParcelSchema = nonEmpty(z.object(parcelFields).partial());
 // The shape points are relative to the parcel position, like the parcel shape.
 // No name (null, '') = automatic name, computed by the app from the plants of the zone
 // ("Zone Basilic", or "Add a plant" when it is empty). Sending null again brings it back.
+// Parcel and zone names start with a capital, whatever the client sends.
 const zoneFields = {
-  name : optionalText(100),
+  name : optionalText(100).transform(capitalizeFirst),
   shape,
 };
 
