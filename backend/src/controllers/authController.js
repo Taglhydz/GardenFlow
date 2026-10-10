@@ -116,7 +116,9 @@ const usernameFromGoogle = ({ name, email }) => {
  * 201 + created: true for a new account (the app shows the welcome dialog).
  */
 exports.googleLogin = async (req, res) => {
-  const profile = await googleAuth.verifyIdToken(req.valid.body.id_token);
+  const google  = await googleAuth.verifyIdToken(req.valid.body.id_token);
+  // stored like the emails typed in the app : 'Jade@Gmail.com' -> 'jade@gmail.com'
+  const profile = { ...google, email: google.email?.trim().toLowerCase() || null };
 
   if (!profile.email || !profile.emailVerified) {
     throw AppError.unauthorized('GOOGLE_EMAIL_NOT_VERIFIED', 'The email of this Google account is not verified');

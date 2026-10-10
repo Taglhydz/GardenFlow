@@ -136,7 +136,8 @@ describe('auth', () => {
     const res = await api.post('/api/auth/register').send({ username: 'x', email: 'not-an-email', password: 'short' });
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('VALIDATION_ERROR');
-    expect(res.body.details.map((d) => d.field).sort()).toEqual(['email', 'password', 'username']);
+    // a weak password gets one detail per missing rule
+    expect([...new Set(res.body.details.map((d) => d.field))].sort()).toEqual(['email', 'password', 'username']);
   });
 
   test('register refuses a password without lowercase, uppercase, digit, symbol or 10 characters', async () => {

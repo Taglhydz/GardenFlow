@@ -27,7 +27,7 @@ const googleAuth = {
 
     return {
       sub          : payload.sub,
-      email        : payload.email?.toLowerCase() ?? null,
+      email        : payload.email ?? null,
       emailVerified: payload.email_verified === true,
       name         : payload.name || payload.given_name || null,
     };
