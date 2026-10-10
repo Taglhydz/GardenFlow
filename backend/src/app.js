@@ -11,6 +11,9 @@ const { notFoundHandler, errorHandler } = require('./middlewares/errorHandler');
 // The app is exported without listening (see server.js) so the tests can use it.
 const app = express();
 
+// behind a reverse proxy (TRUST_PROXY) : req.ip is the IP of the user, the rate limits count per user and not for all
+app.set('trust proxy', config.trustProxy);
+
 // security headers
 app.use(helmet());
 
