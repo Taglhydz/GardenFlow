@@ -1,28 +1,13 @@
--- ==========================
--- GardenFlow Database Schema
--- ==========================
--- ⚠️  This script DROPS every table before recreating them : all data is lost.
--- It does not select a database : run it with `npm run db:reset` (uses DB_NAME from .env)
--- or `mysql -u <user> -p <database> < schema.sql`.
+-- ===============================
+-- Migration 001 : initial schema
+-- ===============================
+-- The tables as they were when the migrations were introduced. The later changes are in the next
+-- migrations (see README.md) : never modify this file, add a migration instead.
 --
 -- Conventions :
 --   - hard delete everywhere, children are removed by ON DELETE CASCADE
 --   - texts stored in the database (plant names, descriptions...) are in French,
 --     other languages are provided by the Flutter translation files using plant.code
-
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS suggestion;
-DROP TABLE IF EXISTS plant_color;
-DROP TABLE IF EXISTS plant_association;
-DROP TABLE IF EXISTS plant_period;
-DROP TABLE IF EXISTS crop;
-DROP TABLE IF EXISTS zone;
-DROP TABLE IF EXISTS parcel;
-DROP TABLE IF EXISTS garden;
-DROP TABLE IF EXISTS plant;
-DROP TABLE IF EXISTS user_identity;
-DROP TABLE IF EXISTS user;
-SET FOREIGN_KEY_CHECKS = 1;
 
 -- =====
 -- Users

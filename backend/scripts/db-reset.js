@@ -1,24 +1,19 @@
 /**
- * Recreates all tables and loads the reference data.
+ * Deletes all the tables, then applies all the migrations (tables + plant catalog).
  *   npm run db:reset        -> database DB_NAME
  *   npm run db:reset:test   -> database DB_NAME_TEST
- * ⚠️  All data in the target database is deleted.
+ * ⚠️  All data in the target database is deleted. Refused in production.
  */
-const fs     = require('fs');
-const path   = require('path');
-const mysql  = require('mysql2/promise');
-const config = require('../src/config/env');
+const config   = require('../src/config/env');
+const migrator = require('../src/database/migrator');
 
-const SQL_DIR = path.join(__dirname, '..', 'src', 'database');
+const resetDatabase = async () => {
+  if (config.isProd) throw new Error('db:reset deletes all the data: refused in production (NODE_ENV=production)');
 
-const resetDatabase = async ({ withSeed = true } = {}) => {
-  const connection = await mysql.createConnection({ ...config.db, multipleStatements: true });
-
+  const connection = await migrator.connect();
   try {
-    await connection.query(fs.readFileSync(path.join(SQL_DIR, 'schema.sql'), 'utf8'));
-    if (withSeed) {
-      await connection.query(fs.readFileSync(path.join(SQL_DIR, 'seed.sql'), 'utf8'));
-    }
+    await migrator.dropAllTables(connection);
+    await migrator.migrate(connection);
   } finally {
     await connection.end();
   }
@@ -28,7 +23,7 @@ module.exports = { resetDatabase };
 
 if (require.main === module) {
   resetDatabase()
-    .then(() => console.log(`✅ Database "${config.db.database}" reset and seeded`))
+    .then(() => console.log(`✅ Database "${config.db.database}" reset, all migrations applied`))
     .catch((err) => {
       console.error(`❌ Database reset failed: ${err.message}`);
       process.exit(1);

@@ -11,7 +11,7 @@ const SELECT = `
   JOIN plant p1 ON p1.id = pa.plant_id_1
   JOIN plant p2 ON p2.id = pa.plant_id_2`;
 
-/** Pairs are always stored with plant_id_1 < plant_id_2 (see schema.sql). */
+/** Pairs are always stored with plant_id_1 < plant_id_2 (see migrations/001_initial_schema.sql). */
 const orderPair = (a, b) => (a < b ? [a, b] : [b, a]);
 
 const PlantAssociation = {

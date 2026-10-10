@@ -40,16 +40,30 @@ It forwards the phone's port 3000 to the PC (`adb reverse`), starts the backend 
 cd backend
 npm install
 cp .env.example .env        # then fill in DB_* and JWT_SECRET
-npm run db:reset            # ⚠️ recreates all tables and loads the plant catalog
+npm run migrate             # creates the tables and loads the plant catalog
 npm run dev                 # http://localhost:3000/api
 ```
 
 | Script | Description |
 | --- | --- |
-| `npm run dev` / `npm run prod` | Start the API |
-| `npm run db:reset` | Drop and recreate the tables of `DB_NAME`, then load `seed.sql` |
+| `npm run dev` / `npm run prod` | Start the API (in production, refuses to start while migrations are pending) |
+| `npm run migrate` | Apply the pending migrations to `DB_NAME` |
+| `npm run migrate:status` | Show the applied and pending migrations |
+| `npm run migrate:new -- <description>` | Create the next migration file, to fill in |
+| `npm run db:baseline` | Once, for a database created before the migrations (with the old `schema.sql`) |
+| `npm run db:reset` | ⚠️ Drop all the tables of `DB_NAME` and apply all the migrations (refused in production) |
 | `npm run set-role -- <email> admin` | Give the admin role to an existing user (there is no public way to become admin) |
 | `npm test` | Integration tests on the database `DB_NAME_TEST` (⚠️ wiped on each run) |
+
+#### Changing the database
+
+The database is changed only by migrations : numbered SQL files in `backend/src/database/migrations`, applied once and in order. The table `schema_migrations` remembers which ones were applied.
+
+1. `npm run migrate:new -- add password reset` creates e.g. `003_add_password_reset.sql`
+2. Write the SQL in it (`ALTER TABLE ...`, `INSERT ...`), then `npm run migrate`
+3. Commit the file with the code that uses it ; after a `git pull`, run `npm run migrate`
+
+A migration that is applied somewhere must **never be modified** (the server detects it with a checksum) : fix it with a new migration. MySQL can't roll back a `CREATE` / `ALTER TABLE` : keep each migration small, and try it on a copy of the production data before deploying.
 
 The test database must exist and be accessible by the MySQL user, for example (as root) :
 

@@ -1,8 +1,8 @@
--- =========================
--- GardenFlow reference data
--- =========================
--- Plant catalog, plant calendars and plant associations. Run after schema.sql
--- (`npm run db:reset` runs both).
+-- ==============================
+-- Migration 002 : plant catalog
+-- ==============================
+-- Plant catalog, plant calendars and plant associations, as they were when the migrations were
+-- introduced. New plants or fixes go in a new migration : never modify this file.
 -- Texts are in French ; the Flutter app translates them with the plant `code`
 -- (plants.<code>.name / plants.<code>.description in assets/translations/*.json).
 --

@@ -1,7 +1,7 @@
 const { z } = require('zod');
 const { isSimplePolygon, polygonArea } = require('../utils/geometry');
 
-// Must stay in sync with the ENUMs of schema.sql
+// Must stay in sync with the ENUMs of the database (src/database/migrations)
 const SOIL_TYPES     = ['standard', 'clay', 'sandy', 'loamy', 'humus', 'chalky'];
 const LEVELS         = ['low', 'medium', 'high'];
 const PLANT_TYPES    = ['vegetable', 'fruit', 'herb', 'flower'];
