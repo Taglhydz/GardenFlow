@@ -200,7 +200,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 Text(
                   'app_name'.tr(),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  style: AppTextStyles.appTitle,
                 ),
                 if (level != null) ...[
                   const SizedBox(height: 4),

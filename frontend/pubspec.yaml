@@ -89,6 +89,12 @@ flutter:
     - assets/avatars/
     - .env
 
+  fonts:
+    # app title (AppTextStyles.appTitle)
+    - family: MoulinRouge
+      fonts:
+        - asset: assets/fonts/MoulinRouge.ttf
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

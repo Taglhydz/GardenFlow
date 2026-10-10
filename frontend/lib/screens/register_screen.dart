@@ -98,17 +98,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'auth.register_title'.tr(),
+                    'app_name'.tr(),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
+                    style: AppTextStyles.appTitle,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'auth.register_subtitle'.tr(),
+                    'auth.register_title'.tr(),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 16,

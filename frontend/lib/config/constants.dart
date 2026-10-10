@@ -66,3 +66,8 @@ class AppColors {
   static const Color surface        = Color(0xFFFFFFFF); // white
   static const Color cardBackground = Color(0xFFFFFFFF); // white
 }
+
+class AppTextStyles {
+  /// "GardenFlow" on the login, register and home screens, in the Moulin Rouge font (assets/fonts/)
+  static const TextStyle appTitle = TextStyle(fontFamily: 'MoulinRouge', fontSize: 32, color: AppColors.primary);
+}
