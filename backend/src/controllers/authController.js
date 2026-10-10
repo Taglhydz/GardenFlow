@@ -3,6 +3,7 @@ const AppError = require('../utils/AppError');
 const { hashPassword, comparePassword } = require('../utils/hash');
 const { signToken } = require('../middlewares/authMiddleware');
 const { sendVerificationEmail, sentRecently, verifyToken, confirmEmailChange } = require('../services/emailVerification');
+const mailer = require('../utils/mailer');
 const { verifyEmailPage, isSuccess } = require('../views/verifyEmailPage');
 const googleAuth = require('../services/googleAuth');
 
@@ -14,28 +15,40 @@ const DUMMY_HASH = '$2b$10$VYNkVe19xl3i3r5naF7iK.aM50HvSOsP0vYjik/f7pR0LjWQKxQc.
 const sendVerificationEmailSafely = (user, lang) => sendVerificationEmail(user, lang)
   .catch((err) => console.error(`❌ Verification email to ${user.email} not sent: ${err.message}`));
 
+/** An email that already has an account : its owner is told by email, never the person who registers. */
+const tellAccountExists = (user, lang) => {
+  // not verified yet : maybe the same person registering again, a new link is sent
+  if (!user.email_verified_at) return sentRecently(user) ? Promise.resolve() : sendVerificationEmailSafely(user, lang);
+
+  return mailer.sendAccountExistsEmail({ to: user.email, username: user.username, lang })
+    .catch((err) => console.error(`❌ Account exists email to ${user.email} not sent: ${err.message}`));
+};
+
 /**
  * POST /auth/register - the role is always 'user' (admins are promoted with scripts/set-role.js)
  * No token : the account can log in once the link sent by email has been opened.
+ * Always 204, whether the email already has an account or not, so it doesn't reveal which emails are
+ * registered : the email received tells what to do (verify the address, or log in with the existing account).
  */
 exports.register = async (req, res) => {
   const { username, email, password, birthdate, lang } = req.valid.body;
 
-  // check email
-  if (await User.findByEmailWithPassword(email)) { throw AppError.conflict('EMAIL_ALREADY_USED', 'Email already in use'); }
+  // hashed in both cases : the answer takes the same time whether the email is registered or not
+  const passwordHash = await hashPassword(password);
+  const existing     = await User.findVerificationByEmail(email);
 
-  let user;
-  try {
-    user = await User.create({ username, email, passwordHash: await hashPassword(password), birthdate });
-  } catch (err) {
-    // two simultaneous registrations with the same email
-    if (err.code === 'ER_DUP_ENTRY') { throw AppError.conflict('EMAIL_ALREADY_USED', 'Email already in use'); }
-    throw err;
+  if (existing) {
+    await tellAccountExists(existing, lang);
+  } else {
+    try {
+      await sendVerificationEmailSafely(await User.create({ username, email, passwordHash, birthdate }), lang);
+    } catch (err) {
+      // two simultaneous registrations with the same email : the first one sent the email
+      if (err.code !== 'ER_DUP_ENTRY') throw err;
+    }
   }
 
-  await sendVerificationEmailSafely(user, lang);
-
-  res.status(201).json({ user });
+  res.status(204).end();
 };
 
 /** POST /auth/login */
@@ -51,9 +64,9 @@ exports.login = async (req, res) => {
   // only told once the password is right, so it doesn't reveal which emails are registered
   if (!found.email_verified_at) { throw new AppError(403, 'EMAIL_NOT_VERIFIED', 'Open the link sent by email before logging in'); }
 
-  const { password_hash, ...user } = found;
+  const { password_hash, token_version, ...user } = found;
 
-  res.json({ token: signToken(user), user });
+  res.json({ token: signToken(found), user });
 };
 
 /** POST /auth/resend-verification - always 204, so it doesn't reveal which emails are registered */
@@ -132,5 +145,5 @@ exports.googleLogin = async (req, res) => {
     user = await User.findById(user.id);
   }
 
-  res.status(created ? 201 : 200).json({ token: signToken(user), user, created });
+  res.status(created ? 201 : 200).json({ token: signToken(await User.findSession(user.id)), user, created });
 };

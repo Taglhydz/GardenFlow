@@ -19,8 +19,19 @@ const User = {
   },
 
   findByEmailWithPassword: async (email) => {
-    const [rows] = await db.query(`SELECT ${PUBLIC_COLUMNS}, password_hash FROM user WHERE email = ?`, [email]);
+    const [rows] = await db.query(`SELECT ${PUBLIC_COLUMNS}, password_hash, token_version FROM user WHERE email = ?`, [email]);
     return rows[0] || null;
+  },
+
+  /** What a token is signed with and checked against (middlewares/authMiddleware.js) */
+  findSession: async (id) => {
+    const [rows] = await db.query('SELECT id, role, token_version FROM user WHERE id = ?', [id]);
+    return rows[0] || null;
+  },
+
+  /** The tokens given before stop working */
+  revokeTokens: async (id) => {
+    await db.query('UPDATE user SET token_version = token_version + 1 WHERE id = ?', [id]);
   },
 
   findPasswordHash: async (id) => {

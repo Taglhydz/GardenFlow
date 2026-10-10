@@ -63,6 +63,11 @@ const changePasswordSchema = z.object({
   new_password    : password,
 });
 
+// the password is asked for an account that has one (not for an account created with Google)
+const deleteMeSchema = z.object({
+  current_password: z.string().optional(),
+});
+
 const adminUpdateUserSchema = nonEmpty(z.object({
   username: username.optional(),
   email   : email.optional(),
@@ -83,5 +88,6 @@ module.exports = {
   updateMeSchema,
   changeEmailSchema,
   changePasswordSchema,
+  deleteMeSchema,
   adminUpdateUserSchema,
 };

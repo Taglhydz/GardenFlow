@@ -4,6 +4,7 @@ const { hashPassword, comparePassword } = require('../utils/hash');
 const { removePhoto, checkPhoto } = require('../utils/photoStorage');
 const { computeLevel } = require('../services/levelService');
 const { sendEmailChangeEmail } = require('../services/emailVerification');
+const { signToken } = require('../middlewares/authMiddleware');
 
 /** Updates a user and turns a duplicate email into a clear error. */
 const updateUser = async (id, data) => {
@@ -96,7 +97,10 @@ exports.getMyLevel = async (req, res) => {
   res.json(computeLevel(await User.levelStats(req.user.id)));
 };
 
-/** PATCH /users/me/password */
+/**
+ * PATCH /users/me/password - the other devices are logged out (their tokens stop working),
+ * this one gets a new token : { token }
+ */
 exports.changePassword = async (req, res) => {
   const { current_password, new_password } = req.valid.body;
 
@@ -106,12 +110,27 @@ exports.changePassword = async (req, res) => {
   if (!hash || !(await comparePassword(current_password, hash))) { throw AppError.badRequest('WRONG_PASSWORD', 'Current password is incorrect'); }
 
   await User.updatePassword(req.user.id, await hashPassword(new_password));
+  await User.revokeTokens(req.user.id);
+
+  res.json({ token: signToken(await User.findSession(req.user.id)) });
+};
+
+/** POST /users/me/logout-all - the tokens of all the devices stop working, this one too */
+exports.logoutAll = async (req, res) => {
+  await User.revokeTokens(req.user.id);
 
   res.status(204).end();
 };
 
-/** DELETE /users/me - deletes the account and all its gardens */
+/** DELETE /users/me { current_password } - deletes the account and all its gardens. */
 exports.deleteMe = async (req, res) => {
+  const hash = await User.findPasswordHash(req.user.id);
+
+  // check password (an account created with Google has none : the token is enough)
+  if (hash && !(await comparePassword(req.valid.body.current_password ?? '', hash))) {
+    throw AppError.badRequest('WRONG_PASSWORD', 'Current password is incorrect');
+  }
+
   const user = await User.findById(req.user.id);
   await User.delete(req.user.id);
   await removePhoto(user?.photo);

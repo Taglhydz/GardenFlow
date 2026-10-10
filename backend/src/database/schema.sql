@@ -36,6 +36,9 @@ CREATE TABLE user (
     email         VARCHAR(255) NOT NULL UNIQUE,
     -- NULL for an account created with Google (no password, see user_identity)
     password_hash VARCHAR(255) NULL,
+    -- written in each token (JWT "ver") : +1 when the password changes or on "log out of all devices",
+    -- the tokens given before stop working
+    token_version INT NOT NULL DEFAULT 0,
     -- NULL until the link sent by email is opened : login is refused before
     email_verified_at       DATETIME NULL,
     -- SHA-256 of the token of the link (the token itself is only in the email), kept after the

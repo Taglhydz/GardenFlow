@@ -20,6 +20,7 @@ const PASSWORD = 'Password123!';
 let sentEmails = [];
 jest.spyOn(mailer, 'sendVerificationEmail').mockImplementation(async (mail) => { sentEmails.push(mail); });
 jest.spyOn(mailer, 'sendEmailChangeEmail').mockImplementation(async (mail) => { sentEmails.push(mail); });
+jest.spyOn(mailer, 'sendAccountExistsEmail').mockImplementation(async (mail) => { sentEmails.push({ ...mail, exists: true }); });
 
 // Google is not called : the "ID token" sent by the tests is the JSON of the Google profile, 'bad' is refused
 jest.spyOn(googleAuth, 'verifyIdToken').mockImplementation(async (idToken) => {
@@ -38,7 +39,7 @@ const verificationLink = (email) => {
 /** Register, open the link of the email, log in */
 const register = async (email, extra = {}) => {
   const res = await api.post('/api/auth/register').send({ username: 'tester', email, password: PASSWORD, ...extra });
-  expect(res.status).toBe(201);
+  expect(res.status).toBe(204);
   expect((await api.get(verificationLink(email))).status).toBe(200);
   const login = await api.post('/api/auth/login').send({ email, password: PASSWORD });
   expect(login.status).toBe(200);
@@ -46,6 +47,9 @@ const register = async (email, extra = {}) => {
 };
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
+
+/** Row of the user table (register answers nothing about the account) */
+const userRow = async (email) => (await db.query('SELECT * FROM user WHERE email = ?', [email]))[0][0];
 
 /** Rectangle shape (points relative to the parcel position) */
 const rect = (w, h, x = 0, y = 0) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }];
@@ -87,30 +91,45 @@ describe('auth', () => {
   test('register ignores a role sent by the client', async () => {
     const res = await api.post('/api/auth/register')
       .send({ username: 'hacker', email: 'hacker@test.dev', password: PASSWORD, role: 'admin' });
-    expect(res.status).toBe(201);
-    expect(res.body.user.role).toBe('user');
-    expect(res.body.user.password_hash).toBeUndefined();
+    expect(res.status).toBe(204);
+    expect((await userRow('hacker@test.dev')).role).toBe('user');
   });
 
   test('register normalizes the email and keeps the birthdate as YYYY-MM-DD', async () => {
     const res = await api.post('/api/auth/register')
       .send({ username: ' Carol la Plus Belle ', email: '  Carol@Test.DEV ', password: PASSWORD, birthdate: '2000-01-01' });
-    expect(res.status).toBe(201);
-    expect(res.body.user.username).toBe('carol la plus belle'); // the app capitalizes it for display
-    expect(res.body.user.email).toBe('carol@test.dev');
-    expect(res.body.user.birthdate).toBe('2000-01-01');
+    expect(res.status).toBe(204);
+    const carol = await userRow('carol@test.dev');
+    expect(carol.username).toBe('carol la plus belle'); // the app capitalizes it for display
+    expect(carol.birthdate).toBe('2000-01-01');
   });
 
   test('register without birthdate works (optional)', async () => {
     const res = await api.post('/api/auth/register').send({ username: 'dave', email: 'dave@test.dev', password: PASSWORD });
-    expect(res.status).toBe(201);
-    expect(res.body.user.birthdate).toBeNull();
+    expect(res.status).toBe(204);
+    expect((await userRow('dave@test.dev')).birthdate).toBeNull();
   });
 
-  test('register with an existing email -> 409 EMAIL_ALREADY_USED', async () => {
-    const res = await api.post('/api/auth/register').send({ username: 'alice2', email: 'ALICE@test.dev', password: PASSWORD });
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe('EMAIL_ALREADY_USED');
+  test('register with an existing email answers the same, its owner is told by email, the account is unchanged', async () => {
+    const res = await api.post('/api/auth/register').send({ username: 'alice2', email: 'ALICE@test.dev', password: 'Other-Password-789' });
+    expect(res.status).toBe(204);
+    expect(res.body).toEqual({});
+    expect(sentEmails).toEqual([expect.objectContaining({ to: 'alice@test.dev', exists: true })]);
+
+    const login = await api.post('/api/auth/login').send({ email: 'alice@test.dev', password: 'Other-Password-789' });
+    expect(login.body.code).toBe('INVALID_CREDENTIALS');
+  });
+
+  test('register again with an email not verified yet sends a new verification link', async () => {
+    await api.post('/api/auth/register').send({ username: 'nina', email: 'nina@test.dev', password: PASSWORD });
+    const firstLink = verificationLink('nina@test.dev');
+    // the cooldown of the "resend" button is over
+    await db.query("UPDATE user SET verification_expires_at = verification_expires_at - INTERVAL 2 MINUTE WHERE email = 'nina@test.dev'");
+
+    const again = await api.post('/api/auth/register').send({ username: 'nina', email: 'nina@test.dev', password: PASSWORD });
+    expect(again.status).toBe(204);
+    expect(sentEmails).toHaveLength(2);
+    expect(verificationLink('nina@test.dev')).not.toBe(firstLink);
   });
 
   test('register with invalid data -> 400 VALIDATION_ERROR with details', async () => {
@@ -142,9 +161,9 @@ describe('auth', () => {
 
   test('register gives no token and sends a verification email in the chosen language', async () => {
     const res = await api.post('/api/auth/register').send({ username: 'frank', email: 'frank@test.dev', password: PASSWORD, lang: 'en' });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(204);
     expect(res.body.token).toBeUndefined();
-    expect(res.body.user.email_verified_at).toBeNull();
+    expect((await userRow('frank@test.dev')).email_verified_at).toBeNull();
     expect(sentEmails).toHaveLength(1);
     expect(sentEmails[0]).toMatchObject({ to: 'frank@test.dev', username: 'frank', lang: 'en' });
     expect(sentEmails[0].url).toMatch(/\/api\/auth\/verify-email\?token=[0-9a-f]{64}$/);
@@ -236,7 +255,8 @@ describe('auth', () => {
     const login = await api.post('/api/auth/login').send({ email: 'jade@gmail.com', password: PASSWORD });
     expect(login.body.code).toBe('INVALID_CREDENTIALS');
     const register = await api.post('/api/auth/register').send({ username: 'jade', email: 'jade@gmail.com', password: PASSWORD });
-    expect(register.body.code).toBe('EMAIL_ALREADY_USED');
+    expect(register.status).toBe(204);
+    expect(sentEmails.at(-1)).toMatchObject({ to: 'jade@gmail.com', exists: true });
     const change = await api.patch('/api/users/me/password').set(auth(first.body.token))
       .send({ current_password: 'anything', new_password: 'NewPassword456?' });
     expect(change.body.code).toBe('WRONG_PASSWORD');
@@ -1079,12 +1099,34 @@ describe('users', () => {
     expect(wrong.status).toBe(400);
     expect(wrong.body.code).toBe('WRONG_PASSWORD');
 
+    // alice on another device
+    const otherDevice = (await api.post('/api/auth/login').send({ email: 'alice@test.dev', password: PASSWORD })).body.token;
+
     const ok = await api.patch('/api/users/me/password').set(auth(alice.token))
       .send({ current_password: PASSWORD, new_password: 'NewPassword456?' });
-    expect(ok.status).toBe(204);
+    expect(ok.status).toBe(200);
+
+    // the other devices are logged out, this one goes on with its new token
+    expect((await api.get('/api/users/me').set(auth(otherDevice))).body.code).toBe('INVALID_TOKEN');
+    expect((await api.get('/api/users/me').set(auth(alice.token))).status).toBe(401);
+    alice.token = ok.body.token;
+    expect((await api.get('/api/users/me').set(auth(alice.token))).status).toBe(200);
 
     const login = await api.post('/api/auth/login').send({ email: 'alice@test.dev', password: 'NewPassword456?' });
     expect(login.status).toBe(200);
+  });
+
+  test('log out of all devices : every token of the account stops working', async () => {
+    const mia = await register('mia@test.dev');
+    const phone = (await api.post('/api/auth/login').send({ email: 'mia@test.dev', password: PASSWORD })).body.token;
+
+    expect((await api.post('/api/users/me/logout-all').set(auth(mia.token))).status).toBe(204);
+
+    expect((await api.get('/api/users/me').set(auth(mia.token))).status).toBe(401);
+    expect((await api.get('/api/users/me').set(auth(phone))).status).toBe(401);
+    // a new login works
+    const login = await api.post('/api/auth/login').send({ email: 'mia@test.dev', password: PASSWORD });
+    expect((await api.get('/api/users/me').set(auth(login.body.token))).status).toBe(200);
   });
 
   test('only admins can list users, without password hashes', async () => {
@@ -1110,7 +1152,13 @@ describe('users', () => {
     const eve = await register('eve@test.dev');
     const garden = await api.post('/api/gardens').set(auth(eve.token)).send({ name: 'Jardin de Eve' });
 
-    expect((await api.delete('/api/users/me').set(auth(eve.token))).status).toBe(204);
+    // the password is asked : a stolen token is not enough
+    const noPassword = await api.delete('/api/users/me').set(auth(eve.token));
+    expect(noPassword.body.code).toBe('WRONG_PASSWORD');
+    const wrong = await api.delete('/api/users/me').set(auth(eve.token)).send({ current_password: 'nope' });
+    expect(wrong.body.code).toBe('WRONG_PASSWORD');
+
+    expect((await api.delete('/api/users/me').set(auth(eve.token)).send({ current_password: PASSWORD })).status).toBe(204);
 
     const [gardens] = await db.query('SELECT id FROM garden WHERE id = ?', [garden.body.id]);
     expect(gardens).toHaveLength(0);

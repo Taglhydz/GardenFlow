@@ -4,21 +4,29 @@ const userController       = require('../controllers/userController');
 const plantColorController = require('../controllers/plantColorController');
 const validate       = require('../middlewares/validate');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
+const { limitPerUser } = require('../middlewares/rateLimit');
 const { idParam } = require('../validators/common');
 const { uploadPhoto } = require('../utils/photoStorage');
 const {
-  updateMeSchema, changeEmailSchema, changePasswordSchema, adminUpdateUserSchema, plantColorSchema,
+  updateMeSchema, changeEmailSchema, changePasswordSchema, deleteMeSchema, adminUpdateUserSchema, plantColorSchema,
 } = require('../validators/userValidators');
 
 router.use(authenticate);
 
+// routes checking the password or sending an email : a stolen token can't use them in a loop
+const passwordLimiter = limitPerUser(10);
+const emailLimiter    = limitPerUser(5);
+
 // current user (declared before /:id so that "me" is not read as an id)
 router.get   ('/me'         , userController.getMe);
 router.patch ('/me'         , validate({ body: updateMeSchema       }), userController.updateMe      );
-router.patch ('/me/password', validate({ body: changePasswordSchema }), userController.changePassword);
-router.patch ('/me/email'   , validate({ body: changeEmailSchema    }), userController.changeEmail   );
+router.patch ('/me/password', passwordLimiter, validate({ body: changePasswordSchema }), userController.changePassword);
+router.patch ('/me/email'   , emailLimiter   , validate({ body: changeEmailSchema    }), userController.changeEmail   );
 router.delete('/me/email'   , userController.cancelEmailChange);
-router.delete('/me'         , userController.deleteMe);
+router.delete('/me'         , passwordLimiter, validate({ body: deleteMeSchema       }), userController.deleteMe      );
+
+// the tokens of all the devices stop working (this one too : the app logs out)
+router.post  ('/me/logout-all', userController.logoutAll);
 
 // picture and level of the current user
 router.post  ('/me/photo'   , uploadPhoto, userController.uploadMyPhoto);
