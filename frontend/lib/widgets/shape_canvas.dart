@@ -598,6 +598,16 @@ class ShapeCanvasState extends State<ShapeCanvas> with SingleTickerProviderState
   }
 
   Widget _buildPlan(Rect world, double ppm, bool editing) {
+    // a tap around the plan (left of or above 0...) touches nothing inside the viewer : it is taken here and
+    // passed to the plan, so it deselects the shape like a tap on an empty part of the plan
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapUp: (d) => _onTapUp(MatrixUtils.transformPoint(Matrix4.inverted(_viewer.value), d.localPosition), world, ppm),
+      child: _buildViewer(world, ppm, editing),
+    );
+  }
+
+  Widget _buildViewer(Rect world, double ppm, bool editing) {
     return InteractiveViewer(
       transformationController: _viewer,
       constrained: false,
