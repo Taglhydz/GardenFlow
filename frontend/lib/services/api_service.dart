@@ -54,7 +54,7 @@ class ApiService {
 
   Future<dynamic> put(String endpoint, Map<String, dynamic> data) => _send('PUT', endpoint, data);
 
-  Future<dynamic> delete(String endpoint) => _send('DELETE', endpoint);
+  Future<dynamic> delete(String endpoint, [Map<String, dynamic>? data]) => _send('DELETE', endpoint, data);
 
   /// Sends a file (multipart/form-data, in the field [field]), e.g. a profile photo.
   Future<dynamic> upload(

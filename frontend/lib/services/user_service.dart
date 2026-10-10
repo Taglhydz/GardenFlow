@@ -37,15 +37,10 @@ class UserService {
   /// Forgets the pending email, its link stops working.
   Future<User> cancelEmailChange() async => User.fromJson(await _api.delete('$_me/email'));
 
-  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
-    await _api.patch('$_me/password', {
-      'current_password': currentPassword,
-      'new_password': newPassword,
-    });
-  }
-
-  /// Deletes the account and all its gardens.
-  Future<void> deleteMe() => _api.delete(_me);
+  /// Deletes the account and all its gardens. [currentPassword] : asked for an account with a password
+  /// (WRONG_PASSWORD otherwise), not for an account created with Google.
+  Future<void> deleteMe({String? currentPassword}) =>
+      _api.delete(_me, {if (currentPassword != null) 'current_password': currentPassword});
 
   /// Plant avatar (Avatars.codes) : it replaces the photo.
   Future<User> setAvatar(String avatar) async => User.fromJson(await _api.patch(_me, {'avatar': avatar}));

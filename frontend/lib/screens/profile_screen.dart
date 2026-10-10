@@ -15,66 +15,56 @@ import '../widgets/user_avatar.dart';
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
+  /// The box logs out the other devices too (a lost phone...) : their sessions stop working.
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
-    final confirm = await showDialog<bool>(
+    var allDevices = false;
+    // null : cancelled, else whether the other devices are logged out too
+    final choice = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('profile.logout_title'.tr()),
-        content: Text('profile.logout_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('cancel'.tr()),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('profile.logout_title'.tr()),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('profile.logout_confirm'.tr()),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                value: allDevices,
+                onChanged: (value) => setState(() => allDevices = value ?? false),
+                title: Text('profile.logout_all_devices'.tr(), style: const TextStyle(fontSize: 14)),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: Text('profile.logout_action'.tr()),
-          ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('cancel'.tr()),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, allDevices),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: Text('profile.logout_action'.tr()),
+            ),
+          ],
+        ),
       ),
     );
-
-    // AuthGate closes this screen and shows the login screen
-    if (confirm == true) {
-      await ref.read(authProvider.notifier).logout();
-    }
-  }
-
-  /// Everything is deleted for good : the dialog says it clearly, the red button is the only way to confirm.
-  Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 40),
-        title: Text('profile.delete_account_title'.tr()),
-        content: Text('profile.delete_account_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: Text('profile.delete_account_action'.tr()),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !context.mounted) return;
+    if (choice == null) return;
 
     // AuthGate closes this screen and shows the login screen
     try {
-      await ref.read(authProvider.notifier).deleteAccount();
+      await ref.read(authProvider.notifier).logout(allDevices: choice);
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.errorMessage(e)), backgroundColor: AppColors.error),
-        );
-      }
+      // the server could not log out the other devices : this one stays logged in, the user can retry
+      if (context.mounted) _showMessage(context, AppLocalizations.errorMessage(e), error: true);
     }
   }
+
+  /// Everything is deleted for good : the dialog says it clearly and asks for the password.
+  Future<void> _deleteAccount(BuildContext context, User user) => showDeleteAccountDialog(context, user);
 
   void _showMessage(BuildContext context, String message, {bool error = false}) {
     ScaffoldMessenger.of(context)
@@ -324,7 +314,7 @@ class ProfileScreen extends ConsumerWidget {
                           SizedBox(
                             width: double.infinity,
                             child: TextButton.icon(
-                              onPressed: () => _deleteAccount(context, ref),
+                              onPressed: () => _deleteAccount(context, user),
                               icon: const Icon(Icons.delete_forever_outlined),
                               label: Text('profile.delete_account'.tr()),
                               style: TextButton.styleFrom(

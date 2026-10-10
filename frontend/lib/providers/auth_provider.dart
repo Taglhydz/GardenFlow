@@ -62,17 +62,21 @@ class AuthNotifier extends AsyncNotifier<User?> {
     DateTime? birthdate,
     required String lang,
   }) async {
-    final user = await ref.read(authServiceProvider).register(
+    await ref.read(authServiceProvider).register(
       username: username,
       email: email,
       password: password,
       birthdate: birthdate,
       lang: lang,
     );
-    await ref.read(sharedPreferencesProvider).setString(AppConstants.welcomeEmailKey, user.email);
+    // the server stores the email trimmed and in lowercase
+    await ref.read(sharedPreferencesProvider).setString(AppConstants.welcomeEmailKey, email.trim().toLowerCase());
   }
 
-  Future<void> logout() async {
+  /// [allDevices] : the other phones and computers of the account are logged out too (throws an
+  /// [ApiException] if the server can't be reached, nothing is logged out then).
+  Future<void> logout({bool allDevices = false}) async {
+    if (allDevices) await ref.read(authServiceProvider).logoutAllDevices();
     await ref.read(authServiceProvider).logout();
     // not blocking : the logout of GardenFlow must work even if Google fails
     try {
@@ -83,8 +87,9 @@ class AuthNotifier extends AsyncNotifier<User?> {
   }
 
   /// Deletes the account on the server (gardens, crops and photo too), then logs out.
-  Future<void> deleteAccount() async {
-    await ref.read(userServiceProvider).deleteMe();
+  /// [currentPassword] : asked for an account with a password.
+  Future<void> deleteAccount({String? currentPassword}) async {
+    await ref.read(userServiceProvider).deleteMe(currentPassword: currentPassword);
     await logout();
   }
 

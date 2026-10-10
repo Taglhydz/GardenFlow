@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_localizations.dart';
 import '../config/constants.dart';
 import '../models/user.dart';
+import '../providers/auth_provider.dart';
 import '../providers/profile_providers.dart';
 import '../utils/validators.dart';
 
@@ -16,6 +17,11 @@ Future<bool> showUsernameDialog(BuildContext context, User user) async =>
 Future<String?> showEmailDialog(BuildContext context, User user) =>
     showDialog<String>(context: context, builder: (_) => _EmailDialog(user: user));
 
+/// Deletes the account after a clear warning, with the password for an account that has one.
+/// Once deleted, AuthGate closes the dialog and shows the login screen.
+Future<void> showDeleteAccountDialog(BuildContext context, User user) =>
+    showDialog<void>(context: context, builder: (_) => _DeleteAccountDialog(user: user));
+
 /// Dialog with a form : the server error is shown in it, above the buttons.
 class _AccountDialog extends StatelessWidget {
   const _AccountDialog({
@@ -26,6 +32,7 @@ class _AccountDialog extends StatelessWidget {
     required this.isLoading,
     required this.error,
     required this.onSubmit,
+    this.destructive = false,
   });
 
   final String title;
@@ -36,9 +43,13 @@ class _AccountDialog extends StatelessWidget {
   final String? error;
   final VoidCallback onSubmit;
 
+  /// Red button and warning icon : the action can't be undone
+  final bool destructive;
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      icon: destructive ? const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 40) : null,
       title: Text(title),
       content: SingleChildScrollView(
         child: Form(
@@ -64,7 +75,7 @@ class _AccountDialog extends StatelessWidget {
         ElevatedButton(
           onPressed: isLoading ? null : onSubmit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: destructive ? AppColors.error : AppColors.primary,
             foregroundColor: AppColors.white,
           ),
           child: isLoading
@@ -257,6 +268,95 @@ class _EmailDialogState extends ConsumerState<_EmailDialog> {
           ),
           validator: Validators.passwordRequired,
         ),
+      ],
+    );
+  }
+}
+
+// ==============
+// Delete account
+// ==============
+class _DeleteAccountDialog extends ConsumerStatefulWidget {
+  const _DeleteAccountDialog({required this.user});
+
+  final User user;
+
+  @override
+  ConsumerState<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  bool _isPasswordVisible = false;
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _delete() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      // an account created with Google has no password : the session is enough
+      await ref.read(authProvider.notifier).deleteAccount(
+            currentPassword: widget.user.hasPassword ? _passwordController.text : null,
+          );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = AppLocalizations.errorMessage(e);
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _AccountDialog(
+      title: 'profile.delete_account_title'.tr(),
+      formKey: _formKey,
+      action: 'profile.delete_account_action'.tr(),
+      isLoading: _isLoading,
+      error: _error,
+      onSubmit: _delete,
+      destructive: true,
+      fields: [
+        Text('profile.delete_account_confirm'.tr()),
+        if (widget.user.hasPassword) ...[
+          const SizedBox(height: 16),
+          Text(
+            'profile.delete_account_password'.tr(),
+            style: const TextStyle(fontSize: 13, color: AppColors.greyDark),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _passwordController,
+            obscureText: !_isPasswordVisible,
+            autofillHints: const [AutofillHints.password],
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _isLoading ? null : _delete(),
+            decoration: InputDecoration(
+              labelText: 'profile.current_password'.tr(),
+              prefixIcon: const Icon(Icons.lock),
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+              ),
+            ),
+            validator: Validators.passwordRequired,
+          ),
+        ],
       ],
     );
   }

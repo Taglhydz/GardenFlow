@@ -12,22 +12,22 @@ class AuthService {
   final TokenStorage _tokenStorage;
 
   /// No session : the server sends a verification email, login is possible once its link is opened.
+  /// The server answers the same way when the email already has an account (the email received tells it).
   /// [lang] : language of the email ('fr' / 'en').
-  Future<User> register({
+  Future<void> register({
     required String username,
     required String email,
     required String password,
     DateTime? birthdate,
     required String lang,
   }) async {
-    final response = await _api.post('${AppConstants.authEndpoint}/register', {
+    await _api.post('${AppConstants.authEndpoint}/register', {
       'username': username,
       'email': email,
       'password': password,
       if (birthdate != null) 'birthdate': JsonUtils.formatDate(birthdate),
       'lang': lang,
     });
-    return User.fromJson(response['user']);
   }
 
   /// Sends a new verification email (the server answers the same way whether the email exists or not).
@@ -58,6 +58,20 @@ class AuthService {
   }
 
   Future<void> logout() => _tokenStorage.clear();
+
+  /// The tokens of all the devices stop working, this one too : call [logout] afterwards.
+  Future<void> logoutAllDevices() async {
+    await _api.post('${AppConstants.usersEndpoint}/me/logout-all');
+  }
+
+  /// The other devices are logged out, this one keeps its session with the new token sent by the server.
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    final response = await _api.patch('${AppConstants.usersEndpoint}/me/password', {
+      'current_password': currentPassword,
+      'new_password': newPassword,
+    });
+    await _tokenStorage.save(response['token'] as String);
+  }
 
   Future<User> _saveSession(dynamic response) async {
     await _tokenStorage.save(response['token'] as String);

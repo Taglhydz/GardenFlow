@@ -136,7 +136,7 @@ void main() {
     expect(find.descendant(of: find.byType(AppBar), matching: find.byType(UserAvatar)), findsOneWidget);
   });
 
-  testWidgets('delete my account : after a clear warning, back to the login screen', (tester) async {
+  testWidgets('delete my account : after a clear warning and my password, back to the login screen', (tester) async {
     await openProfile(tester);
 
     await tester.ensureVisible(find.text('Supprimer mon compte'));
@@ -151,10 +151,35 @@ void main() {
 
     await tester.tap(find.text('Supprimer mon compte'));
     await tester.pumpAndSettle();
+
+    // the password is asked, a wrong one is shown in the dialog
+    await tester.enterText(find.byType(TextFormField), 'bad');
+    await tester.tap(find.text('Supprimer définitivement'));
+    await tester.pumpAndSettle();
+    expect(services.users.deleted, isFalse);
+    expect(find.textContaining('irréversible'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextFormField), 'good');
     await tester.tap(find.text('Supprimer définitivement'));
     await tester.pumpAndSettle();
 
     expect(services.users.deleted, isTrue);
+    expect(services.auth.loggedOut, isTrue);
+    expect(find.text('Se connecter'), findsOneWidget); // login screen
+  });
+
+  testWidgets('log out : the box also logs out the other devices', (tester) async {
+    await openProfile(tester);
+
+    await tester.ensureVisible(find.text('Se déconnecter'));
+    await tester.tap(find.text('Se déconnecter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Me déconnecter aussi de mes autres appareils'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Déconnexion').last);
+    await tester.pumpAndSettle();
+
+    expect(services.auth.loggedOutAllDevices, isTrue);
     expect(services.auth.loggedOut, isTrue);
     expect(find.text('Se connecter'), findsOneWidget); // login screen
   });

@@ -53,13 +53,13 @@ class FakeAuthService implements AuthService {
   }
 
   @override
-  Future<User> register({
+  Future<void> register({
     required String username,
     required String email,
     required String password,
     DateTime? birthdate,
     required String lang,
-  }) async => alice;
+  }) async {}
 
   @override
   Future<void> resendVerification({required String email, required String lang}) async => resentTo.add(email);
@@ -79,6 +79,14 @@ class FakeAuthService implements AuthService {
 
   @override
   Future<void> logout() async => loggedOut = true;
+
+  bool loggedOutAllDevices = false;
+
+  @override
+  Future<void> logoutAllDevices() async => loggedOutAllDevices = true;
+
+  @override
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {}
 }
 
 /// Google Sign-In without Google : hidden by default (like on Windows), [available] shows the button.
@@ -320,7 +328,12 @@ class FakeUserService implements UserService {
   bool deleted = false;
 
   @override
-  Future<void> deleteMe() async => deleted = true;
+  Future<void> deleteMe({String? currentPassword}) async {
+    if (currentPassword != 'good') {
+      throw ApiException(statusCode: 400, code: 'WRONG_PASSWORD', message: 'wrong');
+    }
+    deleted = true;
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
