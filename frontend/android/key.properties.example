@@ -1,0 +1,6 @@
+# Copy to key.properties (not committed) to sign the release builds with the upload key of the Play Store.
+# storeFile : absolute path of the keystore, OUTSIDE the repository, with forward slashes (a \ is an escape character here)
+storeFile=C:/Users/<you>/keys/gardenflow-upload.jks
+storePassword=
+keyAlias=upload
+keyPassword=

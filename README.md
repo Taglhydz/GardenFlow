@@ -99,6 +99,13 @@ flutter build appbundle --release --dart-define-from-file=config/prod.json   # P
 flutter build apk --release --dart-define-from-file=config/prod.json         # APK to install directly
 ```
 
+The release builds are signed with the upload key of the Play Store, read from `frontend/android/key.properties` (not committed, copy of `key.properties.example`). The keystore itself is kept **outside the repository** and backed up. Without `key.properties`, the build is signed with the debug key : it installs on a phone, but the Play Store refuses it.
+
+```bash
+keytool -genkeypair -v -keystore C:/Users/<you>/keys/gardenflow-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload   # once
+keytool -list -v -keystore C:/Users/<you>/keys/gardenflow-upload.jks -alias upload                                                 # SHA-1 / SHA-256 (Google sign-in)
+```
+
 Without `--dart-define-from-file`, the app uses the `.env` values (`localhost`). Only public values go in these files (the Google client id is not a secret) : they end up inside the app. Increase the build number (`version: 1.0.0+N` in `pubspec.yaml`) before each upload to the store.
 
 ## API
