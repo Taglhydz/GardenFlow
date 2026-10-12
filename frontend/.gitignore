@@ -14,6 +14,8 @@ migrate_working_dir/
 
 # Environment variables
 .env
+# build-time configuration of the release builds (copy of config/prod.example.json)
+/config/prod.json
 
 # IntelliJ related
 *.iml

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppConstants {
-  // API Configuration - Chargée depuis .env
-  static String get baseUrl   => dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000/api';
-  static bool   get debugMode => dotenv.env['DEBUG_MODE'  ] == 'true';
+  // Configuration : a value given at build time (--dart-define-from-file=config/prod.json) wins,
+  // otherwise it is read from .env (dev)
+  static const String _apiBaseUrl     = String.fromEnvironment('API_BASE_URL'    );
+  static const String _googleClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
+
+  static String get baseUrl => _apiBaseUrl.isNotEmpty ? _apiBaseUrl : dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000/api';
 
   // Google sign-in : OAuth client id of type "Web" (same as GOOGLE_CLIENT_ID of the backend), empty = no Google button
-  static String get googleClientId => dotenv.env['GOOGLE_CLIENT_ID'] ?? '';
+  static String get googleClientId => _googleClientId.isNotEmpty ? _googleClientId : dotenv.env['GOOGLE_CLIENT_ID'] ?? '';
 
   // API Endpoints
   static const String authEndpoint              = '/auth'              ;

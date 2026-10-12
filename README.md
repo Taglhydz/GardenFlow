@@ -82,6 +82,25 @@ flutter run
 flutter test
 ```
 
+#### Release build
+
+`frontend/.env` is the dev configuration. A release build takes its values from `frontend/config/prod.json` (not committed, copy of `config/prod.example.json`), which wins over `.env` :
+
+```json
+{
+  "API_BASE_URL": "https://api.your-domain.com/api",
+  "GOOGLE_CLIENT_ID": "<OAuth client id of type Web, same as the backend>"
+}
+```
+
+```bash
+cd frontend
+flutter build appbundle --release --dart-define-from-file=config/prod.json   # Play Store : build/app/outputs/bundle/release/app-release.aab
+flutter build apk --release --dart-define-from-file=config/prod.json         # APK to install directly
+```
+
+Without `--dart-define-from-file`, the app uses the `.env` values (`localhost`). Only public values go in these files (the Google client id is not a secret) : they end up inside the app. Increase the build number (`version: 1.0.0+N` in `pubspec.yaml`) before each upload to the store.
+
 ## API
 
 All routes are prefixed with `/api`. Except `/auth/*` and `/health`, they require the header `Authorization: Bearer <token>`.
