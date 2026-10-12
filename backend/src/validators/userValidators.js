@@ -34,6 +34,11 @@ const resendVerificationSchema = z.object({
   lang,
 });
 
+const forgotPasswordSchema = z.object({
+  email,
+  lang,
+});
+
 // ID token given to the app by Google Sign-In (a JWT of about 1 KB)
 const googleLoginSchema = z.object({
   id_token: z.string().min(1).max(4096),
@@ -80,9 +85,11 @@ const plantColorSchema = z.object({
 });
 
 module.exports = {
+  password,
   plantColorSchema,
   registerSchema,
   resendVerificationSchema,
+  forgotPasswordSchema,
   loginSchema,
   googleLoginSchema,
   updateMeSchema,

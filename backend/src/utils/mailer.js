@@ -56,14 +56,50 @@ const EXISTS_TEXTS = {
   fr: {
     subject: 'Vous avez déjà un compte',
     hello  : TEXTS.fr.hello,
-    body   : 'Quelqu\'un (sans doute vous) a essayé de créer un compte GardenFlow avec cette adresse. Vous avez déjà un compte : connectez-vous avec cette adresse et votre mot de passe, ou avec Google si vous l\'avez créé ainsi.',
+    body   : 'Quelqu\'un (sans doute vous) a essayé de créer un compte GardenFlow avec cette adresse. Vous avez déjà un compte : connectez-vous avec cette adresse et votre mot de passe, ou avec Google si vous l\'avez créé ainsi. Mot de passe oublié ? Appuyez sur « Mot de passe oublié ? » sur l\'écran de connexion de l\'application.',
     notMe  : 'Si vous n\'êtes pas à l\'origine de cette demande, vous pouvez ignorer cet email : votre compte n\'a pas été modifié.',
   },
   en: {
     subject: 'You already have an account',
     hello  : TEXTS.en.hello,
-    body   : 'Someone (probably you) tried to create a GardenFlow account with this address. You already have an account: log in with this address and your password, or with Google if you created it that way.',
+    body   : 'Someone (probably you) tried to create a GardenFlow account with this address. You already have an account: log in with this address and your password, or with Google if you created it that way. Forgot your password? Tap "Forgot password?" on the login screen of the app.',
     notMe  : 'If you did not make this request, you can ignore this email: your account was not changed.',
+  },
+};
+
+// "forgot password" asked from the login screen
+const RESET_TEXTS = {
+  fr: {
+    subject: 'Réinitialisez votre mot de passe',
+    hello  : TEXTS.fr.hello,
+    body   : 'Vous avez demandé à changer le mot de passe de votre compte GardenFlow. Cliquez sur le lien ci-dessous pour en choisir un nouveau.',
+    button : 'Choisir un nouveau mot de passe',
+    expiry : 'Ce lien est valable 1 heure et ne sert qu\'une fois.',
+    notMe  : 'Si vous n\'êtes pas à l\'origine de cette demande, vous pouvez ignorer cet email : votre mot de passe ne change pas.',
+  },
+  en: {
+    subject: 'Reset your password',
+    hello  : TEXTS.en.hello,
+    body   : 'You asked to change the password of your GardenFlow account. Click the link below to choose a new one.',
+    button : 'Choose a new password',
+    expiry : 'This link is valid for 1 hour and works only once.',
+    notMe  : 'If you did not make this request, you can ignore this email: your password does not change.',
+  },
+};
+
+// "forgot password" asked for an account created with Google : it has no password
+const GOOGLE_ACCOUNT_TEXTS = {
+  fr: {
+    subject: 'Connectez-vous avec Google',
+    hello  : TEXTS.fr.hello,
+    body   : 'Vous avez demandé à réinitialiser le mot de passe de votre compte GardenFlow. Ce compte a été créé avec Google et n\'a pas de mot de passe : connectez-vous avec le bouton « Continuer avec Google » de l\'application.',
+    notMe  : RESET_TEXTS.fr.notMe,
+  },
+  en: {
+    subject: 'Log in with Google',
+    hello  : TEXTS.en.hello,
+    body   : 'You asked to reset the password of your GardenFlow account. This account was created with Google and has no password: log in with the "Continue with Google" button of the app.',
+    notMe  : RESET_TEXTS.en.notMe,
   },
 };
 
@@ -80,7 +116,7 @@ const send = async ({ to, subject, text, html }) => {
 
 /**
  * Email with a single link button, or only a text when there is no url.
- * texts : TEXTS, CHANGE_TEXTS or EXISTS_TEXTS, lang : 'fr' (default) or 'en'
+ * texts : TEXTS, CHANGE_TEXTS, EXISTS_TEXTS, RESET_TEXTS or GOOGLE_ACCOUNT_TEXTS, lang : 'fr' (default) or 'en'
  */
 const sendLinkEmail = async (texts, { to, username, url, lang }) => {
   const t    = texts[lang] || texts.fr;
@@ -113,6 +149,8 @@ const mailer = {
   sendVerificationEmail : (mail) => sendLinkEmail(TEXTS, mail),
   sendEmailChangeEmail  : (mail) => sendLinkEmail(CHANGE_TEXTS, mail),
   sendAccountExistsEmail: (mail) => sendLinkEmail(EXISTS_TEXTS, mail),
+  sendPasswordResetEmail: (mail) => sendLinkEmail(RESET_TEXTS, mail),
+  sendGoogleAccountEmail: (mail) => sendLinkEmail(GOOGLE_ACCOUNT_TEXTS, mail),
 };
 
 // the functions are read from this object at call time, so the tests can spy on them

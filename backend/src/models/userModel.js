@@ -127,6 +127,45 @@ const User = {
     );
   },
 
+  /** For a "forgot password" : has_password (1 / 0) and the cooldown of the emails */
+  findPasswordResetByEmail: async (email) => {
+    const [rows] = await db.query(
+      `SELECT id, username, email, password_hash IS NOT NULL AS has_password, password_reset_expires_at
+       FROM user WHERE email = ?`,
+      [email]
+    );
+    return rows[0] || null;
+  },
+
+  /** New "forgot password" link : the previous one stops working. */
+  startPasswordReset: async (id, tokenHash, expiresAt) => {
+    await db.query(
+      'UPDATE user SET password_reset_token = ?, password_reset_expires_at = ? WHERE id = ?',
+      [tokenHash, expiresAt, id]
+    );
+  },
+
+  findByPasswordResetToken: async (tokenHash) => {
+    const [rows] = await db.query(
+      'SELECT id, password_reset_expires_at FROM user WHERE password_reset_token = ?',
+      [tokenHash]
+    );
+    return rows[0] || null;
+  },
+
+  /**
+   * New password from a "forgot password" link : the link stops working, the address is verified (the link
+   * was opened from it) and the tokens given before stop working (someone who knew the old password is logged out).
+   */
+  resetPassword: async (id, passwordHash) => {
+    await db.query(
+      `UPDATE user SET password_hash = ?, password_reset_token = NULL, password_reset_expires_at = NULL,
+         email_verified_at = COALESCE(email_verified_at, NOW()), token_version = token_version + 1
+       WHERE id = ?`,
+      [passwordHash, id]
+    );
+  },
+
   update: async (id, data) => {
     const { clause, values } = buildUpdateSet(data, UPDATABLE);
     if (clause) {

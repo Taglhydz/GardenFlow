@@ -21,6 +21,8 @@ let sentEmails = [];
 jest.spyOn(mailer, 'sendVerificationEmail').mockImplementation(async (mail) => { sentEmails.push(mail); });
 jest.spyOn(mailer, 'sendEmailChangeEmail').mockImplementation(async (mail) => { sentEmails.push(mail); });
 jest.spyOn(mailer, 'sendAccountExistsEmail').mockImplementation(async (mail) => { sentEmails.push({ ...mail, exists: true }); });
+jest.spyOn(mailer, 'sendPasswordResetEmail').mockImplementation(async (mail) => { sentEmails.push({ ...mail, reset: true }); });
+jest.spyOn(mailer, 'sendGoogleAccountEmail').mockImplementation(async (mail) => { sentEmails.push({ ...mail, google: true }); });
 
 // Google is not called : the "ID token" sent by the tests is the JSON of the Google profile, 'bad' is refused
 jest.spyOn(googleAuth, 'verifyIdToken').mockImplementation(async (idToken) => {
@@ -232,6 +234,91 @@ describe('auth', () => {
     expect(verified.status).toBe(204);
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(sentEmails).toHaveLength(0);
+  });
+
+  /** Asks for a "forgot password" email, returns the path of its link */
+  const forgotPassword = async (email, lang) => {
+    expect((await api.post('/api/auth/forgot-password').send({ email, lang })).status).toBe(204);
+    await new Promise((resolve) => setTimeout(resolve, 50)); // the email is sent after the answer
+    return verificationLink(email.toLowerCase()); // sent to the address stored in lowercase
+  };
+
+  const postNewPassword = (link, password, confirm = password) => api.post('/api/auth/reset-password')
+    .type('form')
+    .send({ token: new URL(link, 'http://x').searchParams.get('token'), password, password_confirm: confirm });
+
+  test('forgot password : a link to a form, the new password works, the sessions and the link stop working', async () => {
+    const norah = await register('norah@test.dev');
+    sentEmails = [];
+
+    const link = await forgotPassword('Norah@test.dev', 'en');
+    expect(sentEmails).toHaveLength(1);
+    expect(sentEmails[0]).toMatchObject({ to: 'norah@test.dev', username: 'tester', lang: 'en', reset: true });
+    expect(link).toMatch(/^\/api\/auth\/reset-password\?token=[0-9a-f]{64}$/);
+
+    // asked again right away : the first email is enough
+    await forgotPassword('norah@test.dev');
+    expect(sentEmails).toHaveLength(1);
+
+    const form = await api.get(link).set('Accept-Language', 'fr');
+    expect(form.status).toBe(200);
+    expect(form.type).toBe('text/html');
+    expect(form.text).toContain('<form method="post"');
+
+    const weak = await postNewPassword(link, 'short');
+    expect(weak.status).toBe(400);
+    expect(weak.text).toContain('ne respecte pas les règles');
+    const mismatch = await postNewPassword(link, 'NewPassword456?', 'NewPassword456!');
+    expect(mismatch.status).toBe(400);
+    expect(mismatch.text).toContain('Les deux mots de passe sont différents');
+
+    const done = await postNewPassword(link, 'NewPassword456?').set('Accept-Language', 'en');
+    expect(done.status).toBe(200);
+    expect(done.text).toContain('Password changed');
+
+    expect((await api.get('/api/users/me').set(auth(norah.token))).status).toBe(401);
+    expect((await api.post('/api/auth/login').send({ email: 'norah@test.dev', password: PASSWORD })).status).toBe(401);
+    expect((await api.post('/api/auth/login').send({ email: 'norah@test.dev', password: 'NewPassword456?' })).status).toBe(200);
+
+    // the link works only once
+    const again = await api.get(link).set('Accept-Language', 'fr');
+    expect(again.status).toBe(400);
+    expect(again.text).toContain('Lien invalide');
+    expect((await postNewPassword(link, 'OtherPassword789!')).status).toBe(400);
+  });
+
+  test('forgot password : an expired or malformed link is refused', async () => {
+    await register('oscar@test.dev');
+    const link = await forgotPassword('oscar@test.dev');
+
+    await db.query("UPDATE user SET password_reset_expires_at = NOW() - INTERVAL 1 DAY WHERE email = 'oscar@test.dev'");
+    const expired = await api.get(link).set('Accept-Language', 'fr');
+    expect(expired.status).toBe(400);
+    expect(expired.text).toContain('Lien expiré');
+    expect((await postNewPassword(link, 'NewPassword456?')).status).toBe(400);
+    expect((await api.post('/api/auth/login').send({ email: 'oscar@test.dev', password: PASSWORD })).status).toBe(200);
+
+    expect((await api.get('/api/auth/reset-password?token=nope')).status).toBe(400);
+    expect((await api.get('/api/auth/reset-password')).status).toBe(400);
+    expect((await api.post('/api/auth/reset-password').type('form').send({ password: 'NewPassword456?' })).status).toBe(400);
+  });
+
+  test('forgot password : nothing for an unknown email, Google accounts are told to use Google', async () => {
+    await forgotPassword('nobody@test.dev');
+    expect(sentEmails).toHaveLength(0);
+
+    await googleLogin({ sub: 'g-paul', email: 'paul@gmail.com', name: 'Paul' });
+    await forgotPassword('paul@gmail.com', 'en');
+    expect(sentEmails).toEqual([{ to: 'paul@gmail.com', username: 'paul', lang: 'en', google: true }]);
+    expect((await userRow('paul@gmail.com')).password_reset_token).toBeNull();
+  });
+
+  test('forgot password : an unverified account is verified by the link (it was opened from the address)', async () => {
+    await api.post('/api/auth/register').send({ username: 'rose', email: 'rose@test.dev', password: PASSWORD });
+    const link = await forgotPassword('rose@test.dev');
+
+    expect((await postNewPassword(link, 'NewPassword456?')).status).toBe(200);
+    expect((await api.post('/api/auth/login').send({ email: 'rose@test.dev', password: 'NewPassword456?' })).status).toBe(200);
   });
 
   test('Google : a new account is created, verified, without password ; the next time it logs in', async () => {

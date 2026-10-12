@@ -108,6 +108,7 @@ All routes are prefixed with `/api`. Except `/auth/*` and `/health`, they requir
 | Route | Access |
 | --- | --- |
 | `POST /auth/register`, `POST /auth/login` | Public (rate limited) |
+| `POST /auth/forgot-password` : emails a link to a web page (`GET / POST /auth/reset-password`) to choose a new password, valid 1 hour and once | Public (rate limited) |
 | `GET / PATCH / DELETE /users/me`, `PATCH /users/me/password` | Logged in user |
 | `GET / PATCH / DELETE /users/:id`, `GET /users` | Admin |
 | `GET / POST /gardens`, `GET / PATCH / DELETE /gardens/:id` | Owner only |

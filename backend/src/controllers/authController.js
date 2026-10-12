@@ -5,6 +5,9 @@ const { signToken } = require('../middlewares/authMiddleware');
 const { sendVerificationEmail, sentRecently, verifyToken, confirmEmailChange } = require('../services/emailVerification');
 const mailer = require('../utils/mailer');
 const { verifyEmailPage, isSuccess } = require('../views/verifyEmailPage');
+const { sendPasswordResetEmail, checkResetToken, resetPassword } = require('../services/passwordReset');
+const { resetPasswordForm, resetPasswordResult } = require('../views/resetPasswordPage');
+const { password: passwordSchema } = require('../validators/userValidators');
 const googleAuth = require('../services/googleAuth');
 
 // Compared when the email doesn't exist, so that a login takes the same time
@@ -81,13 +84,63 @@ exports.resendVerification = async (req, res) => {
   res.status(204).end();
 };
 
+/**
+ * POST /auth/forgot-password - always 204, so it doesn't reveal which emails are registered.
+ * Account with a password : a link to choose a new one. Account created with Google : an email telling to use Google.
+ */
+exports.forgotPassword = async (req, res) => {
+  const { email, lang } = req.valid.body;
+
+  const user = await User.findPasswordResetByEmail(email);
+
+  // not awaited : the answer takes the same time whether an email is sent or not
+  if (user) {
+    sendPasswordResetEmail(user, lang)
+      .catch((err) => console.error(`❌ Password reset email to ${user.email} not sent: ${err.message}`));
+  }
+
+  res.status(204).end();
+};
+
+/** Language of the pages opened from an email : the one of the browser */
+const pageLang = (req) => req.acceptsLanguages('fr', 'en') || 'fr';
+
 /** Web page showing the result of a link opened from an email */
 const sendLinkPage = (req, res, status) => {
-  const lang = req.acceptsLanguages('fr', 'en') || 'fr';
-
   res.status(isSuccess(status) ? 200 : 400)
     .type('html')
-    .send(verifyEmailPage(status, lang));
+    .send(verifyEmailPage(status, pageLang(req)));
+};
+
+/** GET /auth/reset-password?token=... - web page opened from the "forgot password" email : the form, or why the link doesn't work */
+exports.resetPasswordForm = async (req, res) => {
+  const { token } = req.query;
+  const status = await checkResetToken(token);
+  const lang   = pageLang(req);
+
+  if (status === 'valid') res.type('html').send(resetPasswordForm(token, lang));
+  else res.status(400).type('html').send(resetPasswordResult(status, lang));
+};
+
+/**
+ * POST /auth/reset-password (form of the page : token, password, password_confirm)
+ * The other devices are logged out, the link stops working.
+ */
+exports.resetPassword = async (req, res) => {
+  const { token, password, password_confirm } = req.body ?? {};
+  const lang = pageLang(req);
+
+  // the link is checked first : no form for a link that doesn't work anymore
+  const status = await checkResetToken(token);
+  if (status !== 'valid') return res.status(400).type('html').send(resetPasswordResult(status, lang));
+
+  const error = !passwordSchema.safeParse(password).success ? 'weak'
+    : password !== password_confirm ? 'mismatch'
+      : null;
+  if (error) return res.status(400).type('html').send(resetPasswordForm(token, lang, error));
+
+  const result = await resetPassword(token, password);
+  res.status(result === 'password_changed' ? 200 : 400).type('html').send(resetPasswordResult(result, lang));
 };
 
 /** GET /auth/verify-email?token=... - web page opened from the email */

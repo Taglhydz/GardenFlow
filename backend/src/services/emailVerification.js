@@ -80,4 +80,4 @@ const confirmEmailChange = async (token) => {
   return 'email_changed';
 };
 
-module.exports = { sendVerificationEmail, sentRecently, verifyToken, sendEmailChangeEmail, confirmEmailChange };
+module.exports = { hashToken, sendVerificationEmail, sentRecently, verifyToken, sendEmailChangeEmail, confirmEmailChange };
