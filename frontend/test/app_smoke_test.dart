@@ -208,6 +208,22 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('forgot password : the typed email is proposed, the message does not tell whether the account exists', (tester) async {
+    await pumpApp(tester, services);
+
+    await tester.enterText(find.byType(TextFormField).at(0), ' Alice@Test.dev');
+    await tester.tap(find.text('Mot de passe oublié ?'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mot de passe oublié'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Alice@Test.dev'), findsOneWidget);
+    await tester.tap(find.text('Envoyer le lien'));
+    await tester.pumpAndSettle();
+
+    expect(services.auth.forgotPasswordTo, ['alice@test.dev']);
+    expect(find.text('Si un compte utilise alice@test.dev, un email vient de lui être envoyé. Le lien est valable 1 heure.'), findsOneWidget);
+  });
+
   testWidgets('no Google button where Google sign-in is not available (Windows, no client id)', (tester) async {
     await pumpApp(tester, services);
     expect(find.text('Continuer avec Google'), findsNothing);

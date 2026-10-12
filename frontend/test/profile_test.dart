@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:GardenFlow/models/garden.dart';
 import 'package:GardenFlow/models/gardener_level.dart';
+import 'package:GardenFlow/models/user.dart';
 import 'package:GardenFlow/widgets/level_badge.dart';
 import 'package:GardenFlow/widgets/user_avatar.dart';
 import 'app_harness.dart';
@@ -166,6 +167,48 @@ void main() {
     expect(services.users.deleted, isTrue);
     expect(services.auth.loggedOut, isTrue);
     expect(find.text('Se connecter'), findsOneWidget); // login screen
+  });
+
+  testWidgets('change my password : the rules of the new one, a wrong current one is shown in the dialog', (tester) async {
+    await openProfile(tester);
+
+    await tester.ensureVisible(find.byTooltip('Changer le mot de passe'));
+    await tester.tap(find.byTooltip('Changer le mot de passe'));
+    await tester.pumpAndSettle();
+    final fields = find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextFormField));
+
+    await tester.enterText(fields.at(0), 'bad');
+    await tester.enterText(fields.at(1), 'weak');
+    await tester.enterText(fields.at(2), 'weak');
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Le mot de passe ne respecte pas toutes les règles'), findsOneWidget);
+
+    await tester.enterText(fields.at(1), 'NewPassword456?');
+    await tester.enterText(fields.at(2), 'NewPassword456!');
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Les mots de passe ne correspondent pas'), findsOneWidget);
+
+    await tester.enterText(fields.at(2), 'NewPassword456?');
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Le mot de passe actuel est incorrect.'), findsOneWidget);
+    expect(services.auth.newPassword, isNull);
+
+    await tester.enterText(fields.at(0), 'good');
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    expect(services.auth.newPassword, 'NewPassword456?');
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Mot de passe changé'), findsOneWidget);
+  });
+
+  testWidgets('an account created with Google has no password to change', (tester) async {
+    services.auth.restoreResult = const User(id: 1, username: 'alice', email: 'alice@gmail.com', hasPassword: false);
+    await openProfile(tester);
+
+    expect(find.byTooltip('Changer le mot de passe'), findsNothing);
   });
 
   testWidgets('log out : the box also logs out the other devices', (tester) async {

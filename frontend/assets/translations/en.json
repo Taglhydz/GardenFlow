@@ -121,7 +121,11 @@
     "cancel_email_change": "Cancel the change",
     "check_email_change": "I opened the link",
     "google_email": "Address of your Google account",
-    "username_saved": "Username changed"
+    "username_saved": "Username changed",
+    "change_password": "Change the password",
+    "change_password_help": "Your other devices will be logged out.",
+    "new_password": "New password",
+    "password_changed": "Password changed"
   },
   "settings": "Settings",
   "language": "Language",
@@ -182,7 +186,11 @@
     "welcome_start": "Get started",
     "session_expired": "Your session has expired, please log in again.",
     "or": "or",
-    "continue_with_google": "Continue with Google"
+    "continue_with_google": "Continue with Google",
+    "forgot_password": "Forgot password?",
+    "forgot_password_title": "Forgot password",
+    "forgot_password_help": "Enter the email address of your account: you will receive a link to choose a new password.",
+    "forgot_password_sent": "If an account uses {}, an email was just sent to it. The link is valid for 1 hour."
   },
   "verify_email": {
     "title_sent": "Check your emails",

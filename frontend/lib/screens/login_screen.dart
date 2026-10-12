@@ -6,6 +6,7 @@ import '../config/constants.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/validators.dart';
+import '../widgets/account_dialogs.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/google_sign_in_button.dart';
 import 'register_screen.dart';
@@ -62,6 +63,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// The email already typed is proposed. The server doesn't say whether the account exists : the message neither.
+  Future<void> _forgotPassword() async {
+    final email = await showForgotPasswordDialog(context, email: _emailController.text);
+    if (email == null || !mounted) return;
+
+    _emailController.text = email;
+    _passwordController.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('auth.forgot_password_sent'.tr(args: [email])),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 8),
+      ),
+    );
   }
 
   @override
@@ -142,7 +159,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     validator: Validators.passwordRequired,
                   ),
-                  const SizedBox(height: 24),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _forgotPassword,
+                      child: Text('auth.forgot_password'.tr()),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
 
                   // Bouton Connexion
                   CustomButton(

@@ -85,8 +85,22 @@ class FakeAuthService implements AuthService {
   @override
   Future<void> logoutAllDevices() async => loggedOutAllDevices = true;
 
+  /// Emails asked with forgotPassword
+  final forgotPasswordTo = <String>[];
+
   @override
-  Future<void> changePassword({required String currentPassword, required String newPassword}) async {}
+  Future<void> forgotPassword({required String email, required String lang}) async => forgotPasswordTo.add(email);
+
+  /// The last password set by changePassword
+  String? newPassword;
+
+  @override
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    if (currentPassword != 'good') {
+      throw ApiException(statusCode: 401, code: 'WRONG_PASSWORD', message: 'wrong');
+    }
+    this.newPassword = newPassword;
+  }
 }
 
 /// Google Sign-In without Google : hidden by default (like on Windows), [available] shows the button.

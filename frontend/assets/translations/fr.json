@@ -136,7 +136,11 @@
     "welcome_start": "Commencer",
     "session_expired": "Votre session a expiré, veuillez vous reconnecter.",
     "or": "ou",
-    "continue_with_google": "Continuer avec Google"
+    "continue_with_google": "Continuer avec Google",
+    "forgot_password": "Mot de passe oublié ?",
+    "forgot_password_title": "Mot de passe oublié",
+    "forgot_password_help": "Saisissez l'adresse email de votre compte : vous recevrez un lien pour choisir un nouveau mot de passe.",
+    "forgot_password_sent": "Si un compte utilise {}, un email vient de lui être envoyé. Le lien est valable 1 heure."
   },
   "verify_email": {
     "title_sent": "Vérifiez vos emails",
@@ -211,7 +215,11 @@
     "cancel_email_change": "Annuler le changement",
     "check_email_change": "J'ai ouvert le lien",
     "google_email": "Adresse de votre compte Google",
-    "username_saved": "Nom d'utilisateur modifié"
+    "username_saved": "Nom d'utilisateur modifié",
+    "change_password": "Changer le mot de passe",
+    "change_password_help": "Vos autres appareils seront déconnectés.",
+    "new_password": "Nouveau mot de passe",
+    "password_changed": "Mot de passe changé"
   },
   "errors": {
     "NETWORK_ERROR": "Impossible de joindre le serveur. Vérifiez votre connexion.",

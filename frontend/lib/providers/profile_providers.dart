@@ -50,7 +50,7 @@ class PhotoPicker {
 
 final photoPickerProvider = Provider<PhotoPicker>((ref) => const PhotoPicker());
 
-/// Changes the username and the email of the logged in user : the new user replaces the old one everywhere.
+/// Changes the username, the email and the password of the logged in user : the new user replaces the old one everywhere.
 final accountProvider = Provider<Account>(Account.new);
 
 class Account {
@@ -68,6 +68,10 @@ class Account {
   }
 
   Future<void> cancelEmailChange() async => _update(await _ref.read(userServiceProvider).cancelEmailChange());
+
+  /// The other devices are logged out, this one stays logged in.
+  Future<void> changePassword({required String currentPassword, required String newPassword}) =>
+      _ref.read(authServiceProvider).changePassword(currentPassword: currentPassword, newPassword: newPassword);
 
   /// After the link was opened (in the browser) : the new email is shown.
   Future<void> refresh() async => _update(await _ref.read(userServiceProvider).getMe());

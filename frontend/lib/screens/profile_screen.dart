@@ -90,6 +90,12 @@ class ProfileScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _changePassword(BuildContext context) async {
+    if (await showPasswordDialog(context) && context.mounted) {
+      _showMessage(context, 'profile.password_changed'.tr());
+    }
+  }
+
   /// The link is opened in the browser : the app asks the server for the new email.
   Future<void> _refreshEmail(BuildContext context, WidgetRef ref) async {
     try {
@@ -372,6 +378,16 @@ class ProfileScreen extends ConsumerWidget {
             if (user.pendingEmail != null) ...[
               const SizedBox(height: 12),
               _buildPendingEmail(context, ref, user.pendingEmail!),
+            ],
+            // an account created with Google has no password
+            if (user.hasPassword) ...[
+              const Divider(height: 24),
+              _buildInfoRow(
+                icon: Icons.lock,
+                label: 'password'.tr(),
+                value: '••••••••••',
+                trailing: _editButton('profile.change_password'.tr(), () => _changePassword(context)),
+              ),
             ],
             if (user.birthdate != null) ...[
               const Divider(height: 24),

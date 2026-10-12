@@ -35,6 +35,12 @@ class AuthService {
     await _api.post('${AppConstants.authEndpoint}/resend-verification', {'email': email, 'lang': lang});
   }
 
+  /// Sends a link to choose a new password, or for an account created with Google, an email telling to use Google
+  /// (the server answers the same way whether the email exists or not).
+  Future<void> forgotPassword({required String email, required String lang}) async {
+    await _api.post('${AppConstants.authEndpoint}/forgot-password', {'email': email, 'lang': lang});
+  }
+
   Future<User> login({required String email, required String password}) async {
     final response = await _api.post('${AppConstants.authEndpoint}/login', {
       'email': email,
