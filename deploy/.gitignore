@@ -1,0 +1,4 @@
+# settings with the passwords of the server
+.env
+# local copies of the backups (backup.sh)
+backups/

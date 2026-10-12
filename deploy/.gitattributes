@@ -1,0 +1,3 @@
+# run on Linux : a Windows line ending would break the scripts
+*.sh text eol=lf
+Caddyfile text eol=lf

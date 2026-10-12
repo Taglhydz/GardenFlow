@@ -1,0 +1,26 @@
+{
+	servers {
+		# Requests coming from a private address (cloudflared, another container) : the IP of the user is read
+		# from their headers. From anywhere else (VPS, directly from the internet) these headers are ignored,
+		# so nobody can choose the IP the rate limits of the API count with.
+		trusted_proxies static private_ranges
+		trusted_proxies_strict
+		client_ip_headers CF-Connecting-IP X-Forwarded-For
+	}
+}
+
+# One block per app. SITE_PREFIX (deploy/.env) :
+#   empty     -> VPS : Caddy gets the HTTPS certificate itself (ports 80 and 443 open)
+#   http://   -> server at home : Cloudflare does the HTTPS, the tunnel brings plain HTTP
+{$SITE_PREFIX}{$GARDENFLOW_DOMAIN} {
+	encode gzip
+	reverse_proxy gardenflow-api:3000 {
+		# only the IP of the user, as found above : the API trusts one proxy (TRUST_PROXY=1)
+		header_up X-Forwarded-For {client_ip}
+	}
+}
+
+# Another app, e.g. :
+# {$SITE_PREFIX}blog.example.com {
+# 	reverse_proxy blog:8080
+# }

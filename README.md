@@ -108,6 +108,10 @@ keytool -list -v -keystore C:/Users/<you>/keys/gardenflow-upload.jks -alias uplo
 
 Without `--dart-define-from-file`, the app uses the `.env` values (`localhost`). Only public values go in these files (the Google client id is not a secret) : they end up inside the app. Increase the build number (`version: 1.0.0+N` in `pubspec.yaml`) before each upload to the store.
 
+## Deployment
+
+The server (API, MySQL, HTTPS, backups) runs with Docker Compose, on a small PC at home behind a Cloudflare tunnel or on a VPS : step by step guide in [deploy/README.md](deploy/README.md).
+
 ## API
 
 All routes are prefixed with `/api`. Except `/auth/*` and `/health`, they require the header `Authorization: Bearer <token>`.

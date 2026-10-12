@@ -1,0 +1,106 @@
+# The server : Caddy (entry point, HTTPS) and MySQL are shared by all the apps, GardenFlow is one of them.
+# On a server at home, cloudflared brings the requests from Cloudflare (COMPOSE_PROFILES=tunnel).
+# Settings : deploy/.env (copy of .env.example). Guide : deploy/README.md
+name: server
+
+# the logs of the containers are kept, but limited : they would fill the disk after months
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      SITE_PREFIX: ${SITE_PREFIX:-}
+      GARDENFLOW_DOMAIN: ${GARDENFLOW_DOMAIN:?set GARDENFLOW_DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # HTTPS certificates
+      - caddy_config:/config
+    depends_on:
+      - gardenflow-api
+
+  # server at home only : outgoing connection to Cloudflare, no port to open on the box
+  cloudflared:
+    # kept up to date on purpose : Cloudflare stops supporting the versions older than one year
+    image: cloudflare/cloudflared:latest
+    profiles: [tunnel]
+    restart: unless-stopped
+    logging: *logging
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - caddy
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    logging: *logging
+    # sized for a small server (the default buffer and performance schema take several hundred MB)
+    command: --innodb-buffer-pool-size=256M --performance-schema=OFF
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in deploy/.env}
+      # created at the first start only
+      MYSQL_DATABASE: gardenflow
+      MYSQL_USER: gardenflow
+      MYSQL_PASSWORD: ${GARDENFLOW_DB_PASSWORD:?set GARDENFLOW_DB_PASSWORD in deploy/.env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # answers only once the real server is started (not the temporary one of the first start)
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    # no port published : only the containers can reach MySQL
+
+  gardenflow-api:
+    build: ../backend
+    image: gardenflow-api
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: mysql
+      DB_USER: gardenflow
+      DB_PASSWORD: ${GARDENFLOW_DB_PASSWORD}
+      DB_NAME: gardenflow
+      JWT_SECRET: ${GARDENFLOW_JWT_SECRET:?set GARDENFLOW_JWT_SECRET in deploy/.env}
+      PUBLIC_URL: https://${GARDENFLOW_DOMAIN}
+      # Caddy is the only proxy the API sees : it gives it the IP of the user (see Caddyfile)
+      TRUST_PROXY: 1
+      CORS_ORIGINS: ${GARDENFLOW_CORS_ORIGINS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    volumes:
+      - gardenflow_uploads:/data/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  caddy_data:
+  caddy_config:
+  mysql_data:
+  gardenflow_uploads:
