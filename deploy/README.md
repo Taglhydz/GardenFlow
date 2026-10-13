@@ -141,7 +141,17 @@ rclone config
 #   install rclone on your PC too, run the command it shows there, paste the result back
 ```
 
-In `.env` : `BACKUP_REMOTE=gdrive:gardenflow-backups`. Then :
+The backups contain the data of the users : they are **encrypted** before leaving the server, with a second remote of type `crypt` (Google only sees unreadable files) :
+
+```bash
+rclone config
+#   n (new remote), name : backups, storage : crypt, remote : gdrive:gardenflow-backups
+#   filename_encryption : standard, directory_name_encryption : true
+#   password : g (generate) -> keep it in your password manager, with the second one (salt) :
+#   without them, the backups can never be read again
+```
+
+In `.env` : `BACKUP_REMOTE=backups:` (the encrypted remote, not `gdrive:`). To read a backup from another machine : the same `rclone config` with the same two passwords. Then :
 
 ```bash
 bash ~/GardenFlow/deploy/backup.sh     # by hand once : "✅ Backup ..." and "✅ Copied to ..."
@@ -155,7 +165,7 @@ crontab -e                             # then add this line : every night at 3:3
 bash ~/GardenFlow/deploy/restore.sh ~/GardenFlow/deploy/backups/<date>
 ```
 
-It replaces the databases and the photos by the backup (what changed since is lost) : do it right after a backup, or on a test server. After a disaster (new machine) : steps 2 to 7 with the **same `.env`**, copy a backup back from the remote (`rclone copy gdrive:gardenflow-backups/<date> ~/restore`), then `restore.sh ~/restore`.
+It replaces the databases and the photos by the backup (what changed since is lost) : do it right after a backup, or on a test server. After a disaster (new machine) : steps 2 to 7 with the **same `.env`**, copy a backup back from the remote (`rclone copy backups:<date> ~/restore`, after the same `rclone config` as above), then `restore.sh ~/restore`.
 
 ## 11. Another app on the same server
 

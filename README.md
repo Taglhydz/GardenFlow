@@ -112,6 +112,8 @@ Without `--dart-define-from-file`, the app uses the `.env` values (`localhost`).
 
 The server (API, MySQL, HTTPS, backups) runs with Docker Compose, on a small PC at home behind a Cloudflare tunnel or on a VPS : step by step guide in [deploy/README.md](deploy/README.md).
 
+The website https://gardenflow.fr (privacy policy and account deletion page, required by the Play Store) is in [site/](site/README.md).
+
 ## API
 
 All routes are prefixed with `/api`. Except `/auth/*` and `/health`, they require the header `Authorization: Bearer <token>`.

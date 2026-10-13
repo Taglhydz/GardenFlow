@@ -1,0 +1,101 @@
+/* Pages of gardenflow.fr (privacy policy, account deletion) : same green as the app */
+:root {
+  --green: #4CAF50;
+  --green-dark: #388E3C;
+  --text: #333;
+  --muted: #616161;
+  --bg: #FAFAFA;
+  --card: #FFFFFF;
+  --line: #E0E0E0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --green: #81C784;
+    --green-dark: #A5D6A7;
+    --text: #E8E8E8;
+    --muted: #B0B0B0;
+    --bg: #121412;
+    --card: #1C1F1C;
+    --line: #333833;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 Arial, Helvetica, sans-serif;
+}
+
+header, main, footer {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 24px;
+  padding-bottom: 8px;
+}
+
+.logo {
+  color: var(--green);
+  font-size: 22px;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.lang { font-size: 14px; }
+
+main {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  margin-top: 8px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 600px) {
+  main { border-radius: 0; border-left: 0; border-right: 0; padding: 20px 16px; }
+}
+
+h1 { color: var(--green); font-size: 28px; line-height: 1.2; margin-top: 0; }
+h2 { font-size: 20px; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--line); }
+h3 { font-size: 17px; margin-bottom: 4px; }
+
+a { color: var(--green-dark); }
+
+.updated { color: var(--muted); font-size: 14px; }
+
+.box {
+  border-left: 4px solid var(--green);
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px 0;
+}
+
+ol.steps li { margin-bottom: 8px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: normal; }
+
+@media (max-width: 600px) {
+  table, tbody, tr, td { display: block; }
+  thead { display: none; }
+  tr { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  td { border: 0; padding: 2px 0; }
+  td:first-child { font-weight: bold; }
+}
+
+footer { color: var(--muted); font-size: 14px; padding-bottom: 32px; }
+footer a { color: var(--muted); }

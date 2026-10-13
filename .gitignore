@@ -127,3 +127,5 @@ backend/src/database/reset_database.sql
 # --- VSCode ---
 .vscode/
 I18N_GUIDE.md
+
+site/README.md
