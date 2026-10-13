@@ -1,5 +1,7 @@
 # GardenFlow
 
+[![CI](https://github.com/Taglhydz/GardenFlow/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/Taglhydz/GardenFlow/actions/workflows/ci.yml)
+
 GardenFlow is a mobile app designed to help gardeners efficiently plan and manage their gardens. It provides optimal planting layouts, crop associations, and seasonal advice based on garden size, plant choices, and soil conditions.
 
 ## Planned Features

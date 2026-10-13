@@ -1,0 +1,98 @@
+# Checks run by GitHub on each push and pull request to dev / main : a red cross on the commit = something is broken.
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch: # "Run workflow" button in the Actions tab
+
+# a new push cancels the checks still running for the same branch
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (migrations, tests)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: gardenflow_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: gardenflow_test
+      DB_NAME_TEST: gardenflow_test
+      # only for the tests
+      JWT_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+
+      # every migration must apply on an empty database (a new server, or a restore)
+      - name: Migrations on an empty database
+        run: |
+          npm run migrate
+          npm run migrate:status
+
+      - name: Tests
+        run: npm test
+
+  frontend:
+    name: App (analyze, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.41.5
+          cache: true
+      # .env is an asset of the app (pubspec.yaml) but is not committed : the example is enough for the tests
+      - run: cp .env.example .env
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  deploy:
+    name: Server files (Docker image, Compose)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Image of the API
+        run: docker build -t gardenflow-api backend
+      - name: docker-compose.yml is valid
+        working-directory: deploy
+        env:
+          GARDENFLOW_DOMAIN: api.example.com
+          MYSQL_ROOT_PASSWORD: x
+          GARDENFLOW_DB_PASSWORD: x
+          GARDENFLOW_JWT_SECRET: x
+        run: |
+          docker compose config --quiet
+          COMPOSE_PROFILES=tunnel docker compose config --services | grep -qx cloudflared
