@@ -1,6 +1,8 @@
 # Miscellaneous
 *.class
 *.lock
+# exact versions of the Dart packages of the app : the CI and every build must use the same ones
+!frontend/pubspec.lock
 *.log
 *.pyc
 *.swp
