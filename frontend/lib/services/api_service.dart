@@ -32,11 +32,10 @@ class ApiFieldError {
 /// Thin HTTP client : adds the token, encodes JSON and turns errors into [ApiException].
 class ApiService {
   ApiService({
-    required TokenStorage tokenStorage,
+    required this._tokenStorage,
     required this.onSessionExpired,
     http.Client? client,
-  })  : _tokenStorage = tokenStorage,
-        _client = client ?? http.Client();
+  }) : _client = client ?? http.Client();
 
   final TokenStorage _tokenStorage;
   final http.Client _client;

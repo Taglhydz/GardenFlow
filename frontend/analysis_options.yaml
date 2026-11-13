@@ -7,6 +7,20 @@
 
 # The following line activates a set of recommended lints for Flutter apps,
 # packages, and plugins designed to encourage good coding practices.
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+  errors:
+    # Flutter 3.47 deprecates package:flutter/material.dart for package:material_ui, but flutter_localizations
+    # doesn't support material_ui yet (no French for the Material widgets) : to migrate when it does.
+    # Side effect : the other deprecations are hidden too, check them with `flutter analyze` after removing this line.
+    deprecated_member_use: ignore
 include: package:flutter_lints/flutter.yaml
 
 linter:
