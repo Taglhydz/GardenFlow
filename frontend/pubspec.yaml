@@ -34,23 +34,23 @@ dependencies:
     sdk: flutter
 
   # HTTP requests
-  http: ^1.5.0
+  http: ^1.6.0
   
   # Local storage
-  shared_preferences: ^2.5.3
+  shared_preferences: ^2.5.6
   
   # Internationalization
   easy_localization: ^3.0.8
   
   # Environment variables
-  flutter_dotenv: ^6.0.0
+  flutter_dotenv: ^6.0.1
 
   # State management
-  flutter_riverpod: ^3.0.0
+  flutter_riverpod: ^3.5.0
 
   # Encrypted storage for the auth token (Keychain / Keystore)
   flutter_secure_storage: ^11.2.0
-  image_picker: ^1.2.3
+  image_picker: ^1.2.4
   flutter_svg: ^2.3.0
   http_parser: ^4.1.2
   google_sign_in: ^7.2.0
