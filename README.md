@@ -1,170 +1,91 @@
+<div align="center">
+
+<img src="frontend/assets/logo/logo.png" alt="GardenFlow logo" width="120">
+
 # GardenFlow
 
-[![CI](https://github.com/Taglhydz/GardenFlow/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/Taglhydz/GardenFlow/actions/workflows/ci.yml)
+**Plan your vegetable garden, and know what to plant where and when.**
 
-GardenFlow is a mobile app designed to help gardeners efficiently plan and manage their gardens. It provides optimal planting layouts, crop associations, and seasonal advice based on garden size, plant choices, and soil conditions.
+[Website](https://gardenflow.fr) · [Privacy](https://gardenflow.fr/privacy.html) · [Releases](https://github.com/Taglhydz/GardenFlow/releases)
 
-## Planned Features
+[![CI](https://github.com/Taglhydz/GardenFlow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Taglhydz/GardenFlow/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Taglhydz/GardenFlow?include_prereleases&color=2e7d32)](https://github.com/Taglhydz/GardenFlow/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+![Platform: Android](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
+![Languages: FR | EN](https://img.shields.io/badge/languages-FR%20%7C%20EN-orange)
 
-- Create and visualize your garden layout using custom drawings or shapes.
+![Flutter](https://img.shields.io/badge/Flutter-3.41-02569B?logo=flutter&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 
-- Select the vegetables and plants you want to grow.
+</div>
 
-- Get smart suggestions on what to plant where and when, considering garden size, soil type, and season.
+---
 
-- Discover beneficial plant associations and soil improvement recommendations.
+GardenFlow is a mobile app to draw your garden as it really is, place your crops in it, and get suggestions of what to sow or plant in each spot this month : season, soil, sunlight, companion plants and crop rotation are taken into account.
 
-- Add user authentication and profiles.
+## ✨ Features
 
-## Tech Stack
+- 🗺️ **Garden plans** : parcels and zones of any shape, drawn with your finger on a 50 cm grid, with zoom and recenter
+- 🌱 **Crops** : place a plant in a zone or in a whole parcel, and choose its color on the plans
+- 📅 **Plant catalog** : 30 vegetables and herbs with their sowing, planting and harvest calendar, and 48 good or bad companions
+- 💡 **Suggestions** : the plants that fit a zone this month, ranked by season, soil, sunlight, moisture, neighbours, crop rotation and space, each score explained
+- 👤 **Accounts** : email or Google sign-in, forgot password, profile photo or plant avatar, gardener level, log out of all devices, account deletion
+- 🌍 **French and English**
 
-- Frontend: Flutter (mobile app), Riverpod (state management), easy_localization (FR / EN)
+## 🧭 Roadmap
 
-- Backend: Express.js 5 (Node.js framework), zod (validation), JWT authentication
+- [x] Garden plans, crops, suggestions, accounts
+- [x] Server files : Docker Compose, HTTPS, encrypted backups
+- [x] Website with the privacy policy and the account deletion page
+- [ ] Server online
+- [ ] App on the Google Play Store
+- [ ] "Other" plant with a custom name, for plants missing from the catalog
+- [ ] Error tracking and uptime monitoring
+- [ ] iOS
 
-- Database: MySQL 8
+## 🏗️ Architecture
 
-## Getting started
-
-### Everyday development (Android phone over USB)
-
-With the phone plugged in (USB debugging enabled) and `API_BASE_URL=http://localhost:3000/api` in `frontend/.env` :
-
-```bash
-.\dev        # or double-click dev.cmd
+```mermaid
+flowchart LR
+  app["📱 Flutter app<br/>Riverpod, easy_localization"] -->|HTTPS| caddy["Caddy<br/>reverse proxy"]
+  caddy --> api["Express 5 API<br/>zod, JWT"]
+  api --> db[("MySQL 8.4")]
+  api -.->|emails| smtp["SMTP"]
+  app -.->|sign-in| google["Google"]
+  db -.->|nightly, encrypted| backup["☁️ Off-site backups<br/>rclone"]
 ```
 
-It forwards the phone's port 3000 to the PC (`adb reverse`), starts the backend in a new window and runs the app on the phone. No ngrok or IP address needed. Run it again after re-plugging the phone.
+| Folder | Content |
+| --- | --- |
+| [`frontend/`](frontend) | The Flutter app |
+| [`backend/`](backend) | The Express API, its migrations and tests |
+| [`deploy/`](deploy) | Docker Compose server for a home PC or a VPS, backups |
+| [`site/`](site) | The website https://gardenflow.fr |
+| [`docs/`](docs) | Development guide and API reference |
 
-### Backend
+## 🚀 Getting started
+
+With an Android phone plugged in over USB, MySQL running and `backend/.env` / `frontend/.env` filled in (copies of the `.env.example` files) :
 
 ```bash
 cd backend
 npm install
-cp .env.example .env        # then fill in DB_* and JWT_SECRET
-npm run migrate             # creates the tables and loads the plant catalog
-npm run dev                 # http://localhost:3000/api
+npm run migrate     # creates the tables and loads the plant catalog
+cd ..
+.\dev               # starts the API and runs the app on the phone
 ```
 
-| Script | Description |
+## 📚 Documentation
+
+| Guide | |
 | --- | --- |
-| `npm run dev` / `npm run prod` | Start the API (in production, refuses to start while migrations are pending) |
-| `npm run migrate` | Apply the pending migrations to `DB_NAME` |
-| `npm run migrate:status` | Show the applied and pending migrations |
-| `npm run migrate:new -- <description>` | Create the next migration file, to fill in |
-| `npm run db:baseline` | Once, for a database created before the migrations (with the old `schema.sql`) |
-| `npm run db:reset` | ⚠️ Drop all the tables of `DB_NAME` and apply all the migrations (refused in production) |
-| `npm run set-role -- <email> admin` | Give the admin role to an existing user (there is no public way to become admin) |
-| `npm test` | Integration tests on the database `DB_NAME_TEST` (⚠️ wiped on each run) |
+| [Development](docs/development.md) | Running the backend and the app, database migrations, release build, translations |
+| [API](docs/api.md) | Routes, rules of the plans, how the suggestions are computed |
+| [Deployment](deploy/README.md) | Putting the server online, step by step, with backups |
 
-#### Changing the database
+## 📄 License
 
-The database is changed only by migrations : numbered SQL files in `backend/src/database/migrations`, applied once and in order. The table `schema_migrations` remembers which ones were applied.
-
-1. `npm run migrate:new -- add password reset` creates e.g. `003_add_password_reset.sql`
-2. Write the SQL in it (`ALTER TABLE ...`, `INSERT ...`), then `npm run migrate`
-3. Commit the file with the code that uses it ; after a `git pull`, run `npm run migrate`
-
-A migration that is applied somewhere must **never be modified** (the server detects it with a checksum) : fix it with a new migration. MySQL can't roll back a `CREATE` / `ALTER TABLE` : keep each migration small, and try it on a copy of the production data before deploying.
-
-The test database must exist and be accessible by the MySQL user, for example (as root) :
-
-```sql
-CREATE DATABASE gardenflow_test;
-GRANT ALL PRIVILEGES ON gardenflow_test.* TO 'gardenuser'@'localhost';
-```
-
-### Frontend
-
-```bash
-cd frontend
-cp .env.example .env        # API_BASE_URL=http://localhost:3000/api works on a phone with .\dev (adb reverse)
-flutter pub get
-flutter run
-flutter test
-```
-
-#### Release build
-
-`frontend/.env` is the dev configuration. A release build takes its values from `frontend/config/prod.json` (not committed, copy of `config/prod.example.json`), which wins over `.env` :
-
-```json
-{
-  "API_BASE_URL": "https://api.your-domain.com/api",
-  "GOOGLE_CLIENT_ID": "<OAuth client id of type Web, same as the backend>"
-}
-```
-
-```bash
-cd frontend
-flutter build appbundle --release --dart-define-from-file=config/prod.json   # Play Store : build/app/outputs/bundle/release/app-release.aab
-flutter build apk --release --dart-define-from-file=config/prod.json         # APK to install directly
-```
-
-The release builds are signed with the upload key of the Play Store, read from `frontend/android/key.properties` (not committed, copy of `key.properties.example`). The keystore itself is kept **outside the repository** and backed up. Without `key.properties`, the build is signed with the debug key : it installs on a phone, but the Play Store refuses it.
-
-```bash
-keytool -genkeypair -v -keystore C:/Users/<you>/keys/gardenflow-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload   # once
-keytool -list -v -keystore C:/Users/<you>/keys/gardenflow-upload.jks -alias upload                                                 # SHA-1 / SHA-256 (Google sign-in)
-```
-
-Without `--dart-define-from-file`, the app uses the `.env` values (`localhost`). Only public values go in these files (the Google client id is not a secret) : they end up inside the app. Increase the build number (`version: 1.0.0+N` in `pubspec.yaml`) before each upload to the store.
-
-## Deployment
-
-The server (API, MySQL, HTTPS, backups) runs with Docker Compose, on a small PC at home behind a Cloudflare tunnel or on a VPS : step by step guide in [deploy/README.md](deploy/README.md).
-
-The website https://gardenflow.fr (privacy policy and account deletion page, required by the Play Store) is in [site/](site/README.md).
-
-## API
-
-All routes are prefixed with `/api`. Except `/auth/*` and `/health`, they require the header `Authorization: Bearer <token>`.
-
-| Route | Access |
-| --- | --- |
-| `POST /auth/register`, `POST /auth/login` | Public (rate limited) |
-| `POST /auth/forgot-password` : emails a link to a web page (`GET / POST /auth/reset-password`) to choose a new password, valid 1 hour and once | Public (rate limited) |
-| `GET / PATCH / DELETE /users/me`, `PATCH /users/me/password` | Logged in user |
-| `GET / PATCH / DELETE /users/:id`, `GET /users` | Admin |
-| `GET / POST /gardens`, `GET / PATCH / DELETE /gardens/:id` | Owner only |
-| `GET / POST /gardens/:gardenId/parcels`, `GET / PATCH / DELETE /parcels/:id` | Owner of the garden |
-| `GET / POST /parcels/:parcelId/crops`, `GET / PATCH / DELETE /crops/:id` | Owner of the garden |
-| `GET / POST /parcels/:parcelId/zones`, `GET / PATCH / DELETE /zones/:id` | Owner of the garden |
-| `GET /gardens/:gardenId/crops`, `GET /gardens/:gardenId/zones` (everything for the plans in one request) | Owner of the garden |
-| `GET /parcels/:id/suggestions?month=5`, `GET /zones/:id/suggestions?month=5` | Owner of the garden |
-| `GET /plants`, `GET /plants/:id`, `GET /plant-associations` | Logged in user |
-| `POST / PATCH / DELETE /plants`, `/plant-associations` | Admin |
-
-- The user is always taken from the token, never from the request body or URL. A resource of another user answers `404`.
-- `PATCH` only modifies the fields that are sent and returns the updated resource.
-- Deletions are real deletions : deleting a garden deletes its parcels and crops. A plant used by a crop can't be deleted (`409 RESOURCE_IN_USE`).
-- Plants are returned with their `family` and their calendar `periods` : `[{ type, start_month, end_month }]` with `type` = `sow_indoor`, `sow_outdoor`, `plant_out` or `harvest`. A plant can have several periods of the same type (spinach is sown in spring and in autumn), and a period can wrap around the year (10 -> 3).
-- Parcels and zones are free shapes : `shape` is a list of 3 to 50 points `[{ "x": 0, "y": 0 }, ...]` in meters, without crossing sides. A parcel shape is relative to its position (`pos_x`, `pos_y`) : moving a parcel only changes its position. A zone shape is relative to the position of its parcel, so the zones follow the parcel. The areas are computed from the shapes.
-- A zone must be inside its parcel and must not overlap another zone (`ZONE_OUTSIDE_PARCEL`, `ZONES_OVERLAP`). A new parcel shape that would leave a zone outside is refused (`ZONES_OUTSIDE_PARCEL`). Deleting a zone keeps its crops in the parcel (`zone_id` becomes null).
-- A crop can be placed in a zone of its parcel (`zone_id`), or in the whole parcel (`zone_id` null).
-- Errors have the format `{ "code": "EMAIL_ALREADY_USED", "message": "...", "details": [...] }`. The app translates `code` with the `errors.<code>` translation keys.
-
-## Suggestions
-
-`GET /zones/:id/suggestions?month=5` (or `/parcels/:id/suggestions` for the whole parcel) ranks the plants that can be sown or planted there that month (nothing is stored, it is computed on each request). The rules are in `backend/src/services/suggestionEngine.js` (weights in `WEIGHTS`, unit tests in `backend/tests/suggestionEngine.test.js`). Each plant starts at 50 points :
-
-| Rule | Effect |
-| --- | --- |
-| Season | can go in the ground this month : +15. Only sowing under cover this month : listed, without bonus |
-| Soil | preferred soil = parcel soil : +10, different : -5 (a `standard` soil suits everything) |
-| Sunlight / moisture | matching : bonus, not enough sun or too dry / too wet : penalty |
-| Associations | good / bad companion among the crops in the ground of the zone : +12 / -20, elsewhere in the parcel : +8 / -14, in an adjacent parcel (gap of 50 cm at most between the shapes) : +6 / -10 |
-| Crop rotation | same botanical family harvested in the zone (or in the whole parcel) less than 1 / 2 / 3 years ago : -25 / -15 / -8 |
-| Space | number of plants that fit in the zone with the spacing of the plant (info), -30 if not even one fits |
-
-Each score change comes with a reason `{ code, impact, params }`, translated in the app with `suggestion_reasons.<code>`.
-
-## Translations
-
-- Interface texts : `frontend/assets/translations/<lang>.json`, every language must have the same keys (checked by `flutter test`).
-- Plant catalog : the database stores the texts **in French** with a stable `code` (e.g. `tomato`). Other languages translate them in their JSON file (`plants.<code>.name`, `plants.<code>.description`, `plant_associations.<codeA>__<codeB>` with codes sorted alphabetically). Without a translation the French text is displayed. `npm test` checks that `en.json` translates every seeded plant.
-- Adding a language = adding a JSON file and its `Locale` in `main.dart`, no database change.
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
+GardenFlow is released under the [MIT License](LICENSE).
