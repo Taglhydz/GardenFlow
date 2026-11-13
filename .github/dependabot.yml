@@ -1,0 +1,70 @@
+# Dependabot opens pull requests on dev once a month to update the dependencies.
+# The minor and patch updates of each folder come in one pull request, each major update in its own : read its changelog before merging.
+# Merge them on GitHub only when the CI is green, then git pull on dev.
+version: 2
+updates:
+  # backend : npm packages
+  - package-ecosystem: npm
+    directory: /backend
+    target-branch: dev
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      backend-minor-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  # app : Dart / Flutter packages
+  - package-ecosystem: pub
+    directory: /frontend
+    target-branch: dev
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      app-minor-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  # actions used by the CI
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # base image of the API (node) : no major update, the LTS version is changed by hand
+  - package-ecosystem: docker
+    directory: /backend
+    target-branch: dev
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
+  # server images (Caddy, MySQL) : no major update, MySQL 8.4 is an LTS version
+  - package-ecosystem: docker-compose
+    directory: /deploy
+    target-branch: dev
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
