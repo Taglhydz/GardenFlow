@@ -116,7 +116,7 @@ docker compose exec gardenflow-api node scripts/set-role.js <your email> admin
 
 ## 8. The app
 
-In `frontend/config/prod.json` (see the main README, "Release build") : `"API_BASE_URL": "https://<GARDENFLOW_DOMAIN>/api"`, then build the app.
+In `frontend/config/prod.json` (see [docs/development.md](../docs/development.md#release-build)) : `"API_BASE_URL": "https://<GARDENFLOW_DOMAIN>/api"`, then build the app.
 
 ## 9. Updates
 

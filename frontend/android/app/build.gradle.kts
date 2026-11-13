@@ -8,7 +8,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Upload key of the Play Store : android/key.properties (not committed, see key.properties.example and the README).
+// Upload key of the Play Store : android/key.properties (not committed, see key.properties.example and docs/development.md).
 // Without it, release builds are signed with the debug key : `flutter run --release` works, the Play Store refuses them.
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
